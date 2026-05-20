@@ -15,12 +15,13 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="assets/css/soft-orb.css">
 </head>
 <body>
 
   <!-- url-bar -->
   <div class="url-bar">
-    <span class="comment">// matthewjamison.dev/epk &nbsp;·&nbsp; 2026</span>
+    <span class="comment">// matthew jamison &nbsp;·&nbsp; epk &nbsp;·&nbsp; 2026</span>
   </div>
 
   <!-- nav -->
@@ -28,9 +29,10 @@
     <a href="#catalog">catalog</a>
     <a href="#bio">bio</a>
     <a href="#live">live</a>
+    <a href="#homies">homies</a>
     <a href="#rider">rider</a>
     <a href="#press">press</a>
-    <a href="#dev-work">dev work</a>
+    <a href="#services">services</a>
     <a href="#contact">contact</a>
   </nav>
 
@@ -38,40 +40,40 @@
 
     <!-- hero -->
     <section class="hero" aria-label="hero">
-      <div class="hero-text">
-        <p class="comment">// percussionist &nbsp;·&nbsp; bassist &nbsp;·&nbsp; producer &nbsp;·&nbsp; audio engineer &nbsp;·&nbsp; developer</p>
-        <h1>matthew<br>jamison</h1>
-        <p class="tags">
-          <span>st. louis, mo</span>
-          <span class="muted">·</span>
-          <span>instrumental hip-hop</span>
-          <span class="muted">·</span>
-          <span>sp-404 a</span>
-        </p>
-        <p class="hero-blurb">
-          st. louis. beats built from the body up.<br>
-          thirty-plus releases. sp-404 a, no laptop.
-          <span class="accent">love is king.</span>
-        </p>
-        <div class="hero-links">
-          <a href="https://matthewjjamison.bandcamp.com" target="_blank" rel="noopener" class="btn">→ bandcamp</a>
-          <a href="mailto:matthewjamisonmusicinquiries@gmail.com" class="btn-ghost">→ booking</a>
+      <canvas id="soft-orb-bg" aria-hidden="true" width="1920" height="1080"></canvas>
+      <div class="hero-inner">
+        <div class="hero-text">
+          <p class="comment">// bassist &nbsp;·&nbsp; percussionist &nbsp;·&nbsp; producer &nbsp;·&nbsp; audio engineer &nbsp;·&nbsp; developer</p>
+          <h1>matthew<br>jamison</h1>
+          <p class="tags">
+            <span>st. louis, mo</span>
+            <span class="muted">·</span>
+            <span>instrumental hip-hop</span>
+            <span class="muted">·</span>
+            <span>sp-404 a</span>
+          </p>
+          <p class="hero-blurb">
+            st. louis. grew up in the church. drums first, then bass, then the sp&#8209;404 a.<br>
+            thirty-plus releases. <em>the journey</em> was real.<br>
+            session bassist. rails developer. live, no laptop.
+            <span class="accent">love is king.</span>
+          </p>
+          <div class="hero-links">
+            <a href="https://matthewjjamison.bandcamp.com" target="_blank" rel="noopener" class="btn">→ bandcamp</a>
+            <a href="mailto:matthewjamisonmusicinquiries@gmail.com" class="btn-ghost">→ booking</a>
+          </div>
         </div>
-      </div>
 
-      <div class="hero-media">
-        <video
-          id="hero-video"
-          autoplay
-          loop
-          muted
-          playsinline
-          src="assets/video/live-set.mp4"
-          aria-label="matthew jamison live sp-404 a performance"
-        ></video>
-        <div class="media-placeholder" id="hero-placeholder" aria-hidden="true">
-          <span class="comment">// live set</span>
-          <span class="muted">sp-404 a &nbsp;·&nbsp; stl</span>
+        <div class="hero-media">
+          <video
+            id="hero-video"
+            autoplay
+            loop
+            muted
+            playsinline
+            src="assets/video/hero-sp404.mp4"
+            aria-label="matthew jamison sp-404 a performance"
+          ></video>
         </div>
       </div>
     </section>
@@ -91,8 +93,8 @@
         <span class="stat-label">base</span>
       </div>
       <div class="stat">
-        <span class="stat-num">FABC</span>
-        <span class="stat-label">community</span>
+        <span class="stat-num">SIDECHAIN</span>
+        <span class="stat-label">society</span>
       </div>
     </div>
 
@@ -142,159 +144,114 @@
           <div class="tile-overlay"><span class="tile-name">perspective</span></div>
         </a>
 
-        <!-- text tiles -->
         <a class="catalog-tile" href="https://matthewjjamison.bandcamp.com/album/perspectives-pt-1" target="_blank" rel="noopener" aria-label="perspectives pt.1">
-          <div class="catalog-tile-text">
-            <span class="tile-title">perspectives pt.1</span>
-            <span class="tile-type">album</span>
-          </div>
+          <img src="https://f4.bcbits.com/img/a0612105869_10.jpg" alt="perspectives pt.1" loading="lazy">
+          <div class="tile-overlay"><span class="tile-name">perspectives pt.1</span></div>
         </a>
 
         <a class="catalog-tile" href="https://matthewjjamison.bandcamp.com/album/sp-ep-the-next-chapter" target="_blank" rel="noopener" aria-label="sp ep: the next chapter">
-          <div class="catalog-tile-text">
-            <span class="tile-title">sp ep: the next chapter</span>
-            <span class="tile-type">album</span>
-          </div>
+          <img src="https://f4.bcbits.com/img/a1993644077_10.jpg" alt="sp ep: the next chapter" loading="lazy">
+          <div class="tile-overlay"><span class="tile-name">sp ep: the next chapter</span></div>
         </a>
 
         <a class="catalog-tile" href="https://matthewjjamison.bandcamp.com/track/hallelujah" target="_blank" rel="noopener" aria-label="hallelujah">
-          <div class="catalog-tile-text">
-            <span class="tile-title">hallelujah</span>
-            <span class="tile-type">track</span>
-          </div>
+          <img src="https://f4.bcbits.com/img/a1292473870_10.jpg" alt="hallelujah" loading="lazy">
+          <div class="tile-overlay"><span class="tile-name">hallelujah</span></div>
         </a>
 
         <a class="catalog-tile" href="https://matthewjjamison.bandcamp.com/album/the-journey" target="_blank" rel="noopener" aria-label="the journey">
-          <div class="catalog-tile-text">
-            <span class="tile-title">the journey</span>
-            <span class="tile-type">album</span>
-          </div>
+          <img src="https://f4.bcbits.com/img/a1324382178_10.jpg" alt="the journey" loading="lazy">
+          <div class="tile-overlay"><span class="tile-name">the journey</span></div>
         </a>
 
         <a class="catalog-tile" href="https://matthewjjamison.bandcamp.com/album/perspective" target="_blank" rel="noopener" aria-label="perspective (original)">
-          <div class="catalog-tile-text">
-            <span class="tile-title">perspective</span>
-            <span class="tile-type">album</span>
-          </div>
+          <img src="https://f4.bcbits.com/img/a0346282979_10.jpg" alt="perspective" loading="lazy">
+          <div class="tile-overlay"><span class="tile-name">perspective</span></div>
         </a>
 
         <a class="catalog-tile" href="https://matthewjjamison.bandcamp.com/track/noh-talent" target="_blank" rel="noopener" aria-label="(noh)_talent">
-          <div class="catalog-tile-text">
-            <span class="tile-title">(noh)_talent</span>
-            <span class="tile-type">track</span>
-          </div>
+          <img src="https://f4.bcbits.com/img/a1620594798_10.jpg" alt="(noh)_talent" loading="lazy">
+          <div class="tile-overlay"><span class="tile-name">(noh)_talent</span></div>
         </a>
 
         <a class="catalog-tile" href="https://matthewjjamison.bandcamp.com/track/ball-so-hard" target="_blank" rel="noopener" aria-label="ball so hard">
-          <div class="catalog-tile-text">
-            <span class="tile-title">ball so hard</span>
-            <span class="tile-type">track</span>
-          </div>
+          <img src="https://f4.bcbits.com/img/a0206893899_10.jpg" alt="ball so hard" loading="lazy">
+          <div class="tile-overlay"><span class="tile-name">ball so hard</span></div>
         </a>
 
         <a class="catalog-tile" href="https://matthewjjamison.bandcamp.com/track/we-got-the-keys" target="_blank" rel="noopener" aria-label="we got the keys">
-          <div class="catalog-tile-text">
-            <span class="tile-title">we got the keys</span>
-            <span class="tile-type">track</span>
-          </div>
+          <img src="https://f4.bcbits.com/img/a2821977305_10.jpg" alt="we got the keys" loading="lazy">
+          <div class="tile-overlay"><span class="tile-name">we got the keys</span></div>
         </a>
 
         <a class="catalog-tile" href="https://matthewjjamison.bandcamp.com/track/bando-matthew-jamison-edit" target="_blank" rel="noopener" aria-label="bando edit">
-          <div class="catalog-tile-text">
-            <span class="tile-title">bando (edit)</span>
-            <span class="tile-type">track</span>
-          </div>
+          <img src="https://f4.bcbits.com/img/a0000051834_10.jpg" alt="bando (edit)" loading="lazy">
+          <div class="tile-overlay"><span class="tile-name">bando (edit)</span></div>
         </a>
 
         <a class="catalog-tile" href="https://matthewjjamison.bandcamp.com/album/beat-tape-2" target="_blank" rel="noopener" aria-label="beat tape #2">
-          <div class="catalog-tile-text">
-            <span class="tile-title">beat tape #2</span>
-            <span class="tile-type">album</span>
-          </div>
+          <img src="https://f4.bcbits.com/img/a2957423084_10.jpg" alt="beat tape #2" loading="lazy">
+          <div class="tile-overlay"><span class="tile-name">beat tape #2</span></div>
         </a>
 
         <a class="catalog-tile" href="https://matthewjjamison.bandcamp.com/album/beat-tape-1" target="_blank" rel="noopener" aria-label="beat tape #1">
-          <div class="catalog-tile-text">
-            <span class="tile-title">beat tape #1</span>
-            <span class="tile-type">album</span>
-          </div>
+          <img src="https://f4.bcbits.com/img/a1560038475_10.jpg" alt="beat tape #1" loading="lazy">
+          <div class="tile-overlay"><span class="tile-name">beat tape #1</span></div>
         </a>
 
         <a class="catalog-tile" href="https://matthewjjamison.bandcamp.com/track/hold-on-be-strong-matthew-jamison-edit" target="_blank" rel="noopener" aria-label="hold on be strong edit">
-          <div class="catalog-tile-text">
-            <span class="tile-title">hold on be strong (edit)</span>
-            <span class="tile-type">track</span>
-          </div>
+          <img src="https://f4.bcbits.com/img/a3992531895_10.jpg" alt="hold on be strong (edit)" loading="lazy">
+          <div class="tile-overlay"><span class="tile-name">hold on be strong (edit)</span></div>
         </a>
 
         <a class="catalog-tile" href="https://matthewjjamison.bandcamp.com/track/dangerous-by-busta-rhymes-matthew-jamison-edit" target="_blank" rel="noopener" aria-label="dangerous edit">
-          <div class="catalog-tile-text">
-            <span class="tile-title">dangerous (busta edit)</span>
-            <span class="tile-type">track</span>
-          </div>
+          <img src="https://f4.bcbits.com/img/a1435252358_10.jpg" alt="dangerous (busta edit)" loading="lazy">
+          <div class="tile-overlay"><span class="tile-name">dangerous (busta edit)</span></div>
         </a>
 
         <a class="catalog-tile" href="https://matthewjjamison.bandcamp.com/track/the-blessing" target="_blank" rel="noopener" aria-label="the blessing">
-          <div class="catalog-tile-text">
-            <span class="tile-title">the blessing</span>
-            <span class="tile-type">track</span>
-          </div>
+          <img src="https://f4.bcbits.com/img/a2245644669_10.jpg" alt="the blessing" loading="lazy">
+          <div class="tile-overlay"><span class="tile-name">the blessing</span></div>
         </a>
 
         <a class="catalog-tile" href="https://matthewjjamison.bandcamp.com/track/wedobeatschallenge-9" target="_blank" rel="noopener" aria-label="wedobeatschallenge #9">
-          <div class="catalog-tile-text">
-            <span class="tile-title">wedobeatschallenge #9</span>
-            <span class="tile-type">track</span>
-          </div>
+          <img src="https://f4.bcbits.com/img/a4132390476_10.jpg" alt="wedobeatschallenge #9" loading="lazy">
+          <div class="tile-overlay"><span class="tile-name">wedobeatschallenge #9</span></div>
         </a>
 
         <a class="catalog-tile" href="https://matthewjjamison.bandcamp.com/track/love-bounce" target="_blank" rel="noopener" aria-label="love bounce">
-          <div class="catalog-tile-text">
-            <span class="tile-title">love bounce</span>
-            <span class="tile-type">track</span>
-          </div>
+          <img src="https://f4.bcbits.com/img/a3459744734_10.jpg" alt="love bounce" loading="lazy">
+          <div class="tile-overlay"><span class="tile-name">love bounce</span></div>
         </a>
 
         <a class="catalog-tile" href="https://matthewjjamison.bandcamp.com/track/twice-matthew-jamison-edit" target="_blank" rel="noopener" aria-label="twice edit">
-          <div class="catalog-tile-text">
-            <span class="tile-title">twice (edit)</span>
-            <span class="tile-type">track</span>
-          </div>
+          <img src="https://f4.bcbits.com/img/a3760170116_10.jpg" alt="twice (edit)" loading="lazy">
+          <div class="tile-overlay"><span class="tile-name">twice (edit)</span></div>
         </a>
 
         <a class="catalog-tile" href="https://matthewjjamison.bandcamp.com/album/black-is-beautiful" target="_blank" rel="noopener" aria-label="black is beautiful">
-          <div class="catalog-tile-text">
-            <span class="tile-title">black is beautiful</span>
-            <span class="tile-type">album</span>
-          </div>
+          <img src="https://f4.bcbits.com/img/a1352156487_10.jpg" alt="black is beautiful" loading="lazy">
+          <div class="tile-overlay"><span class="tile-name">black is beautiful</span></div>
         </a>
 
         <a class="catalog-tile" href="https://matthewjjamison.bandcamp.com/track/black-vegas" target="_blank" rel="noopener" aria-label="black vegas">
-          <div class="catalog-tile-text">
-            <span class="tile-title">black vegas</span>
-            <span class="tile-type">track</span>
-          </div>
+          <img src="https://f4.bcbits.com/img/a0780556333_10.jpg" alt="black vegas" loading="lazy">
+          <div class="tile-overlay"><span class="tile-name">black vegas</span></div>
         </a>
 
         <a class="catalog-tile" href="https://matthewjjamison.bandcamp.com/album/sorbet" target="_blank" rel="noopener" aria-label="sorbet">
-          <div class="catalog-tile-text">
-            <span class="tile-title">sorbet</span>
-            <span class="tile-type">album</span>
-          </div>
+          <img src="https://f4.bcbits.com/img/a1612406287_10.jpg" alt="sorbet" loading="lazy">
+          <div class="tile-overlay"><span class="tile-name">sorbet</span></div>
         </a>
 
         <a class="catalog-tile" href="https://matthewjjamison.bandcamp.com/track/sideshow" target="_blank" rel="noopener" aria-label="sideshow">
-          <div class="catalog-tile-text">
-            <span class="tile-title">sideshow</span>
-            <span class="tile-type">track</span>
-          </div>
+          <img src="https://f4.bcbits.com/img/a1477690848_10.jpg" alt="sideshow" loading="lazy">
+          <div class="tile-overlay"><span class="tile-name">sideshow</span></div>
         </a>
 
         <a class="catalog-tile" href="https://matthewjjamison.bandcamp.com/album/new-start" target="_blank" rel="noopener" aria-label="new start">
-          <div class="catalog-tile-text">
-            <span class="tile-title">new start</span>
-            <span class="tile-type">album</span>
-          </div>
+          <img src="https://f4.bcbits.com/img/a4164201526_10.jpg" alt="new start" loading="lazy">
+          <div class="tile-overlay"><span class="tile-name">new start</span></div>
         </a>
 
       </div>
@@ -310,26 +267,30 @@
       </div>
 
       <div class="bio-content" id="bio-short" role="tabpanel">
-        matt jamison is from st. louis. he came up in church — dad was a minister — learned drums the right way, then bass, then beats. thirty-plus releases on bandcamp. plays live on the sp-404 a, no laptop. rails developer by day. session bassist for hire. ask him what sets him apart and he'll say: "when i make music, it's genuine." that's the whole thing.
+        st. louis. grew up in the church. drums first, then bass, then beats.<br>
+        thirty-plus releases on bandcamp. sp-404 a live, no laptop.<br>
+        session bassist. rails developer. <em>the journey</em> was real.<br><br>
+        "when i make music, it's genuine."
       </div>
 
       <div class="bio-content hidden" id="bio-medium" role="tabpanel">
-        matt grew up in st. louis, in the church. his dad was a minister. his cousin played the drums and matt watched — they wouldn't let him on the kit yet because the rhythm wasn't there. so he went and got the rhythm.<br><br>
-        concert band. drumline. church drummer. bass guitar. bands around the city. he came to production the long way, through the body, through years of actually playing before he ever touched a sampler.<br><br>
-        he joined sidechain society in 2020 and started matthew jamison music, llc. thirty-plus releases on bandcamp since. the catalog covers real territory — faith, family, the work of becoming.<br><br>
-        by day he's a rails developer at concordia publishing house. plays live on the sp-404 a. no laptop. when someone asked what sets him apart he said "when i make music, it's genuine" and left it at that.<br><br>
-        that's an accurate description.
+        matt grew up in st. louis at his father's church. his cousin played drums — they wouldn't let him touch the kit yet, so he went and found the rhythm anyway. concert band. drumline. bass guitar. bands around the city.<br><br>
+        in 2020 he joined sidechain society and started his llc. that same year he began learning to code.<br><br>
+        two years later: <em>the journey</em> — a 56-track autobiographical album about addiction, denial, and what it takes to actually come out the other side. not a concept album. a document.<br><br>
+        in 2024, <em>shoot the j</em> — every track title is real ruby or sql syntax. <code>validates :love, presence: true</code>. code became another language for the same questions he'd always been asking.<br><br>
+        rails developer at concordia publishing house. session bassist. mtd 6-string maple bass live. sp-404 a, no laptop.<br><br>
+        "when i make music, it's genuine."
       </div>
 
       <div class="bio-content hidden" id="bio-long" role="tabpanel">
-        if matt introduced himself he'd probably just say he makes beats and leave it at that. so let me tell you the rest.<br><br>
-        he grew up in st. louis, in the church. his dad was a minister. music wasn't something he decided to do — it was just there. his cousin played the drums and matt watched. they wouldn't let him on yet because the rhythm wasn't there on the drumset. so he went and got it. concert band. drumline. back to the church kit. then bass guitar, playing with bands around the city, building connections with musicians and producers beyond st. louis.<br><br>
-        this matters: he came to production through musicianship, not the other way around. he already knew how music felt in his body before he ever touched the sp-404 a.<br><br>
-        in 2020 he joined sidechain society and started his llc. thirty-plus releases since — beat tapes, eps, collabs. the catalog is a record of someone doing the work because the work is the point.<br><br>
-        he's also a session bassist. an audio engineer. a polyglot. a full-stack developer at concordia publishing house — rails 8, ~500k users, 77+ merged prs. his github bio: "learning how to create in a way that gives power to others." that's not copy. that's how he actually thinks about it.<br><br>
-        his faith doesn't show up in the music as a message. it shows up as something steady underneath — the same way it's steady underneath everything else. he's a husband and a dad. he's still being formed. he'd tell you that last part himself, actually. it's one of the few things he'll say out loud without prompting.<br><br>
-        he plays live on the sp-404 a. the original. a table, the machine, hands on pads. no laptop. the constraint is the point.<br><br>
-        ask him what sets him apart: "when i make music, it's genuine." and then he stops talking. because that's the whole answer.
+        matt grew up in st. louis, in the church. his dad was a minister. his cousin played the drums — they wouldn't let him on the kit yet. so he went and got the rhythm anyway. concert band. drumline. church drummer. bass guitar. bands around the city.<br><br>
+        he came to production through the body. he already knew how music felt before he ever touched the sp&#8209;404 a.<br><br>
+        in 2020 he joined sidechain society, founded matthew jamison music llc, and started learning to code. the pivot wasn't a decision to stop being a musician.<br><br>
+        in january 2022, <em>the journey</em>. fifty-six tracks. thirteen instrumentals. forty-three spoken commentary chapters — self-medication, trauma, denial, meditation, acceptance. the description: "this is a culmination of my life experiences up to this point. my goal is to highlight the human experience and notate the stages of what i have come to understand through growth."<br><br>
+        in 2024, <em>shoot the j</em>. every track title is actual ruby, rails, or sql syntax: <code>validates :love, presence: true</code>. <code>love.nil?</code>. his daughter nadi sang on "jelly asparaguys." this isn't a gimmick — it's someone who now thinks in two languages and uses both.<br><br>
+        rails developer at concordia publishing house — rails 8, ~500k users, 77+ merged prs. session bassist. mtd 6-string maple bass with looper sfx, live arranging in real time. sp-404 a, no laptop.<br><br>
+        his faith doesn't show up in the music as a message. it shows up as something steady underneath.<br><br>
+        "when i make music, it's genuine."
       </div>
     </section>
 
@@ -360,13 +321,10 @@ you gotta be quiet long enough to let it in."
         <video
           id="live-video"
           controls
+          playsinline
           src="assets/video/live-set.mp4"
           aria-label="matthew jamison live sp-404 a set"
         ></video>
-        <div class="media-placeholder" id="live-placeholder" aria-hidden="true">
-          <span class="comment">// full live set &nbsp;·&nbsp; coming soon</span>
-          <span class="muted">airdrop or yt-dlp from instagram to add video</span>
-        </div>
       </div>
 
       <p class="video-caption">
@@ -377,42 +335,58 @@ you gotta be quiet long enough to let it in."
         <span>st. louis, mo</span>
       </p>
 
+      <p class="section-note comment">// also live: mtd 6-string maple bass + looper sfx pedal &nbsp;·&nbsp; real-time arranging</p>
       <p class="section-note comment">// follow <a href="https://www.instagram.com/matthewjamisonmusic/" target="_blank" rel="noopener">@matthewjamisonmusic</a> for performance footage</p>
     </section>
 
-    <!-- dev-work -->
-    <section id="dev-work" class="section" aria-label="development work">
-      <p class="section-label comment">// also &nbsp;·&nbsp; if you need a developer</p>
-      <div class="dev-body">matthew is a full-stack developer
-at concordia publishing house —
-the publishing arm of the lutheran church-missouri synod,
-one of the largest protestant publishers in the united states.
+    <!-- with the homies -->
+    <section id="homies" class="section" aria-label="with the homies">
+      <p class="section-label comment">// with the homies</p>
 
-rails 8 &nbsp;·&nbsp; ~500k users &nbsp;·&nbsp; 77+ merged prs
-stack: ruby on rails &nbsp;·&nbsp; rust &nbsp;·&nbsp; hugo &nbsp;·&nbsp; shopify
+      <div class="live-video-wrap">
+        <video
+          id="homies-video"
+          controls
+          playsinline
+          src="assets/video/midwest-sidechain.mp4"
+          aria-label="making beats with the homies — mtd bass, sp-404 a, sidechain society"
+        ></video>
+      </div>
 
-right tool, right job.
+      <p class="video-caption">
+        <!-- MATTHEW: add your caption for this video -->
+        <span>sp-404 a</span>
+        <span class="muted">·</span>
+        <span>mtd bass</span>
+        <span class="muted">·</span>
+        <span>sidechain society</span>
+      </p>
+    </section>
 
-available for:
-<span class="arrow">→</span> rails / ruby projects
-<span class="arrow">→</span> fixing vibe-coded slop that shipped too fast
-<span class="arrow">→</span> greenfield builds that need to actually work
-<span class="arrow">→</span> consulting &nbsp;·&nbsp; architecture review &nbsp;·&nbsp; code cleanup
+    <!-- services -->
+    <section id="services" class="section" aria-label="services">
+      <p class="section-label comment">// services</p>
+      <div class="dev-body">need a website? i got you.
+<span class="arrow">→</span> $500 — domain (1 year) &nbsp;·&nbsp; full build &nbsp;·&nbsp; seo + aeo included
+<span class="arrow">→</span> consulting: $100 / hr
+<span class="arrow">→</span> hire me to build — consulting hours come off the total
 
-also available:
-<span class="arrow">→</span> session bass (up to 4 tracks)
+session bass
+<span class="arrow">→</span> $350 — full session (4 songs, 3–5 min each)
+<span class="arrow">→</span> $100 — single bass line (up to 7 min)
+<span class="arrow">→</span> songs over length are charged extra
 
-not available for: building something you can't maintain.
-he'll make sure you can.
+live: mtd 6-string maple bass + looper sfx pedal
+<span class="arrow">→</span> real-time arranging
+<span class="arrow">→</span> available alongside sp-404 a sets or standalone
 
-inquiry &nbsp;&nbsp;<span class="arrow">→</span> <a href="mailto:matthewjamisonmusicinquiries@gmail.com">matthewjamisonmusicinquiries@gmail.com</a>
-portfolio <span class="arrow">→</span> <a href="https://matthewjamison.dev" target="_blank" rel="noopener">matthewjamison.dev</a>
+inquiry <span class="arrow">→</span> <a href="mailto:matthewjamisonmusicinquiries@gmail.com">matthewjamisonmusicinquiries@gmail.com</a>
 github &nbsp;&nbsp;&nbsp;<span class="arrow">→</span> <a href="https://github.com/MatthewJamisonJS" target="_blank" rel="noopener">MatthewJamisonJS</a></div>
     </section>
 
     <!-- rider -->
     <section id="rider" class="section" aria-label="gear and tech rider">
-      <p class="section-label comment">// gear + rider &nbsp;·&nbsp; sp-404 mkii</p>
+      <p class="section-label comment">// gear + rider &nbsp;·&nbsp; sp-404 a</p>
       <div class="rider-grid">
         <div class="rider-col">
           <h3>input list</h3>
@@ -420,6 +394,7 @@ github &nbsp;&nbsp;&nbsp;<span class="arrow">→</span> <a href="https://github.
             <li>2× ¼" ts outputs from sp-404 a stereo main outs (l + r — no mono summing)</li>
             <li>1× monitor wedge or iem — stereo mix of sp-404 a output</li>
             <li>1× standard power outlet at table (sp-404 a can also run on batteries as backup)</li>
+            <li>if bass set: 1× di box or ¼" bass input &nbsp;·&nbsp; 1× monitor for bass mix — confirm at booking</li>
           </ul>
         </div>
         <div class="rider-col">
@@ -437,6 +412,8 @@ github &nbsp;&nbsp;&nbsp;<span class="arrow">→</span> <a href="https://github.
             <li>no laptop</li>
             <li>no mixer or interface needed from venue</li>
             <li>the machine is the stage plot</li>
+            <li>mtd 6-string maple bass (available — confirm at booking)</li>
+            <li>looper sfx pedal (when bass is part of the set)</li>
           </ul>
         </div>
         <div class="rider-col">
@@ -485,10 +462,6 @@ github &nbsp;&nbsp;&nbsp;<span class="arrow">→</span> <a href="https://github.
           <span class="contact-value"><a href="https://www.instagram.com/matthewjamisonmusic/" target="_blank" rel="noopener">@matthewjamisonmusic</a></span>
         </div>
         <div class="contact-row">
-          <span class="contact-label">portfolio</span>
-          <span class="contact-value"><a href="https://matthewjamison.dev" target="_blank" rel="noopener">matthewjamison.dev</a></span>
-        </div>
-        <div class="contact-row">
           <span class="contact-label">github</span>
           <span class="contact-value"><a href="https://github.com/MatthewJamisonJS" target="_blank" rel="noopener">MatthewJamisonJS</a></span>
         </div>
@@ -518,13 +491,13 @@ github &nbsp;&nbsp;&nbsp;<span class="arrow">→</span> <a href="https://github.
     <div class="footer-links">
       <a href="https://matthewjjamison.bandcamp.com" target="_blank" rel="noopener">bandcamp</a>
       <a href="https://www.instagram.com/matthewjamisonmusic/" target="_blank" rel="noopener">instagram</a>
-      <a href="https://matthewjamison.dev" target="_blank" rel="noopener">matthewjamison.dev</a>
       <a href="https://github.com/MatthewJamisonJS" target="_blank" rel="noopener">github</a>
       <a href="https://matthewjamisonwwjd.substack.com" target="_blank" rel="noopener">substack</a>
     </div>
-    <p class="footer-copy">matthewjamison.dev/epk &nbsp;·&nbsp; 2026</p>
+    <p class="footer-copy">matthew jamison &nbsp;·&nbsp; epk &nbsp;·&nbsp; 2026</p>
   </footer>
 
   <script src="script.js"></script>
+  <script defer src="assets/js/soft-orb.js"></script>
 </body>
 </html>

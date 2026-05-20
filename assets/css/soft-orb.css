@@ -1,0 +1,25 @@
+/* ============================================================
+   Soft Orb interactive shader — EPK build
+   Canvas sits at z-index:0, hero-inner sits at z-index:1.
+   Hero is full-bleed so orb covers full viewport width.
+   Colors adapted to EPK purple palette.
+   ============================================================ */
+
+#soft-orb-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: 0;
+  pointer-events: none;
+  /* CSS fallback — visible until WebGL paints */
+  background:
+    radial-gradient(55% 75% at 32% 44%, rgba(96, 6, 117, 0.70), transparent 65%),
+    radial-gradient(65% 85% at 72% 62%, rgba(139, 31, 168, 0.55), transparent 65%),
+    #0a0a0a;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #soft-orb-bg { display: none; }
+}
