@@ -1,3 +1,5 @@
 .DS_Store
 .firecrawl/
 .claude/
+.wrangler/
+node_modules/
