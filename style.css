@@ -86,7 +86,7 @@ a:hover { color: var(--mj-accent-bright); }
   z-index: 1;
 }
 
-.hero-text .comment { font-size: 11px; margin-bottom: 20px; letter-spacing: 0.05em; }
+.hero-text .comment { font-size: 11px; margin-bottom: 20px; letter-spacing: 0.05em; overflow-wrap: break-word; }
 
 .hero-text h1 {
   font-size: clamp(30px, 5vw, 54px);
@@ -229,6 +229,7 @@ a:hover { color: var(--mj-accent-bright); }
   font-size: 11px;
   letter-spacing: 0.05em;
   margin-bottom: 32px;
+  overflow-wrap: break-word;
 }
 
 /* ── catalog ─────────────────────────────────── */
@@ -406,6 +407,7 @@ a:hover { color: var(--mj-accent-bright); }
   color: var(--text-muted);
   max-width: 640px;
   white-space: pre-line;
+  overflow-wrap: break-word;
 }
 
 .dev-body .arrow { color: var(--mj-accent-bright); }
@@ -497,7 +499,7 @@ a:hover { color: var(--mj-accent-bright); }
 }
 
 .contact-label { font-size: 10px; color: var(--text-muted); letter-spacing: 0.1em; }
-.contact-value { font-size: 12px; color: var(--text); }
+.contact-value { font-size: 12px; color: var(--text); overflow-wrap: break-word; word-break: break-all; }
 .contact-value a { color: var(--mj-accent-bright); }
 .contact-value a:hover { text-decoration: underline; }
 
@@ -560,4 +562,5 @@ a:hover { color: var(--mj-accent-bright); }
   .nav a { padding: 12px 10px; font-size: 10px; }
   .url-bar { padding: 8px 16px; }
   .hero-text h1 { font-size: 28px; }
+  .contact-row { grid-template-columns: 1fr; gap: 4px; }
 }
