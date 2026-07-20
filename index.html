@@ -15,9 +15,12 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="assets/css/soft-orb.css">
 </head>
 <body>
+
+  <!-- page-wide orb background + pointer glow -->
+  <div class="page-orb" aria-hidden="true"></div>
+  <div class="page-glow" id="page-glow" aria-hidden="true"></div>
 
   <!-- url-bar -->
   <div class="url-bar">
@@ -28,8 +31,7 @@
   <nav class="nav" aria-label="main navigation">
     <a href="#catalog">catalog</a>
     <a href="#bio">bio</a>
-    <a href="#live">live</a>
-    <a href="#homies">homies</a>
+    <a href="#watch">watch</a>
     <a href="#rider">rider</a>
     <a href="#press">press</a>
     <a href="#services">services</a>
@@ -40,39 +42,33 @@
 
     <!-- hero -->
     <section class="hero" aria-label="hero">
-      <canvas id="soft-orb-bg" aria-hidden="true" width="1920" height="1080"></canvas>
+      <video
+        class="hero-bg-video"
+        autoplay
+        loop
+        muted
+        playsinline
+        src="assets/video/hero-sp404.mp4"
+        aria-hidden="true"
+      ></video>
+      <div class="hero-tint" aria-hidden="true"></div>
       <div class="hero-inner">
-        <div class="hero-text">
-          <h1>matthew<br>jamison</h1>
-          <p class="tags">
-            <span>st. louis, mo</span>
-            <span class="muted">·</span>
-            <span>instrumental hip-hop</span>
-            <span class="muted">·</span>
-            <span>sp-404 a</span>
-          </p>
-          <p class="hero-blurb">
-            St. Louis. Grew up in the church. Drums first, then bass, then the SP&#8209;404 A.<br>
-            Thirty-plus releases. <em>The Journey</em> was real.<br>
-            Session bassist. Rails developer. Live, no laptop.
-            <span class="accent">peace and long life to you and yours🖖🏿🤎</span>
-          </p>
-          <div class="hero-links">
-            <a href="https://matthewjjamison.bandcamp.com" target="_blank" rel="noopener" class="btn">→ bandcamp</a>
-            <a href="mailto:matthewjamisonmusicinquiries@gmail.com" class="btn-ghost">→ booking</a>
-          </div>
+        <h1>matthew jamison</h1>
+        <p class="tags">
+          <span>st. louis, mo</span>
+          <span class="muted">·</span>
+          <span>instrumental hip-hop</span>
+          <span class="muted">·</span>
+          <span>sp-404 a</span>
+        </p>
+        <div class="mantra">
+          <p class="comment">// a vessel</p>
+          <p>grateful for expression</p>
+          <p>healing-state</p>
         </div>
-
-        <div class="hero-media">
-          <video
-            id="hero-video"
-            autoplay
-            loop
-            muted
-            playsinline
-            src="assets/video/hero-sp404.mp4"
-            aria-label="matthew jamison sp-404 a performance"
-          ></video>
+        <div class="hero-links">
+          <a href="https://matthewjjamison.bandcamp.com" target="_blank" rel="noopener" class="btn">→ bandcamp</a>
+          <a href="mailto:matthewjamisonmusicinquiries@gmail.com" class="btn-ghost">→ booking</a>
         </div>
       </div>
     </section>
@@ -90,10 +86,6 @@
       <div class="stat">
         <span class="stat-num">STL</span>
         <span class="stat-label">base</span>
-      </div>
-      <div class="stat">
-        <span class="stat-num">SIDECHAIN</span>
-        <span class="stat-label">society</span>
       </div>
     </div>
 
@@ -254,6 +246,9 @@
         </a>
 
       </div>
+      <div class="catalog-more">
+        <button type="button" id="catalog-more-btn" aria-expanded="false">→ full catalog &nbsp;·&nbsp; 30 releases</button>
+      </div>
     </section>
 
     <!-- bio -->
@@ -266,31 +261,27 @@
       </div>
 
       <div class="bio-content" id="bio-short" role="tabpanel">
-        St. Louis. Grew up in the church. Drums first, then bass, then beats.<br>
-        Thirty-plus releases on Bandcamp. SP-404 A live, no laptop.<br>
-        Session bassist. LaunchCode 2022 → Rails developer. <em>The Journey</em> was real.<br><br>
+        St. Louis. I grew up in the church; bongos &amp; auxiliary percussion at Ezekiel Temple, then drums, then bass, then the SP&#8209;404 A.<br>
+        The music is how I mark time — thirty releases, each one a timestamp of where I was, because I can forget.<br>
+        Session bass on an MTD 6-string. Rails by day. Live, no laptop, no undo.<br>
+        I'm not who I am without the gift of faith I was bestowed or without Berneshia &amp; my daughters.<br><br>
         "when i make music, it's genuine."
       </div>
 
       <div class="bio-content hidden" id="bio-medium" role="tabpanel">
-        Matt grew up in St. Louis at his father's church. His cousin played drums; they wouldn't let him touch the kit yet, so he went and found the rhythm anyway. Concert band. Drumline. Bass guitar. Bands around the city.<br><br>
-        In 2020 he joined Sidechain Society and started his LLC. In 2022 he began learning to code through LaunchCode.<br><br>
-        Two years later: <em>the journey</em>. A 56-track autobiographical album about addiction, denial, and what it takes to actually come out the other side. Not a concept album. A document.<br><br>
-        In 2024, <em>shoot the j</em>. Every track title is real Ruby or SQL syntax. <code>validates :love, presence: true</code>. Code became another language for the same questions he'd always been asking.<br><br>
-        Rails developer at Concordia Publishing House. 229 merged PRs &nbsp;·&nbsp; still counting. Open-source patches landed in warp and ref-tools-mcp; a codecarbon PR is in review. Session bassist on MTD 6-string maple bass. SP-404 A, no laptop.<br><br>
-        Home is the first calling. Wife Berneshia ministers at Refresh Community Church; their daughters Zoe and Nadia are around. Recent seasons have been heavy at home, and home gets answered first. He's writing through it at <em>still processing</em>.<br><br>
+        I grew up in St. Louis, in the church. My dad, Minister Wells W. Jamison, served at Ezekiel Temple C.O.G.I.C. They didn't let me play drums often there; they let me play bongos &amp; auxiliary percussion, and that was a blessing. Concert band, drumline, bass guitar, bands around the city. I knew how music felt long before I touched an SP&#8209;404 A.<br><br>
+        The music is how I mark time. <em>the journey</em> (2022), <em>shoot the j</em> (2024, every track title real Ruby or SQL), and the releases between them are timestamps — expressions along the way, because I can forget.<br><br>
+        In 2020 I joined Sidechain Society and started my LLC. In 2022 I learned to code through LaunchCode; now I build Rails apps at Concordia Publishing House. On stage it's the SP-404 A with no laptop, or an MTD 6-string with a looper, arranging in real time.<br><br>
+        Home answers first. Berneshia, God's daughter &amp; my best friend, ministers at Refresh Community Church; our girls are 17 &amp; 10, and they're sweeties! I'm not who I am without the gift of faith I was bestowed or without them.<br><br>
         "when i make music, it's genuine."
       </div>
 
       <div class="bio-content hidden" id="bio-long" role="tabpanel">
-        Matt grew up in St. Louis, in the church. His dad, Minister Wells W. Jamison, is one of the reasons Matt's relationship to music and faith is the same relationship. His cousin played the drums and wouldn't let him on the kit yet, so he went and got the rhythm anyway. Concert band. Drumline. Church drummer. Bass guitar. Bands around the city.<br><br>
-        He came to production through the body. He already knew how music felt before he ever touched the SP&#8209;404 A.<br><br>
-        In 2020 he joined Sidechain Society and founded Matthew Jamison Music LLC. In 2022 he started learning to code through LaunchCode. The pivot wasn't a decision to stop being a musician.<br><br>
-        In January 2022, <em>the journey</em>. Fifty-six tracks. Thirteen instrumentals. Forty-three spoken commentary chapters covering self-medication, trauma, denial, meditation, acceptance. The description: "this is a culmination of my life experiences up to this point. my goal is to highlight the human experience and notate the stages of what i have come to understand through growth."<br><br>
-        In 2024, <em>shoot the j</em>. Every track title is actual Ruby, Rails, or SQL syntax: <code>validates :love, presence: true</code>. <code>love.nil?</code>. His daughter Nadi sang on "jelly asparaguys." This isn't a gimmick. It's someone who now thinks in two languages and uses both.<br><br>
-        Rails developer at Concordia Publishing House. Rails 8, roughly 500k users, 229 merged PRs &nbsp;·&nbsp; still counting. Open-source patches landed in warp and ref-tools-mcp; a codecarbon PR is in review. Matt won't bring those up himself. Live: MTD 6-string maple bass with looper sfx, real-time arranging. SP-404 A, no laptop.<br><br>
-        Home is the first calling. His wife Berneshia ministers at Refresh Community Church — Frog and Toad, eleven years in. Their daughters Zoe and Nadia are around. Recent seasons have been heavy at home, and home gets answered first. He's writing through it at <em>still processing</em>. Everything else lines up behind that.<br><br>
-        His faith doesn't show up in the music as a message. It shows up as something steady underneath.<br><br>
+        I grew up in St. Louis, in the church. My dad, Minister Wells W. Jamison, served at Ezekiel Temple C.O.G.I.C., and he's one of the reasons my relationship to music and my relationship to faith are the same relationship. They didn't let me play drums often at Ezekiel Temple; I didn't have the syncopation yet to hold down a rhythm section. They let me play bongos &amp; auxiliary percussion, and that was a blessing. Concert band. Drumline. Bass guitar. Bands around the city. I already knew how music felt before I ever touched the SP&#8209;404 A.<br><br>
+        The music is how I mark time. Thirty releases on Bandcamp — timestamps, expressions along the way, because I can forget. <em>the journey</em> (January 2022) is fifty-six tracks of exactly that. <em>shoot the j</em> (2024) came after I learned to code: every track title is actual Ruby, Rails, or SQL syntax. <code>validates :love, presence: true</code>. <code>love.nil?</code>. My daughter Nadi sang on "jelly asparaguys."<br><br>
+        The résumé stuff: Sidechain Society since 2020. LaunchCode in 2022. Rails developer at Concordia Publishing House, 229 merged PRs. Session bass on an MTD 6-string maple with a looper pedal, arranging in real time. On stage there's no laptop and no undo; you make the call and live with it.<br><br>
+        Home is the first calling. Berneshia, God's daughter &amp; my best friend, ministers at Refresh Community Church. Our daughters are 17 &amp; 10, and they're sweeties!<br><br>
+        I'm not who I am without the gift of faith I was bestowed or without Berneshia &amp; my daughters. The faith doesn't show up in the music as a message. It shows up as something steady underneath.<br><br>
         "when i make music, it's genuine."
       </div>
     </section>
@@ -309,53 +300,48 @@ That's the whole workflow.
 <span class="comment">// still being formed.</span></p>
     </section>
 
-    <!-- live -->
-    <section id="live" class="section" aria-label="live performance">
-      <p class="section-label comment">// live &nbsp;·&nbsp; sp-404 a</p>
+    <!-- watch: live + with the homies -->
+    <section id="watch" class="section" aria-label="watch — live performance and sessions">
+      <p class="section-label comment">// watch &nbsp;·&nbsp; sp-404 a &nbsp;·&nbsp; mtd bass</p>
 
-      <div class="live-video-wrap">
-        <video
-          id="live-video"
-          controls
-          playsinline
-          src="assets/video/live-set.mp4"
-          aria-label="matthew jamison live sp-404 a set"
-        ></video>
+      <div class="watch-grid">
+        <div class="watch-cell">
+          <video
+            id="live-video"
+            controls
+            playsinline
+            preload="metadata"
+            src="assets/video/live-set.mp4"
+            aria-label="matthew jamison live sp-404 a set"
+          ></video>
+          <p class="video-caption">
+            <span>sp-404 a</span>
+            <span class="muted">·</span>
+            <span>continuous live set</span>
+            <span class="muted">·</span>
+            <span>st. louis, mo</span>
+          </p>
+        </div>
+        <div class="watch-cell">
+          <video
+            id="homies-video"
+            controls
+            playsinline
+            preload="metadata"
+            src="assets/video/midwest-sidechain.mp4"
+            aria-label="making beats with the homies — mtd bass, sp-404 a, sidechain society"
+          ></video>
+          <p class="video-caption">
+            <span>sp-404 a</span>
+            <span class="muted">·</span>
+            <span>mtd bass</span>
+            <span class="muted">·</span>
+            <span>sidechain society</span>
+          </p>
+        </div>
       </div>
-
-      <p class="video-caption">
-        <span>sp-404 a</span>
-        <span class="muted">·</span>
-        <span>continuous live set</span>
-        <span class="muted">·</span>
-        <span>st. louis, mo</span>
-      </p>
 
       <p class="section-note comment">// also live: mtd 6-string maple bass + looper sfx pedal &nbsp;·&nbsp; real-time arranging</p>
-    </section>
-
-    <!-- with the homies -->
-    <section id="homies" class="section" aria-label="with the homies">
-      <p class="section-label comment">// with the homies</p>
-
-      <div class="live-video-wrap">
-        <video
-          id="homies-video"
-          controls
-          playsinline
-          src="assets/video/midwest-sidechain.mp4"
-          aria-label="making beats with the homies — mtd bass, sp-404 a, sidechain society"
-        ></video>
-      </div>
-
-      <p class="video-caption">
-        <!-- MATTHEW: add your caption for this video -->
-        <span>sp-404 a</span>
-        <span class="muted">·</span>
-        <span>mtd bass</span>
-        <span class="muted">·</span>
-        <span>sidechain society</span>
-      </p>
     </section>
 
     <!-- services -->
@@ -497,6 +483,5 @@ github &nbsp;&nbsp;&nbsp;<span class="arrow">→</span> <a href="https://github.
   </footer>
 
   <script src="script.js"></script>
-  <script defer src="assets/js/soft-orb.js"></script>
 </body>
 </html>
