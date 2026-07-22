@@ -1,0 +1,20 @@
+name: dependabot auto-merge
+
+on: pull_request
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      # --auto waits for required checks when branch protection exists;
+      # without protection it errors, so fall back to a direct squash merge
+      - name: merge dependabot pr
+        run: gh pr merge --squash --auto "$PR_URL" || gh pr merge --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
