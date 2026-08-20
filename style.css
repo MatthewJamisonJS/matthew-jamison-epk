@@ -8,8 +8,18 @@
   --bg: #0a0a0a;
   --surface: rgba(17, 17, 17, 0.8);
   --surface-2: rgba(22, 22, 22, 0.8);
-  --glass: rgba(10, 10, 10, 0.68); /* tempered-glass tint — dark enough for AA over the orb */
-  --glass-blur: 16px;
+  --glass: rgba(10, 10, 10, 0.34);  /* panel shell — thin, stars read through it */
+  --glass-blur: 20px;
+  --plate: rgba(10, 10, 10, 0.92);  /* copy plate — AA over a lit star */
+  --plate-edge: rgba(255, 255, 255, 0.05);
+  /* gloss: one soft highlight down from the plate's top edge. Kept faint —
+     at 0.055 the highlight itself pushed muted copy under 4.5:1. */
+  --plate-gloss: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.032) 0%,
+    rgba(255, 255, 255, 0.010) 38%,
+    rgba(255, 255, 255, 0) 64%
+  );
   --text: #e8e8e8;
   --text-muted: #8f8f8f; /* AA 4.5:1 on dark bg */
   --border: rgba(255,255,255,0.08);
@@ -38,23 +48,31 @@ a:hover { color: var(--mj-accent-bright); }
 
 :focus-visible { outline: 2px solid var(--mj-accent-bright); outline-offset: 2px; }
 
-/* ── page-wide orb + pointer glow ────────────── */
+/* ── page background: starfield over orb fallback, + pointer glow ─── */
+/* .page-orb is the fallback layer: it shows before starfield.js upgrades the
+   <star-field> element, and stays visible if the script never loads. */
 .page-orb {
   position: fixed;
   inset: -20%;
-  z-index: 0;
+  z-index: -1;
   pointer-events: none;
   background:
     radial-gradient(45% 55% at 28% 30%, rgba(96, 6, 117, 0.60), transparent 65%),
     radial-gradient(50% 65% at 74% 64%, rgba(139, 31, 168, 0.42), transparent 65%),
     radial-gradient(35% 45% at 55% 90%, rgba(96, 6, 117, 0.35), transparent 70%),
     #0a0a0a;
-  animation: orb-drift 40s ease-in-out infinite alternate;
 }
 
-@keyframes orb-drift {
-  from { transform: translate(0, 0) scale(1); }
-  to   { transform: translate(2.5%, -2.5%) scale(1.06); }
+/* pixel starfield — paints opaque over the fallback. No background here, so the
+   orb gradient covers the gap before the first canvas frame. `contain: strict`
+   keeps the canvas from ever invalidating page layout. */
+star-field {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  pointer-events: none;
+  contain: strict;
 }
 
 .page-glow {
@@ -71,12 +89,53 @@ a:hover { color: var(--mj-accent-bright); }
   background: radial-gradient(circle, rgba(139, 31, 168, 0.30), rgba(96, 6, 117, 0.12) 45%, transparent 70%);
 }
 
-/* content sits above the orb */
+/* content sits above the background layers */
 .url-bar, main, .footer { position: relative; z-index: 1; }
 
+/* ── copy plates ─────────────────────────────── */
+/* the panels are nearly transparent, so every block of running copy carries its
+   own glossed plate: readable, and visibly sitting *in* the starfield. */
+.bio-content,
+.process-text,
+.dev-body,
+.rider-col,
+.press-item,
+.contact-grid,
+.video-caption,
+.press-slots {
+  background: var(--plate-gloss), var(--plate);
+  border: 1px solid var(--plate-edge);
+  padding: 20px 22px;
+}
+
+/* Plates that cap their measure sit centred on the card's axis. Grid-item
+   plates are excluded on purpose: auto inline margins stop a grid item from
+   stretching, which left the rider columns at ragged content widths. */
+.bio-content,
+.process-text,
+.dev-body,
+.contact-grid { margin-inline: auto; }
+
+.rider-col { justify-self: stretch; }
+
+/* the card's own copy is centred on the card's axis, like the hero mantra */
+.section-label,
+.section-note,
+.bio-content,
+.process-text,
+.dev-body,
+.catalog-more,
+.press-item { text-align: center; }
+
+.video-caption { justify-content: center; }
+
+.bio-tabs { justify-content: center; }
+
 /* ── url-bar ─────────────────────────────────── */
+/* url-bar and nav align their first glyph to the section content edge:
+   (viewport - max-w) / 2 + section padding, with a small-screen floor. */
 .url-bar {
-  padding: 9px 32px;
+  padding: 9px max(36px, calc((100% - var(--max-w)) / 2 + 32px));
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   font-size: 11px;
@@ -90,7 +149,7 @@ a:hover { color: var(--mj-accent-bright); }
   top: 0;
   z-index: 100;
   display: flex;
-  padding: 0 24px;
+  padding: 0 max(22px, calc((100% - var(--max-w)) / 2 + 18px));
   background: rgba(10,10,10,0.82);
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
@@ -100,6 +159,14 @@ a:hover { color: var(--mj-accent-bright); }
 }
 
 .nav::-webkit-scrollbar { display: none; }
+
+/* the trailing fade only appears when the strip actually overflows */
+@media (max-width: 640px) {
+  .nav {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+  }
+}
 
 .nav a {
   display: block;
@@ -131,19 +198,26 @@ a:hover { color: var(--mj-accent-bright); }
   height: 100%;
   object-fit: cover;
   object-position: center 40%;
-  filter: brightness(0.38) saturate(1.15);
+  filter: brightness(0.46) saturate(1.15);
   z-index: 0;
 }
 
-.hero-tint {
+/* neutral scrim: the video peaks near white, which drops the mantra and the
+   tags row below AA. Dark through the middle where the copy sits, lighter at
+   the edges so the frame still reads. */
+.hero::after {
+  content: "";
   position: absolute;
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  mix-blend-mode: screen;
-  background:
-    radial-gradient(55% 75% at 32% 44%, rgba(96, 6, 117, 0.45), transparent 65%),
-    radial-gradient(65% 85% at 72% 62%, rgba(139, 31, 168, 0.32), transparent 65%);
+  background: linear-gradient(
+    to bottom,
+    rgba(10, 10, 10, 0.26) 0%,
+    rgba(10, 10, 10, 0.62) 34%,
+    rgba(10, 10, 10, 0.64) 70%,
+    rgba(10, 10, 10, 0.32) 100%
+  );
 }
 
 .hero-inner {
@@ -168,8 +242,10 @@ a:hover { color: var(--mj-accent-bright); }
   gap: 8px;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
-  color: var(--text-muted);
+  font-size: 13px;
+  /* full-strength text, not muted: this row sits over a lit video frame, and
+     muted grey there measures ~2:1 against the brightest parts of it */
+  color: var(--text);
   margin-bottom: 34px;
   letter-spacing: 0.04em;
 }
@@ -230,9 +306,12 @@ a:hover { color: var(--mj-accent-bright); }
 .stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  border-top: 1px solid var(--mj-accent-border);
-  border-bottom: 1px solid var(--mj-accent-border);
-  background: var(--glass);
+  border-top: 1px solid rgba(255, 255, 255, 0.11);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.11);
+  background:
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0) 70px),
+    var(--glass);
+  box-shadow: 0 24px 56px -30px rgba(0, 0, 0, 0.92);
   -webkit-backdrop-filter: blur(var(--glass-blur));
   backdrop-filter: blur(var(--glass-blur));
 }
@@ -243,6 +322,7 @@ a:hover { color: var(--mj-accent-bright); }
   align-items: center;
   justify-content: center;
   padding: 36px 16px;
+  background: var(--plate-gloss), var(--plate);
   border-right: 1px solid var(--mj-accent-border);
 }
 
@@ -268,10 +348,15 @@ a:hover { color: var(--mj-accent-bright); }
   max-width: var(--max-w);
   margin: 28px auto;
   padding: 56px 32px;
-  background: var(--glass);
+  background:
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0) 140px),
+    var(--glass);
   -webkit-backdrop-filter: blur(var(--glass-blur));
   backdrop-filter: blur(var(--glass-blur));
-  border: 1px solid var(--border);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 28px 64px -28px rgba(0, 0, 0, 0.92);
   transition: border-color 0.3s;
 }
 
@@ -307,16 +392,18 @@ a:hover { color: var(--mj-accent-bright); }
 }
 
 .section-label {
-  font-size: 11px;
+  font-size: 13px;
   letter-spacing: 0.05em;
   margin-bottom: 32px;
   overflow-wrap: break-word;
 }
 
 /* ── catalog ─────────────────────────────────── */
+/* 6 and 3 both divide 12 (curated) and 30 (full catalog), so neither view
+   ever ends on an orphan row. auto-fill left a 7-wide grid short of the column. */
 .catalog-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 6px;
 }
 
@@ -360,7 +447,7 @@ a:hover { color: var(--mj-accent-bright); }
 }
 
 .tile-name {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text);
   line-height: 1.3;
   letter-spacing: 0.03em;
@@ -377,7 +464,7 @@ a:hover { color: var(--mj-accent-bright); }
   border: 1px solid var(--mj-accent-border);
   color: var(--text-muted);
   font-family: var(--mj-font);
-  font-size: 11px;
+  font-size: 13px;
   letter-spacing: 0.06em;
   cursor: pointer;
   transition: all 0.15s;
@@ -427,7 +514,7 @@ a:hover { color: var(--mj-accent-bright); }
   border-bottom: 2px solid transparent;
   padding: 10px 20px;
   font-family: var(--mj-font);
-  font-size: 11px;
+  font-size: 13px;
   color: var(--text-muted);
   cursor: pointer;
   letter-spacing: 0.06em;
@@ -443,7 +530,7 @@ a:hover { color: var(--mj-accent-bright); }
 .tab-btn:hover:not(.active) { color: var(--text); }
 
 .bio-content {
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.95;
   color: var(--text-muted);
   max-width: 680px;
@@ -453,7 +540,7 @@ a:hover { color: var(--mj-accent-bright); }
 
 .bio-content code {
   font-family: var(--mj-font);
-  font-size: 12px;
+  font-size: 14px;
   color: var(--mj-accent-bright);
   background: var(--mj-accent-dim);
   padding: 1px 5px;
@@ -462,7 +549,7 @@ a:hover { color: var(--mj-accent-bright); }
 
 /* ── process ─────────────────────────────────── */
 .process-text {
-  font-size: 13px;
+  font-size: 15px;
   line-height: 2.1;
   color: var(--text-muted);
   max-width: 580px;
@@ -472,7 +559,7 @@ a:hover { color: var(--mj-accent-bright); }
 /* ── watch ───────────────────────────────────── */
 .watch-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 24px;
 }
 
@@ -490,18 +577,18 @@ a:hover { color: var(--mj-accent-bright); }
   flex-wrap: wrap;
   gap: 10px;
   align-items: center;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--text-muted);
   letter-spacing: 0.05em;
   margin-top: 10px;
 }
 
-.section-note { font-size: 11px; letter-spacing: 0.04em; margin-top: 28px; }
+.section-note { font-size: 13px; letter-spacing: 0.04em; margin-top: 28px; }
 .section-note a { color: var(--mj-accent-bright); }
 
 /* ── dev-work ────────────────────────────────── */
 .dev-body {
-  font-size: 13px;
+  font-size: 15px;
   line-height: 2.1;
   color: var(--text-muted);
   max-width: 640px;
@@ -516,53 +603,46 @@ a:hover { color: var(--mj-accent-bright); }
 /* ── rider ───────────────────────────────────── */
 .rider-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 48px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 32px;
 }
 
 .rider-col h3 {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.1em;
   color: var(--mj-accent-bright);
   margin-bottom: 16px;
 }
 
+.rider-col { text-align: center; }
+
 .rider-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
 
 .rider-list li {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-muted);
   line-height: 1.55;
-  padding-left: 18px;
-  position: relative;
 }
 
+/* inline, not absolute: the marker has to travel with the centred line */
 .rider-list li::before {
-  content: '→';
-  position: absolute;
-  left: 0;
+  content: '→ ';
   color: var(--mj-accent-bright);
 }
 
 /* ── press ───────────────────────────────────── */
-.press-item {
-  padding: 32px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.press-item:first-child { padding-top: 0; }
-.press-item:last-child { border-bottom: none; }
+.press-item + .press-item { margin-top: 12px; }
 
 .press-source {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--mj-comment-green);
   letter-spacing: 0.12em;
   margin-bottom: 10px;
 }
 
 .press-quote {
-  font-size: 17px;
+  font-size: 19px;
   color: var(--text);
   line-height: 1.6;
   font-style: italic;
@@ -570,7 +650,7 @@ a:hover { color: var(--mj-accent-bright); }
   max-width: 680px;
 }
 
-.press-link { font-size: 11px; color: var(--mj-accent-bright); }
+.press-link { font-size: 13px; color: var(--mj-accent-bright); }
 .press-link:hover { text-decoration: underline; }
 
 .press-slots {
@@ -580,7 +660,7 @@ a:hover { color: var(--mj-accent-bright); }
   border: 1px solid var(--border);
 }
 
-.press-slots p { font-size: 11px; color: var(--text-muted); line-height: 1.7; }
+.press-slots p { font-size: 13px; color: var(--text-muted); line-height: 1.7; }
 
 /* ── contact ─────────────────────────────────── */
 .contact-grid {
@@ -590,6 +670,8 @@ a:hover { color: var(--mj-accent-bright); }
   max-width: 540px;
 }
 
+.contact-row { justify-content: center; }
+
 .contact-row {
   display: grid;
   grid-template-columns: 110px 1fr;
@@ -597,8 +679,8 @@ a:hover { color: var(--mj-accent-bright); }
   align-items: baseline;
 }
 
-.contact-label { font-size: 10px; color: var(--text-muted); letter-spacing: 0.1em; }
-.contact-value { font-size: 12px; color: var(--text); overflow-wrap: break-word; word-break: break-all; }
+.contact-label { font-size: 12px; color: var(--text-muted); letter-spacing: 0.1em; }
+.contact-value { font-size: 14px; color: var(--text); overflow-wrap: break-word; word-break: break-all; }
 .contact-value a { color: var(--mj-accent-bright); }
 .contact-value a:hover { text-decoration: underline; }
 
@@ -607,14 +689,14 @@ a:hover { color: var(--mj-accent-bright); }
   padding: 64px 32px;
   text-align: center;
   border-top: 1px solid var(--mj-accent-border);
-  background: var(--glass);
+  background: var(--plate-gloss), var(--plate);
   -webkit-backdrop-filter: blur(var(--glass-blur));
   backdrop-filter: blur(var(--glass-blur));
 }
 
 .footer .comment { font-size: 11px; margin-bottom: 6px; letter-spacing: 0.05em; }
 
-.footer p { font-size: 13px; color: var(--text-muted); line-height: 1.85; }
+.footer p { font-size: 15px; color: var(--text-muted); line-height: 1.85; }
 
 .footer-links {
   display: flex;
@@ -624,7 +706,7 @@ a:hover { color: var(--mj-accent-bright); }
   margin-top: 36px;
 }
 
-.footer-links a { font-size: 11px; color: var(--text-muted); letter-spacing: 0.05em; }
+.footer-links a { font-size: 13px; color: var(--text-muted); letter-spacing: 0.05em; }
 .footer-links a:hover { color: var(--mj-accent-bright); }
 
 .footer-copy {
@@ -639,15 +721,16 @@ a:hover { color: var(--mj-accent-bright); }
 @media (max-width: 768px) {
   .hero { min-height: 76dvh; }
 
-  .watch-grid { grid-template-columns: 1fr; }
+  .watch-grid { grid-template-columns: minmax(0, 1fr); }
 
-  .rider-grid { grid-template-columns: 1fr; gap: 32px; }
+  .rider-grid { grid-template-columns: minmax(0, 1fr); gap: 32px; }
+
+  .catalog-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
   .section { margin: 20px 12px; padding: 44px 24px; }
 }
 
 @media (max-width: 480px) {
-  .catalog-grid { grid-template-columns: repeat(3, 1fr); }
   .nav { padding: 0 12px; }
   .nav a { padding: 12px 10px; font-size: 10px; }
   .url-bar { padding: 8px 16px; }
@@ -656,10 +739,10 @@ a:hover { color: var(--mj-accent-bright); }
 }
 
 /* ── reduced motion: ambient motion stops, pointer feedback stays ── */
-/* orb gradient + hero video stay visible (video is paused to a still frame
-   by script.js); the pointer glow and click pulse are user-initiated. */
+/* the starfield paints one still frame (handled inside the component) and the
+   hero video is paused to a still frame by script.js; the pointer glow and
+   click pulse are user-initiated, so they stay. */
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .page-orb { animation: none; }
   .mantra p { animation: none; opacity: 1; transform: none; }
 }

@@ -18,8 +18,10 @@
 </head>
 <body>
 
-  <!-- page-wide orb background + pointer glow -->
+  <!-- page background: pixel starfield, with the orb gradient beneath it as
+       the no-JS fallback — plus the pointer glow on top -->
   <div class="page-orb" aria-hidden="true"></div>
+  <star-field speed="2.75" density="1.2" nebulae="1.5" aria-hidden="true"></star-field>
   <div class="page-glow" id="page-glow" aria-hidden="true"></div>
 
   <!-- url-bar -->
@@ -51,7 +53,6 @@
         src="assets/video/hero-sp404.mp4"
         aria-hidden="true"
       ></video>
-      <div class="hero-tint" aria-hidden="true"></div>
       <div class="hero-inner">
         <h1>Matthew Jamison { <em>wwjd</em> }</h1>
         <p class="tags">
@@ -480,6 +481,7 @@ github &nbsp;&nbsp;&nbsp;<span class="arrow">→</span> <a href="https://github.
     <p class="footer-copy">matthew jamison &nbsp;·&nbsp; epk &nbsp;·&nbsp; 2026</p>
   </footer>
 
+  <script src="assets/js/starfield.js" defer></script>
   <script src="script.js"></script>
 </body>
 </html>
