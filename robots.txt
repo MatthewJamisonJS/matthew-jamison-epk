@@ -1,0 +1,65 @@
+# matthewjamison.dev — everything here is meant to be found, by people and by
+# machines. Search indexing, AI answers, and AI training are all welcome.
+
+# Content Signals Policy — set explicitly. Without this file, Cloudflare serves
+# free-plan domains a default policy that states no preference.
+# content-signal = yes  -> you may collect content for that use.
+# content-signal = no   -> you may not.
+# Content-Signal: search=yes, ai-input=yes, ai-train=yes
+
+User-agent: *
+Allow: /
+
+# Named explicitly so the intent survives any future blanket rule.
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Claude-User
+Allow: /
+
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Perplexity-User
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Googlebot
+Allow: /
+
+User-agent: Applebot
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+User-agent: Meta-ExternalAgent
+Allow: /
+
+User-agent: Amazonbot
+Allow: /
+
+User-agent: Bytespider
+Allow: /
+
+Sitemap: https://matthewjamison.dev/sitemap.xml

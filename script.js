@@ -74,9 +74,11 @@ window.addEventListener('pointerdown', e => {
   btn.addEventListener('click', () => {
     const expanded = grid.classList.toggle('expanded');
     btn.setAttribute('aria-expanded', String(expanded));
-    btn.innerHTML = expanded
+    // textContent, not innerHTML — the CSP enforces Trusted Types. The
+    // &nbsp; entities become literal non-breaking spaces here.
+    btn.textContent = expanded
       ? '→ show fewer'
-      : '→ full catalog &nbsp;·&nbsp; 30 releases';
+      : '→ full catalog \u00a0·\u00a0 30 releases';
   });
 })();
 

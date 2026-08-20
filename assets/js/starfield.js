@@ -110,7 +110,12 @@
       this._scrolling = false;
       var self = this;
       this._mq = matchMedia('(prefers-reduced-motion: reduce)');
-      this._ro = new ResizeObserver(function () { self._resize(); });
+      // take the size from the observer entry: reading clientWidth here would
+      // force a synchronous layout on every resize
+      this._ro = new ResizeObserver(function (entries) {
+        var r = entries && entries[0] && entries[0].contentRect;
+        self._resize(r && r.width, r && r.height);
+      });
       this._ro.observe(this);
       this._io = new IntersectionObserver(function (e) {
         self._visible = e[0].isIntersecting;
@@ -119,15 +124,19 @@
       this._io.observe(this);
       this._onVis = function () { self._kick(); };
       document.addEventListener('visibilitychange', this._onVis);
-      // hold the sky still while the page is scrolling — keeps a full-viewport
-      // repaint off the scroll thread; trailing edge re-enables drawing
+      // thin the sky out while the page is scrolling rather than freezing it:
+      // half the frame rate and the two cheapest layers dropped, so the scroll
+      // thread stays clear but the stars keep falling. Trailing edge restores
+      // the full sky.
       this._onScroll = function () {
         self._scrolling = true;
         clearTimeout(self._scrollT);
         self._scrollT = setTimeout(function () { self._scrolling = false; }, 260);
       };
       window.addEventListener('scroll', this._onScroll, { passive: true });
-      this._resize();
+      // no _resize() call here: observe() fires the callback once on its own,
+      // and letting it deliver the first size avoids a synchronous layout read
+      // during element upgrade. The .page-orb fallback covers the one frame.
     };
 
     F.prototype.disconnectedCallback = function () {
@@ -155,8 +164,10 @@
       return window.innerWidth < 640 || conn.saveData === true;   // phones lean, tablets get the full sky
     };
 
-    F.prototype._resize = function () {
-      var w = this.clientWidth, h = this.clientHeight;
+    F.prototype._resize = function (w, h) {
+      // w/h come from the ResizeObserver entry; measuring is the fallback for
+      // an entry without a contentRect (older engines)
+      if (!w || !h) { w = this.clientWidth; h = this.clientHeight; }
       if (!w || !h) return;
       this._W = Math.max(32, Math.round(w / PX));
       this._H = Math.max(32, Math.round(h / PX));
@@ -212,16 +223,23 @@
       var ctx = this._ctx, W = this._W, H = this._H, T = this._T;
       if (!W) return;
       var sp = this._num('speed', 1) * (this._spBudget || 1);
+      var lean = this._scrolling;   // scrolling: cheapest work that still moves
       ctx.imageSmoothingEnabled = false;
       ctx.fillStyle = BG;
       ctx.fillRect(0, 0, W, H);
       var midOff = (t * SPEEDS.mid * sp) % T;
-      // nebulae ride the mid layer
-      ctx.drawImage(this._tile, 0, midOff - T);
-      ctx.drawImage(this._tile, 0, midOff);
+      if (!lean) {
+        // nebulae ride the mid layer — two full-canvas blits, the priciest
+        // thing here, so they sit out the scroll
+        ctx.drawImage(this._tile, 0, midOff - T);
+        ctx.drawImage(this._tile, 0, midOff);
+      }
       this._drawLayer(this._far, (t * SPEEDS.far * sp) % T, FAR_COLORS, 0, t);
       this._drawLayer(this._mid, midOff, MID_COLORS, 1, t);
-      this._drawLayer(this._near, (t * SPEEDS.near * sp) % T, MID_COLORS, 2, t);
+      // every layer advances off the same `t`, so nothing jumps when lean lifts
+      if (!lean) {
+        this._drawLayer(this._near, (t * SPEEDS.near * sp) % T, MID_COLORS, 2, t);
+      }
     };
 
     F.prototype._kick = function () {
@@ -229,7 +247,8 @@
       cancelAnimationFrame(this._raf);
       var step = function (now) {
         self._raf = requestAnimationFrame(step);   // reschedule first: a skipped frame must not end the loop
-        if (now - self._last < 33 || self._scrolling) return;   // ~30fps is plenty for pixel art
+        // ~30fps is plenty for pixel art; ~20fps while scrolling
+        if (now - self._last < (self._scrolling ? 50 : 33)) return;
         self._last = now;
         self._draw((now - self._t0) / 1000);
         if (self._mq.matches || !self._visible || document.hidden) {

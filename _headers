@@ -1,0 +1,32 @@
+# Cloudflare Pages headers. Applied at the edge only — a local static server
+# ignores this file, so header audits must run against the deployed site.
+
+/*
+  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Cross-Origin-Opener-Policy: same-origin
+  Permissions-Policy: accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()
+  # Enforcing. This is safe only while Cloudflare injects no inline script of
+  # its own: Bot Fight Mode and JavaScript Detections are both off, so the
+  # /cdn-cgi/challenge-platform/ snippet (inline, nonce-less, and using
+  # innerHTML) is no longer added. If either is ever turned back on, that
+  # snippet will be blocked here — rename this back to
+  # Content-Security-Policy-Report-Only, or Cloudflare's bot challenge and this
+  # policy cannot coexist without a per-request nonce (which _headers cannot
+  # mint — it would need a Pages Function).
+  # The sha256 covers the JSON-LD block in index.html — recompute it if that
+  # JSON changes.
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-wqJ8v4cvDP3d3raqKPL0U/Vf1jiRHh4snmWHMYoF87U='; style-src 'self'; img-src 'self' https://f4.bcbits.com; font-src 'self'; media-src 'self'; connect-src 'self'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; require-trusted-types-for 'script'
+
+# content-stable: fonts, video, and the retired orb files never change in place
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# unversioned at the root, so revalidate rather than pin for a year
+/style.css
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+
+/script.js
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400

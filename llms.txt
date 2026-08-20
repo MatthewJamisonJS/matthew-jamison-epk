@@ -1,0 +1,138 @@
+# Matthew Jamison { wwjd }
+
+> St. Louis, MO instrumental music producer and performer. 6-string MTD maple
+> bass and SP-404 A. 30+ releases on Bandcamp. Full-stack software developer
+> during work hours.
+
+Site: https://matthewjamison.dev/
+Booking and inquiries: matthewjamisonmusicinquiries@gmail.com
+
+This file mirrors the copy on the site verbatim. The site is a single page; the
+headings below are its sections.
+
+## mantra
+
+// a vessel
+grateful for expression
+healing-state
+
+## quick stats
+
+- 30+ releases
+- started 2015
+- home STL
+
+## bio
+
+Raised C.O.G.I.C.! Started playing with the auxiliary percussion with the band at Ezekiel Temple, then drums, then bass guitar, then producing & eventually being blessed with an SP-404 A by a brother in the faith.
+
+Only child to Minister Wells W. Jamison & Antoinette Jamison, who served at Ezekiel Temple C.O.G.I.C.
+
+I was a goof who didn't have rhythm yet. However, they did allow me to play bongos & auxiliary percussion; that was a blessing!
+
+From there, I took drum lessons, joined concert band, corps-style drumline, started playing bass guitar with bands around STL.
+
+Music will take you on a journey!
+
+Each song is a timestamp from a different season of my life. These audio imprints are reminders of just how much God has been with me every step of the way.
+
+In 2020, I started pursuing music full-time. I started a music company, Matthew Jamison Music, LLC, and entered a couple of sync-libraries.
+
+I quickly learned that a music income wasn't stable enough to provide for a family of 4. I learned to code through a local bootcamp (LaunchCode); now I work on rails apps for a living.
+
+If you didn't know my best friend, wife, and favorite human, Bernie J, is a women's minister at Refresh Community Church; our daughters are 17 y/o & 10 y/o.
+
+I wouldn't be who I am today if it weren't for these beautiful humans.
+
+Immense gratitude for the responsibility and ministry bestowed on me.
+
+## why the beats sound like this
+
+These moments are honestly conversations I was having within myself,
+and wrestling with emotions, trauma, and limitations
+when I was making each track,
+it was as if I wasn't alone in any of it
+it felt as if God was giving me ideas as I explored and created in these sandboxes of sound
+creation for creation's sake
+still healing
+
+## production catalog
+
+All 30 releases, on Bandcamp: https://matthewjjamison.bandcamp.com
+
+- [it is what it is](https://matthewjjamison.bandcamp.com/album/it-is-what-it-is)
+- [grace alone](https://matthewjjamison.bandcamp.com/track/grace-alone)
+- [shoot the j](https://matthewjjamison.bandcamp.com/album/shoot-the-j)
+- [space 2 be](https://matthewjjamison.bandcamp.com/album/space-2-be)
+- [ryokō](https://matthewjjamison.bandcamp.com/album/ryok)
+- [jeremiah 29:11](https://matthewjjamison.bandcamp.com/album/jeremiah-29-11)
+- [bojji's resolve](https://matthewjjamison.bandcamp.com/album/bojjis-resolve-2)
+- [perspective](https://matthewjjamison.bandcamp.com/album/perspective-2)
+- [perspectives pt.1](https://matthewjjamison.bandcamp.com/album/perspectives-pt-1)
+- [sp ep: the next chapter](https://matthewjjamison.bandcamp.com/album/sp-ep-the-next-chapter)
+- [hallelujah](https://matthewjjamison.bandcamp.com/track/hallelujah)
+- [the journey](https://matthewjjamison.bandcamp.com/album/the-journey)
+- [perspective](https://matthewjjamison.bandcamp.com/album/perspective)
+- [(noh)_talent](https://matthewjjamison.bandcamp.com/track/noh-talent)
+- [ball so hard](https://matthewjjamison.bandcamp.com/track/ball-so-hard)
+- [we got the keys](https://matthewjjamison.bandcamp.com/track/we-got-the-keys)
+- [bando (edit)](https://matthewjjamison.bandcamp.com/track/bando-matthew-jamison-edit)
+- [beat tape #2](https://matthewjjamison.bandcamp.com/album/beat-tape-2)
+- [beat tape #1](https://matthewjjamison.bandcamp.com/album/beat-tape-1)
+- [hold on be strong (edit)](https://matthewjjamison.bandcamp.com/track/hold-on-be-strong-matthew-jamison-edit)
+- [dangerous (busta edit)](https://matthewjjamison.bandcamp.com/track/dangerous-by-busta-rhymes-matthew-jamison-edit)
+- [the blessing](https://matthewjjamison.bandcamp.com/track/the-blessing)
+- [wedobeatschallenge #9](https://matthewjjamison.bandcamp.com/track/wedobeatschallenge-9)
+- [love bounce](https://matthewjjamison.bandcamp.com/track/love-bounce)
+- [twice (edit)](https://matthewjjamison.bandcamp.com/track/twice-matthew-jamison-edit)
+- [black is beautiful](https://matthewjjamison.bandcamp.com/album/black-is-beautiful)
+- [black vegas](https://matthewjjamison.bandcamp.com/track/black-vegas)
+- [sorbet](https://matthewjjamison.bandcamp.com/album/sorbet)
+- [sideshow](https://matthewjjamison.bandcamp.com/track/sideshow)
+- [new start](https://matthewjjamison.bandcamp.com/album/new-start)
+
+## services
+
+need a website? i got you.
+- consulting: $95 / hr
+- full builds - software integrations - email for quote
+
+session bass
+- $350 - full session (4 songs, 3-5 min each)
+- $150 - single bass line (up to 7 min)
+- songs over length are charged extra
+
+live bassist: mtd 6-string maple bass + looper sfx pedal
+- real-time arranging
+- available alongside sp-404 a sets or standalone
+
+inquiry: matthewjamisonmusicinquiries@gmail.com
+github: https://github.com/MatthewJamisonJS
+
+## gear + rider (sp-404 a)
+
+Input list:
+- 2x 1/4" ts outputs from sp-404 a stereo main outs (l + r - no mono summing)
+- 1x monitor wedge or iem - stereo mix of sp-404 a output
+- 1x standard power outlet at table (sp-404 a can also run on batteries as backup)
+- if bass set: 1x di box or 1/4" bass input - 1x monitor for bass mix - confirm at booking
+
+Full stage needs, what Matthew brings, and what he doesn't need are listed on
+the site under gear + rider.
+
+## press
+
+voyagestl magazine, august 2024:
+"when I make music, it's genuine."
+https://voyagestl.com/interview/meet-matthew-jamison-of-saint-louis/
+
+hi-res photos - interview available - press kit on request
+matthewjamisonmusicinquiries@gmail.com
+
+## links
+
+- Bandcamp: https://matthewjjamison.bandcamp.com
+- GitHub: https://github.com/MatthewJamisonJS
+- Substack: https://matthewjamisonwwjd.substack.com
+
+peace and long life to you and yours
