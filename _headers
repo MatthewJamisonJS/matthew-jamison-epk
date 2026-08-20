@@ -8,17 +8,18 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Cross-Origin-Opener-Policy: same-origin
   Permissions-Policy: accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()
-  # Enforcing. This is safe only while Cloudflare injects no inline script of
-  # its own: Bot Fight Mode and JavaScript Detections are both off, so the
-  # /cdn-cgi/challenge-platform/ snippet (inline, nonce-less, and using
-  # innerHTML) is no longer added. If either is ever turned back on, that
-  # snippet will be blocked here — rename this back to
-  # Content-Security-Policy-Report-Only, or Cloudflare's bot challenge and this
-  # policy cannot coexist without a per-request nonce (which _headers cannot
-  # mint — it would need a Pages Function).
+  # Enforcing. Four Cloudflare zone features inject script that cannot satisfy
+  # this policy, and all four are off: Bot Fight Mode, JavaScript Detections
+  # (inline + nonce-less + innerHTML), Email Address Obfuscation (its decoder
+  # uses innerHTML, so with Trusted Types on it left mailto: links rendering as
+  # broken placeholder text), and Rocket Loader. Turning any of them back on
+  # breaks either that feature or this policy — Cloudflare's own answer is a
+  # per-request CSP nonce, which _headers cannot mint (it would need a Pages
+  # Function). Web Analytics is the exception: its beacon host is allowed below
+  # rather than disabled.
   # The sha256 covers the JSON-LD block in index.html — recompute it if that
   # JSON changes.
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-wqJ8v4cvDP3d3raqKPL0U/Vf1jiRHh4snmWHMYoF87U='; style-src 'self'; img-src 'self' https://f4.bcbits.com; font-src 'self'; media-src 'self'; connect-src 'self'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; require-trusted-types-for 'script'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-wqJ8v4cvDP3d3raqKPL0U/Vf1jiRHh4snmWHMYoF87U=' https://static.cloudflareinsights.com; style-src 'self'; img-src 'self' https://f4.bcbits.com; font-src 'self'; media-src 'self'; connect-src 'self' https://cloudflareinsights.com; form-action 'none'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; require-trusted-types-for 'script'
 
 # content-stable: fonts, video, and the retired orb files never change in place
 /assets/*
