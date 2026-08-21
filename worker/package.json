@@ -1,0 +1,28 @@
+{
+  "name": "mj-music-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Direct-to-fan music store backend for matthewjamison.dev (Cloudflare Worker + D1 + R2 + Stripe)",
+  "scripts": {
+    "dev": "wrangler dev --test-scheduled",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dry-run": "wrangler deploy --dry-run",
+    "smoke": "./test/smoke.sh",
+    "db:local": "wrangler d1 migrations apply mj-music --local",
+    "db:remote": "wrangler d1 migrations apply mj-music --remote",
+    "seed:local": "wrangler d1 execute mj-music --local --file=./seed-albums.sql"
+  },
+  "dependencies": {
+    "stripe": "^18.5.0"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.22.0",
+    "@cloudflare/workers-types": "^4.20250801.0",
+    "typescript": "^5.7.3",
+    "vitest": "^4.1.0",
+    "wrangler": "^4.86.0"
+  }
+}

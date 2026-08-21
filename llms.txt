@@ -1,8 +1,8 @@
 # Matthew Jamison { wwjd }
 
 > St. Louis, MO instrumental music producer and performer. 6-string MTD maple
-> bass and SP-404 A. 30+ releases on Bandcamp. Full-stack software developer
-> during work hours.
+> bass and SP-404 A. 30 releases, sold direct from this site. Full-stack
+> software developer during work hours.
 
 Site: https://matthewjamison.dev/
 Booking and inquiries: matthewjamisonmusicinquiries@gmail.com
@@ -56,40 +56,44 @@ it felt as if God was giving me ideas as I explored and created in these sandbox
 creation for creation's sake
 still healing
 
-## production catalog
+## store
 
-All 30 releases, on Bandcamp: https://matthewjjamison.bandcamp.com
+All 30 releases are sold direct from https://matthewjamison.dev/#catalog.
+Every release previews in full in the browser before you buy. Checkout is
+Stripe; the download link is emailed after purchase.
 
-- [it is what it is](https://matthewjjamison.bandcamp.com/album/it-is-what-it-is)
-- [grace alone](https://matthewjjamison.bandcamp.com/track/grace-alone)
-- [shoot the j](https://matthewjjamison.bandcamp.com/album/shoot-the-j)
-- [space 2 be](https://matthewjjamison.bandcamp.com/album/space-2-be)
-- [ryokō](https://matthewjjamison.bandcamp.com/album/ryok)
-- [jeremiah 29:11](https://matthewjjamison.bandcamp.com/album/jeremiah-29-11)
-- [bojji's resolve](https://matthewjjamison.bandcamp.com/album/bojjis-resolve-2)
-- [perspective](https://matthewjjamison.bandcamp.com/album/perspective-2)
-- [perspectives pt.1](https://matthewjjamison.bandcamp.com/album/perspectives-pt-1)
-- [sp ep: the next chapter](https://matthewjjamison.bandcamp.com/album/sp-ep-the-next-chapter)
-- [hallelujah](https://matthewjjamison.bandcamp.com/track/hallelujah)
-- [the journey](https://matthewjjamison.bandcamp.com/album/the-journey)
-- [perspective](https://matthewjjamison.bandcamp.com/album/perspective)
-- [(noh)_talent](https://matthewjjamison.bandcamp.com/track/noh-talent)
-- [ball so hard](https://matthewjjamison.bandcamp.com/track/ball-so-hard)
-- [we got the keys](https://matthewjjamison.bandcamp.com/track/we-got-the-keys)
-- [bando (edit)](https://matthewjjamison.bandcamp.com/track/bando-matthew-jamison-edit)
-- [beat tape #2](https://matthewjjamison.bandcamp.com/album/beat-tape-2)
-- [beat tape #1](https://matthewjjamison.bandcamp.com/album/beat-tape-1)
-- [hold on be strong (edit)](https://matthewjjamison.bandcamp.com/track/hold-on-be-strong-matthew-jamison-edit)
-- [dangerous (busta edit)](https://matthewjjamison.bandcamp.com/track/dangerous-by-busta-rhymes-matthew-jamison-edit)
-- [the blessing](https://matthewjjamison.bandcamp.com/track/the-blessing)
-- [wedobeatschallenge #9](https://matthewjjamison.bandcamp.com/track/wedobeatschallenge-9)
-- [love bounce](https://matthewjjamison.bandcamp.com/track/love-bounce)
-- [twice (edit)](https://matthewjjamison.bandcamp.com/track/twice-matthew-jamison-edit)
-- [black is beautiful](https://matthewjjamison.bandcamp.com/album/black-is-beautiful)
-- [black vegas](https://matthewjjamison.bandcamp.com/track/black-vegas)
-- [sorbet](https://matthewjjamison.bandcamp.com/album/sorbet)
-- [sideshow](https://matthewjjamison.bandcamp.com/track/sideshow)
-- [new start](https://matthewjjamison.bandcamp.com/album/new-start)
+Singles $2.99 · EPs $5.99 · albums $9.99.
+
+- it is what it is — album · 14 tracks · $9.99
+- grace alone — single · 1 track · $2.99
+- shoot the j — album · 20 tracks · $9.99
+- space 2 be — album · 12 tracks · $9.99
+- ryokō — album · 7 tracks · $9.99
+- jeremiah 29:11 — ep · 3 tracks · $5.99
+- bojji's resolve — album · 11 tracks · $9.99
+- perspective — album · 11 tracks · $9.99
+- perspectives pt.1 — album · 8 tracks · $9.99
+- sp ep: the next chapter — ep · 6 tracks · $5.99
+- hallelujah — single · 1 track · $2.99
+- the journey — album · 56 tracks · $9.99
+- perspective — ep · 3 tracks · $5.99
+- (noh)_talent — single · 1 track · $2.99
+- ball so hard — single · 1 track · $2.99
+- we got the keys — single · 1 track · $2.99
+- bando (edit) — single · 1 track · $2.99
+- beat tape #2 — ep · 6 tracks · $5.99
+- beat tape #1 — ep · 6 tracks · $5.99
+- hold on be strong (edit) — single · 1 track · $2.99
+- dangerous (busta edit) — single · 1 track · $2.99
+- the blessing — single · 1 track · $2.99
+- wedobeatschallenge #9 — single · 1 track · $2.99
+- love bounce — single · 1 track · $2.99
+- twice (edit) — single · 1 track · $2.99
+- black is beautiful — ep · 4 tracks · $5.99
+- black vegas — single · 1 track · $2.99
+- sorbet — ep · 5 tracks · $5.99
+- sideshow — single · 1 track · $2.99
+- new start — album · 15 tracks · $9.99
 
 ## services
 
@@ -131,7 +135,6 @@ matthewjamisonmusicinquiries@gmail.com
 
 ## links
 
-- Bandcamp: https://matthewjjamison.bandcamp.com
 - GitHub: https://github.com/MatthewJamisonJS
 - Substack: https://matthewjamisonwwjd.substack.com
 

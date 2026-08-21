@@ -1,0 +1,69 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mj-music",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Custom domain. Left commented ON PURPOSE: attaching a route requires an
+  // authenticated account and a zone that already resolves. Uncomment after
+  // `wrangler login`, then `wrangler deploy`.
+  //
+  "routes": [
+    { "pattern": "api.matthewjamison.dev", "custom_domain": true }
+  ],
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "mj-music",
+      // Replace both after `wrangler d1 create mj-music` /
+      // `wrangler d1 create mj-music-preview`.
+      "database_id": "0f6722a8-d71c-44f5-83fe-b1d928a68ace",
+      "preview_database_id": "67a1501e-3f88-4607-909b-f1187cbc1112",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  "r2_buckets": [{ "binding": "ALBUMS", "bucket_name": "mj-albums" }],
+
+  // GA rate-limit bindings. Per-location, locally cached: a fast first line of
+  // defence, NOT a correctness boundary. The D1 counter in download.ts is.
+  "ratelimits": [
+    {
+      "name": "DOWNLOAD_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 20, "period": 60 }
+    },
+    {
+      "name": "CHECKOUT_LIMITER",
+      "namespace_id": "1002",
+      "simple": { "limit": 10, "period": 60 }
+    }
+  ],
+
+  "triggers": {
+    // 03:00 UTC nightly maintenance + reconciliation; every 10 min outbox drain.
+    "crons": ["0 3 * * *", "*/10 * * * *"]
+  },
+
+  "vars": {
+    "SITE_ORIGIN": "https://matthewjamison.dev",
+    "WORKER_ORIGIN": "https://api.matthewjamison.dev",
+    "EMAIL_FROM": "matthew jamison <downloads@matthewjamison.dev>",
+    // matthewjamison.dev has no inbound mail (Email Routing unconfigured), so
+    // replies and alerts go to the same gmail the site already publishes.
+    "EMAIL_REPLY_TO": "matthewjamisonmusicinquiries@gmail.com",
+    "ALERT_EMAIL": "matthewjamisonmusicinquiries@gmail.com",
+    // Comma-separated allowlist checked AFTER Cloudflare Access authenticates.
+    // Access authenticates; it does not authorize.
+    "ADMIN_EMAILS": "matthewjamisonmusicinquiries@gmail.com",
+    // Must match the Stripe key family in use. "false" while on test keys.
+    "STRIPE_LIVEMODE": "true",
+    "DOWNLOAD_TTL_HOURS": "72",
+    "MAX_DOWNLOADS": "5",
+    "VERIFY_TTL_DAYS": "7"
+  },
+
+  "observability": { "enabled": true }
+}

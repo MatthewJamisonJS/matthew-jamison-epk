@@ -163,7 +163,8 @@ star-field {
 .process-text,
 .dev-body,
 .catalog-more,
-.press-item { text-align: center; }
+.press-item,
+.press-slots { text-align: center; }
 
 .video-caption { justify-content: center; }
 
@@ -438,33 +439,42 @@ star-field {
   overflow-wrap: break-word;
 }
 
-/* ── catalog ─────────────────────────────────── */
-/* 6 and 3 both divide 12 (curated) and 30 (full catalog), so neither view
-   ever ends on an orphan row. auto-fill left a 7-wide grid short of the column. */
-.catalog-grid {
+/* ── store ───────────────────────────────────── */
+/* 3 up on the card, 2 up on phones. Both divide 12 (curated) and 30 (full
+   catalog) evenly, so neither view ever ends on an orphan row. */
+.store-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  text-align: left;
 }
 
-.catalog-tile {
-  display: block;
+.store-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 10px 12px;
+  background: var(--plate-gloss), var(--plate);
+  border: 1px solid var(--plate-edge);
+  /* no hover-scale: these cards hold controls, and a scaling target under the
+     pointer makes the play and buy buttons harder to hit */
+  transition: border-color 0.18s;
+}
+
+.store-card:hover,
+.store-card:focus-within { border-color: var(--mj-accent-border); }
+
+.store-card.is-active { border-color: var(--mj-accent-bright); }
+
+/* cover + the play control that sits on it */
+.store-art {
   position: relative;
   aspect-ratio: 1;
   overflow: hidden;
   background: var(--surface-2);
-  border: 1px solid transparent;
-  transition: border-color 0.18s, transform 0.18s;
 }
 
-.catalog-tile:hover,
-.catalog-tile:focus-visible {
-  border-color: var(--mj-accent-bright);
-  transform: scale(1.03);
-  z-index: 2;
-}
-
-.catalog-tile img {
+.store-art img {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -472,29 +482,232 @@ star-field {
   transition: opacity 0.18s;
 }
 
-.catalog-tile:hover img,
-.catalog-tile:focus-visible img { opacity: 0.65; }
+.store-card:hover .store-art img,
+.store-card.is-active .store-art img { opacity: 0.72; }
 
-/* names always visible — touch and keyboard users see them too */
-.tile-overlay {
+.store-play {
   position: absolute;
-  inset: 0;
+  left: 8px;
+  bottom: 8px;
+  width: 38px;
+  height: 38px;
   display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  padding: 8px;
-  background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 45%);
-}
-
-.tile-name {
-  font-size: 11px;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 10, 10, 0.86);
+  border: 1px solid var(--mj-accent-border);
   color: var(--text);
-  line-height: 1.3;
-  letter-spacing: 0.03em;
+  font-family: var(--mj-font);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
-/* curated view: first 12 tiles, button reveals the rest */
-.catalog-grid:not(.expanded) .catalog-tile:nth-child(n+13) { display: none; }
+.store-play:hover,
+.store-play:focus-visible {
+  background: var(--mj-accent);
+  border-color: var(--mj-accent-bright);
+  color: var(--text);
+}
+
+.store-card.is-active .store-play {
+  background: var(--mj-accent);
+  border-color: var(--mj-accent-bright);
+}
+
+/* the glyph is nudged right so the triangle looks optically centred */
+.store-glyph { display: block; transform: translateX(1px); }
+.store-card.is-playing .store-glyph { transform: none; }
+
+.store-title {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text);
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+  overflow-wrap: anywhere;
+}
+
+.store-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+.store-buy {
+  margin-top: auto;
+  padding: 9px 12px;
+  background: none;
+  border: 1px solid var(--mj-accent-border);
+  color: var(--text);
+  font-family: var(--mj-font);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.store-buy:hover,
+.store-buy:focus-visible {
+  background: var(--mj-accent);
+  border-color: var(--mj-accent-bright);
+}
+
+.store-buy[aria-busy="true"] { color: var(--text-muted); cursor: progress; }
+
+/* curated view: first 12 cards, button reveals the rest */
+.store-grid:not(.expanded) .store-card:nth-child(n+13) { display: none; }
+
+/* full-strength text, not the accent: --mj-accent-bright measures ~2.8:1 on the
+   plate, and a failure message is the one string that has to be readable */
+.store-status {
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--text);
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+
+.store-status:empty { display: none; }
+
+/* ── store player ────────────────────────────── */
+/* one bar for the whole store. Sticks to the bottom of the viewport while the
+   store is on screen, so the transport stays reachable while browsing. */
+.store-player {
+  position: sticky;
+  bottom: 12px;
+  z-index: 3;
+  margin-top: 22px;
+  padding: 12px 14px;
+  background: var(--plate-gloss), var(--plate);
+  border: 1px solid var(--mj-accent-border);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  box-shadow: 0 18px 40px -22px rgba(0, 0, 0, 0.95);
+  text-align: left;
+}
+
+.store-player[hidden] { display: none; }
+
+.store-player-label {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.store-player-row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto minmax(90px, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.store-player-art {
+  width: 52px;
+  height: 52px;
+  object-fit: cover;
+  display: block;
+  background: var(--surface-2);
+}
+
+.store-player-meta { min-width: 0; }
+
+.store-player-release {
+  font-size: 12px;
+  color: var(--text);
+  letter-spacing: 0.02em;
+  overflow-wrap: anywhere;
+}
+
+.store-player-track {
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.03em;
+  overflow-wrap: anywhere;
+}
+
+.store-transport { display: flex; gap: 6px; }
+
+.store-ctl {
+  min-width: 38px;
+  height: 34px;
+  padding: 0 8px;
+  background: none;
+  border: 1px solid var(--mj-accent-border);
+  color: var(--text);
+  font-family: var(--mj-font);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.store-ctl:hover:not(:disabled),
+.store-ctl:focus-visible {
+  background: var(--mj-accent);
+  border-color: var(--mj-accent-bright);
+}
+
+.store-ctl:disabled { color: var(--text-muted); opacity: 0.45; cursor: default; }
+
+.store-ctl-stop { border-color: var(--border); }
+
+.store-time {
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* scrubber — a real range input, so arrow keys seek for free */
+.store-scrub {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 18px;
+  background: none;
+  cursor: pointer;
+}
+
+.store-scrub::-webkit-slider-runnable-track {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.store-scrub::-moz-range-track {
+  height: 3px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.store-scrub::-moz-range-progress {
+  height: 3px;
+  background: var(--mj-accent-bright);
+}
+
+/* the thumb is the position indicator, so it takes full-strength text rather
+   than the accent — accent-bright is ~2.8:1 here, under the 3:1 that
+   non-text UI needs. The filled track keeps the purple. */
+.store-scrub::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 4px;
+  height: 14px;
+  margin-top: -5.5px;
+  background: var(--text);
+  border: none;
+  border-radius: 0;
+}
+
+.store-scrub::-moz-range-thumb {
+  width: 4px;
+  height: 14px;
+  background: var(--text);
+  border: none;
+  border-radius: 0;
+}
 
 .catalog-more { margin-top: 20px; text-align: center; }
 
@@ -516,28 +729,19 @@ star-field {
   color: var(--mj-accent-bright);
 }
 
-.catalog-tile-text {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: flex-end;
-  padding: 9px;
-  gap: 3px;
-}
-
-.catalog-tile-text .tile-title {
-  font-size: 9px;
-  color: var(--text-muted);
-  line-height: 1.3;
-  letter-spacing: 0.03em;
-}
-
-.catalog-tile-text .tile-type {
-  font-size: 8px;
-  color: var(--mj-accent-border);
-  letter-spacing: 0.04em;
+/* ── thanks page ─────────────────────────────── */
+/* Matthew's line, and the only heading on the receipt page. Full-strength text
+   rather than .accent: --mj-accent-bright measures ~2.8:1 on the plate. */
+.thanks-blessing {
+  max-width: 640px;
+  margin: 0 auto 28px;
+  font-size: clamp(17px, 2.6vw, 21px);
+  font-weight: 400;
+  line-height: 1.75;
+  letter-spacing: 0.01em;
+  color: var(--text);
+  text-align: center;
+  overflow-wrap: anywhere;
 }
 
 /* ── bio ─────────────────────────────────────── */
@@ -772,7 +976,19 @@ star-field {
 
   .rider-grid { grid-template-columns: minmax(0, 1fr); gap: 32px; }
 
-  .catalog-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .store-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+  /* the transport moves under the title rather than squeezing six tracks of
+     grid into a phone width */
+  .store-player-row {
+    grid-template-columns: 52px minmax(0, 1fr) auto;
+    row-gap: 10px;
+  }
+
+  .store-transport { grid-column: 3; }
+  .store-scrub { grid-column: 1 / -1; grid-row: 2; }
+  .store-time { grid-column: 1; grid-row: 3; }
+  .store-ctl-stop { grid-column: 3; grid-row: 3; justify-self: end; }
 
   .section { margin: 20px 12px; padding: 44px 24px; }
 }
@@ -783,6 +999,9 @@ star-field {
   .url-bar { padding: 8px 16px; }
   .hero h1 { font-size: 30px; }
   .contact-row { grid-template-columns: 1fr; gap: 4px; }
+  .store-grid { gap: 10px; }
+  .store-card { padding: 8px 8px 10px; }
+  .store-buy { font-size: 10px; padding: 8px 8px; }
 }
 
 /* ── reduced motion: ambient motion stops, pointer feedback stays ── */

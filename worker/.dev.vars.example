@@ -1,0 +1,15 @@
+# Copy to .dev.vars for `wrangler dev`. NEVER commit .dev.vars.
+# In production these are `wrangler secret put`, not vars.
+#
+# The webhook secret is unique PER ENDPOINT. The one `stripe listen` prints is
+# for local forwarding only -- a leaked staging secret would let anyone spoof
+# production traffic, so never reuse it.
+
+STRIPE_SECRET_KEY=sk_test_REPLACE_ME
+STRIPE_WEBHOOK_SECRET=whsec_FROM_STRIPE_LISTEN
+EMAIL_API_KEY=re_REPLACE_ME
+
+# Only needed when Cloudflare Access is NOT enabled on the Worker. Must be at
+# least 32 characters or the fallback path refuses to authenticate at all.
+#   openssl rand -base64 48
+ADMIN_BEARER_TOKEN=

@@ -12,6 +12,12 @@ jobs:
       deployments: write
     steps:
       - uses: actions/checkout@v7
+      # Pages uploads everything under the output dir ("."), and only
+      # node_modules/.git/.DS_Store are auto-excluded — prune source that
+      # must never ship as a static asset (the Worker deploys separately
+      # via wrangler deploy from worker/).
+      - name: prune non-site files
+        run: rm -rf worker docs
       - uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}

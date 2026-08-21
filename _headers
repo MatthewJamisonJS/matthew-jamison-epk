@@ -17,9 +17,22 @@
   # per-request CSP nonce, which _headers cannot mint (it would need a Pages
   # Function). Web Analytics is the exception: its beacon host is allowed below
   # rather than disabled.
-  # The sha256 covers the JSON-LD block in index.html — recompute it if that
-  # JSON changes.
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-wqJ8v4cvDP3d3raqKPL0U/Vf1jiRHh4snmWHMYoF87U=' https://static.cloudflareinsights.com; style-src 'self'; img-src 'self' https://f4.bcbits.com; font-src 'self'; media-src 'self'; connect-src 'self' https://cloudflareinsights.com; form-action 'none'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; require-trusted-types-for 'script'
+  # Two sha256 sources, both for inline *data* blocks in index.html: the
+  # application/ld+json block, and the application/json store-data block that
+  # carries the track lists. Neither is executable, but both are pinned so the
+  # policy stays honest — recompute a hash whenever its block's bytes change:
+  #   python3 - <<'EOF'
+  #   import re,hashlib,base64
+  #   h=open('index.html',encoding='utf-8').read()
+  #   for p in (r'<script type="application/ld\+json">(.*?)</script>',
+  #             r'<script type="application/json" id="store-data">(.*?)</script>'):
+  #       b=re.search(p,h,re.S).group(1).encode()
+  #       print('sha256-'+base64.b64encode(hashlib.sha256(b).digest()).decode())
+  #   EOF
+  # api.matthewjamison.dev is the store worker: connect-src for the checkout
+  # POST, media-src for the /p/{slug}/{NN} preview streams. Album art is
+  # self-hosted under /assets/covers/, so img-src is back to 'self'.
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-7WZRhvoM4Y4qbwFj4Eqv1Dwc6sW6qz1Tcglu2dYdtQ0=' 'sha256-ahMy8G+QDf3iZW8s4nErto4l9qyTKDyY2KNKcmGhNW8=' https://static.cloudflareinsights.com; style-src 'self'; img-src 'self'; font-src 'self'; media-src 'self' https://api.matthewjamison.dev; connect-src 'self' https://cloudflareinsights.com https://api.matthewjamison.dev; form-action 'none'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; require-trusted-types-for 'script'
 
 # content-stable: fonts, video, and the retired orb files never change in place
 /assets/*
