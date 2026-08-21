@@ -61,6 +61,9 @@
   --text: #e8e8e8;
   --text-muted: #8f8f8f; /* AA 4.5:1 on dark bg */
   --border: rgba(255,255,255,0.08);
+  /* one corner radius for every panel, card and control, so the page reads as
+     a single set of shapes rather than a grid of separate boxes */
+  --radius: 10px;
   --max-w: 960px;
 }
 
@@ -143,6 +146,7 @@ star-field {
 .press-slots {
   background: var(--plate-gloss), var(--plate);
   border: 1px solid var(--plate-edge);
+  border-radius: var(--radius);
   padding: 20px 22px;
 }
 
@@ -156,7 +160,7 @@ star-field {
 
 .rider-col { justify-self: stretch; }
 
-/* the card's own copy is centred on the card's axis, like the hero mantra */
+/* the card's own copy is centred on the card's axis, like the hero copy */
 .section-label,
 .section-note,
 .bio-content,
@@ -199,12 +203,28 @@ star-field {
 
 .nav::-webkit-scrollbar { display: none; }
 
-/* the trailing fade only appears when the strip actually overflows */
+/* Phones wrap the strip into centred rows instead of scrolling it. The old
+   overflow + right-edge fade hid the last links ("Contact") behind a gesture
+   nobody discovers; every link has to be reachable at 320px.
+
+   The padding is a wrap governor, not decoration. Left to the full width the
+   seven links break 6+1 and orphan "Contact" on a row of its own; capping the
+   row box lands the break after "gear" instead, so the rows read 4+3 and both
+   centre on the same axis. The caps are measured against the two type sizes
+   the nav uses — at 11px the first four links run 250px and the first five
+   run 314px, so 288px sits cleanly between them; the 480px block below
+   re-caps for the 10px size. The bar itself stays full-bleed: only the
+   padding grows, so the sticky glass still spans the viewport. */
 @media (max-width: 640px) {
   .nav {
-    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
-    mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+    flex-wrap: wrap;
+    justify-content: center;
+    overflow-x: visible;
+    padding-inline: max(22px, calc((100% - 288px) / 2));
   }
+
+  /* the url-bar centres with the nav rows below it */
+  .url-bar { text-align: center; }
 }
 
 .nav a {
@@ -241,9 +261,9 @@ star-field {
   z-index: 0;
 }
 
-/* neutral scrim: the video peaks near white, which drops the mantra and the
-   tags row below AA. Dark through the middle where the copy sits, lighter at
-   the edges so the frame still reads. */
+/* neutral scrim: the video peaks near white, which drops the hero copy and
+   the tags row below AA. Dark through the middle where the copy sits, lighter
+   at the edges so the frame still reads. */
 .hero::after {
   content: "";
   position: absolute;
@@ -289,26 +309,6 @@ star-field {
   letter-spacing: 0.04em;
 }
 
-.mantra { margin-bottom: 40px; }
-
-.mantra p {
-  font-size: 15px;
-  line-height: 2.1;
-  letter-spacing: 0.04em;
-  color: var(--text);
-  opacity: 0;
-  transform: translateY(6px);
-  animation: rise 0.7s ease forwards;
-}
-
-.mantra p:nth-child(1) { animation-delay: 0.15s; }
-.mantra p:nth-child(2) { animation-delay: 0.4s; }
-.mantra p:nth-child(3) { animation-delay: 0.65s; }
-
-@keyframes rise {
-  to { opacity: 1; transform: none; }
-}
-
 .hero-links { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
 
 .btn {
@@ -320,6 +320,7 @@ star-field {
   font-size: 11px;
   letter-spacing: 0.06em;
   border: none;
+  border-radius: var(--radius);
   cursor: pointer;
   transition: background 0.15s;
 }
@@ -335,6 +336,7 @@ star-field {
   font-size: 11px;
   letter-spacing: 0.06em;
   border: 1px solid var(--mj-accent-border);
+  border-radius: var(--radius);
   transition: all 0.15s;
   cursor: pointer;
 }
@@ -345,8 +347,9 @@ star-field {
 .stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  border-top: 1px solid rgba(255, 255, 255, 0.11);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.11);
+  /* same quiet edge alpha as .section — the strip is full-bleed, so no radius */
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   background:
     linear-gradient(to bottom, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0) 70px),
     var(--glass);
@@ -392,10 +395,13 @@ star-field {
     var(--glass);
   -webkit-backdrop-filter: blur(var(--glass-blur));
   backdrop-filter: blur(var(--glass-blur));
-  border: 1px solid rgba(255, 255, 255, 0.11);
+  /* the edge is deliberately quiet — separation comes from the plate and the
+     drop shadow, not from a hard 1px line around every panel */
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: var(--radius);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.07),
-    0 28px 64px -28px rgba(0, 0, 0, 0.92);
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 30px 68px -26px rgba(0, 0, 0, 0.94);
   transition: border-color 0.3s;
 }
 
@@ -405,6 +411,7 @@ star-field {
   position: absolute;
   inset: 0;
   pointer-events: none;
+  border-radius: inherit;
   background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), rgba(139, 31, 168, 0.10), transparent 70%);
   opacity: 0;
   transition: opacity 0.3s;
@@ -455,7 +462,11 @@ star-field {
   gap: 8px;
   padding: 10px 10px 12px;
   background: var(--plate-gloss), var(--plate);
-  border: 1px solid var(--plate-edge);
+  /* resting edge is barely there; the plate + shadow do the separating. The
+     hover and .is-active borders below are the exception — they carry state. */
+  border: 1px solid rgba(255, 255, 255, 0.035);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 26px -18px rgba(0, 0, 0, 0.95);
   /* no hover-scale: these cards hold controls, and a scaling target under the
      pointer makes the play and buy buttons harder to hit */
   transition: border-color 0.18s;
@@ -472,6 +483,8 @@ star-field {
   aspect-ratio: 1;
   overflow: hidden;
   background: var(--surface-2);
+  /* the art sits inside the card's 1px edge, so it rounds one pixel tighter */
+  border-radius: calc(var(--radius) - 1px) calc(var(--radius) - 1px) 0 0;
 }
 
 .store-art img {
@@ -489,16 +502,19 @@ star-field {
   position: absolute;
   left: 8px;
   bottom: 8px;
-  width: 38px;
-  height: 38px;
+  /* 44x44 — the minimum touch target, and the reason the icon is an svg
+     rather than a glyph sized off the font */
+  width: 44px;
+  height: 44px;
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   background: rgba(10, 10, 10, 0.86);
   border: 1px solid var(--mj-accent-border);
+  border-radius: var(--radius);
   color: var(--text);
   font-family: var(--mj-font);
-  font-size: 13px;
   line-height: 1;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
@@ -516,9 +532,23 @@ star-field {
   border-color: var(--mj-accent-bright);
 }
 
-/* the glyph is nudged right so the triangle looks optically centred */
-.store-glyph { display: block; transform: translateX(1px); }
-.store-card.is-playing .store-glyph { transform: none; }
+/* ── icons ───────────────────────────────────── */
+/* inline svg, currentColor, sized in px so they never shift with the font */
+.icon {
+  display: block;
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+/* every play/pause button carries both icons; the .is-playing state picks one */
+.store-play .icon-pause,
+.store-card.is-playing .store-play .icon-play,
+#store-toggle .icon-pause,
+#store-toggle.is-playing .icon-play { display: none; }
+
+.store-card.is-playing .store-play .icon-pause,
+#store-toggle.is-playing .icon-pause { display: block; }
 
 .store-title {
   font-size: 12px;
@@ -540,6 +570,7 @@ star-field {
   padding: 9px 12px;
   background: none;
   border: 1px solid var(--mj-accent-border);
+  border-radius: var(--radius);
   color: var(--text);
   font-family: var(--mj-font);
   font-size: 11px;
@@ -577,12 +608,14 @@ star-field {
    store is on screen, so the transport stays reachable while browsing. */
 .store-player {
   position: sticky;
-  bottom: 12px;
+  /* clears the iOS home indicator when the bar parks at the bottom edge */
+  bottom: calc(12px + env(safe-area-inset-bottom));
   z-index: 3;
   margin-top: 22px;
   padding: 12px 14px;
   background: var(--plate-gloss), var(--plate);
   border: 1px solid var(--mj-accent-border);
+  border-radius: var(--radius);
   -webkit-backdrop-filter: blur(var(--glass-blur));
   backdrop-filter: blur(var(--glass-blur));
   box-shadow: 0 18px 40px -22px rgba(0, 0, 0, 0.95);
@@ -610,6 +643,7 @@ star-field {
   object-fit: cover;
   display: block;
   background: var(--surface-2);
+  border-radius: calc(var(--radius) - 2px);
 }
 
 .store-player-meta { min-width: 0; }
@@ -634,11 +668,14 @@ star-field {
   min-width: 38px;
   height: 34px;
   padding: 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: 1px solid var(--mj-accent-border);
+  border-radius: var(--radius);
   color: var(--text);
   font-family: var(--mj-font);
-  font-size: 12px;
   line-height: 1;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, color 0.15s;
@@ -715,6 +752,7 @@ star-field {
   padding: 12px 24px;
   background: none;
   border: 1px solid var(--mj-accent-border);
+  border-radius: var(--radius);
   color: var(--text-muted);
   font-family: var(--mj-font);
   font-size: 13px;
@@ -813,6 +851,7 @@ star-field {
   object-fit: cover;
   background: var(--surface);
   border: 1px solid var(--mj-accent-border);
+  border-radius: var(--radius);
   display: block;
 }
 
@@ -894,7 +933,9 @@ star-field {
   max-width: 680px;
 }
 
-.press-link { font-size: 13px; color: var(--mj-accent-bright); }
+/* the booking address is one unbroken 39-character token; without this it
+   pushed the document past 320px and the whole page scrolled sideways */
+.press-link { font-size: 13px; color: var(--mj-accent-bright); overflow-wrap: anywhere; }
 .press-link:hover { text-decoration: underline; }
 
 .press-slots {
@@ -978,30 +1019,63 @@ star-field {
 
   .store-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
-  /* the transport moves under the title rather than squeezing six tracks of
-     grid into a phone width */
+  /* the bar stacks top-to-bottom rather than squeezing six tracks of grid into
+     a phone width: what's playing, then the transport centred on the bar's
+     axis, then the scrubber full-width, then time and stop on the outer edges.
+     Four rows keeps room for 44px controls without crushing the title. */
   .store-player-row {
-    grid-template-columns: 52px minmax(0, 1fr) auto;
-    row-gap: 10px;
+    grid-template-columns: 52px minmax(0, 1fr);
+    row-gap: 12px;
   }
 
-  .store-transport { grid-column: 3; }
-  .store-scrub { grid-column: 1 / -1; grid-row: 2; }
-  .store-time { grid-column: 1; grid-row: 3; }
-  .store-ctl-stop { grid-column: 3; grid-row: 3; justify-self: end; }
+  .store-transport { grid-column: 1 / -1; grid-row: 2; justify-content: center; }
+  .store-scrub { grid-column: 1 / -1; grid-row: 3; }
+  .store-time { grid-column: 1; grid-row: 4; align-self: center; }
+  .store-ctl-stop { grid-column: 2; grid-row: 4; justify-self: end; }
 
   .section { margin: 20px 12px; padding: 44px 24px; }
 }
 
 @media (max-width: 480px) {
-  .nav { padding: 0 12px; }
+  /* 10px type here, so the row box re-caps: first four links run 205px and the
+     first five run 258px — 230px keeps the break after "gear" */
+  .nav { padding-inline: max(12px, calc((100% - 230px) / 2)); }
   .nav a { padding: 12px 10px; font-size: 10px; }
   .url-bar { padding: 8px 16px; }
   .hero h1 { font-size: 30px; }
   .contact-row { grid-template-columns: 1fr; gap: 4px; }
+  /* stacked rows centre with the rest of the phone layout */
+  .contact-grid { max-width: none; text-align: center; }
   .store-grid { gap: 10px; }
   .store-card { padding: 8px 8px 10px; }
   .store-buy { font-size: 10px; padding: 8px 8px; }
+}
+
+/* ── touch targets ───────────────────────────── */
+/* Touch gets the 44px minimum; a mouse keeps the tighter transport, which is
+   what the bar's proportions were drawn around. */
+@media (pointer: coarse) {
+  .nav a { padding-block: 14px; }
+
+  .store-ctl {
+    min-width: 44px;
+    height: 44px;
+  }
+
+  .catalog-more button { min-height: 44px; }
+
+  .store-buy { min-height: 44px; }
+
+  /* a taller thumb-friendly hit strip for the scrubber; the visible 3px track
+     is drawn by the pseudo-elements, so only the target grows */
+  .store-scrub { height: 44px; }
+
+  /* the 4px thumb is a sliver under a fingertip — widen it to 12px on touch.
+     Height and colour are unchanged: still --text, because accent-bright is
+     ~2.8:1 here and non-text UI needs 3:1. margin-top stays half the 3px
+     track minus half the thumb, which keeps it centred on the line. */
+  .store-scrub::-webkit-slider-thumb { width: 12px; }
+  .store-scrub::-moz-range-thumb { width: 12px; }
 }
 
 /* ── reduced motion: ambient motion stops, pointer feedback stays ── */
@@ -1010,5 +1084,4 @@ star-field {
    click pulse are user-initiated, so they stay. */
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .mantra p { animation: none; opacity: 1; transform: none; }
 }

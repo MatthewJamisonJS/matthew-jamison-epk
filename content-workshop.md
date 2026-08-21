@@ -732,6 +732,8 @@ Same rules as above — blank slot = keep what's there.
 <!-- slot:store.label file:index.html -->
 ### store · section label (this replaced the old bandcamp line)
 
+**⚠ needs your words:** the site now streams full tracks lossless (not previews), so "preview before you buy" is out of date. Something in the "stream free, buy to own" direction — your phrasing.
+
 > current:
 > // store &nbsp;·&nbsp; 30 releases &nbsp;·&nbsp; preview before you buy
 
@@ -838,6 +840,8 @@ It only appears once something is playing.
 
 <!-- slot:store.errors file:script.js type:grouped -->
 ### store · the two things the page says when something goes wrong
+
+**⚠ needs your words:** line 2 says "preview" but the player now streams full tracks — worth rewording when you do a pass.
 
 > current:
 > checkout didn't open. try again, or email matthewjamisonmusicinquiries@gmail.com

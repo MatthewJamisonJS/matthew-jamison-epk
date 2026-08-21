@@ -87,8 +87,16 @@ window.addEventListener('pointerdown', e => {
 // 'unsafe-inline' and requires Trusted Types, so innerHTML is not available.
 (function () {
   const API = 'https://api.matthewjamison.dev';
-  const PLAY = '▶︎';   // ▶ forced to text presentation, not emoji
-  const PAUSE = '▮▮';  // ▮▮
+  // play/pause are inline <svg> pairs baked into the markup; state is carried by
+  // an .is-playing class and CSS picks which of the two icons is displayed.
+  // Nothing here writes markup — the CSP requires Trusted Types.
+
+  // full tracks stream lossless where the browser can decode FLAC (all
+  // current engines); anything older falls back to the 128k MP3 previews.
+  const probe = document.createElement('audio');
+  const STREAM_PATH = probe.canPlayType && probe.canPlayType('audio/flac')
+    ? '/s/'
+    : '/p/';
 
   const dataEl = document.getElementById('store-data');
   const grid = document.querySelector('.store-grid');
@@ -136,17 +144,15 @@ window.addEventListener('pointerdown', e => {
       c.classList.toggle('is-playing', active && !audio.paused);
       const btn = c.querySelector('.store-play');
       if (!btn) return;
-      const glyph = btn.querySelector('.store-glyph');
       const playing = active && !audio.paused;
-      if (glyph) glyph.textContent = playing ? PAUSE : PLAY;
       const name = catalog[c.dataset.slug] ? catalog[c.dataset.slug].t : '';
-      btn.setAttribute('aria-label', (playing ? 'pause preview of ' : 'play preview of ') + name);
+      btn.setAttribute('aria-label', (playing ? 'pause ' : 'play ') + name);
     });
   }
 
   function syncToggle() {
-    toggleBtn.textContent = audio.paused ? PLAY : PAUSE;
-    toggleBtn.setAttribute('aria-label', audio.paused ? 'resume preview' : 'pause preview');
+    toggleBtn.classList.toggle('is-playing', !audio.paused);
+    toggleBtn.setAttribute('aria-label', audio.paused ? 'resume playback' : 'pause playback');
     markCards();
   }
 
@@ -161,7 +167,7 @@ window.addEventListener('pointerdown', e => {
     const track = rel.tr[index];      // [trackNumber, title, seconds]
     const nn = track[0] < 10 ? '0' + track[0] : String(track[0]);
 
-    audio.src = API + '/p/' + slug + '/' + nn;
+    audio.src = API + STREAM_PATH + slug + '/' + nn;
     bar.hidden = false;
 
     const c = card(slug);

@@ -18,6 +18,11 @@ jobs:
       # via wrangler deploy from worker/).
       - name: prune non-site files
         run: rm -rf worker docs
+      # style.css and script.js are cached 7 days unversioned (_headers); stamp
+      # their ?v= query with the commit SHA so every deploy is a new URL and
+      # returning phones never run stale JS against fresh HTML.
+      - name: version assets
+        run: sed -i "s/?v=dev/?v=${GITHUB_SHA::8}/g" index.html
       - uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}

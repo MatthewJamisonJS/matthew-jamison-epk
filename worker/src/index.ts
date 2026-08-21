@@ -8,7 +8,7 @@ import { handleVerify, handleVerifyResend } from './routes/verify';
 import { handleUnsubscribe } from './routes/unsubscribe';
 import { handleExport } from './routes/admin';
 import { handleMpu } from './routes/upload';
-import { handlePreview } from './routes/preview';
+import { handlePreview, handleStream } from './routes/preview';
 import { scheduled } from './scheduled';
 
 const router = new Router()
@@ -32,8 +32,10 @@ const router = new Router()
   .get('/unsubscribe/:token', handleUnsubscribe)
   .post('/unsubscribe/:token', handleUnsubscribe)
 
-  // Public 128 kbps preview streams for the on-site player.
+  // Public streams for the on-site player: /p/ = 128k MP3 previews (legacy +
+  // fallback), /s/ = lossless FLAC full tracks.
   .get('/p/:slug/:track', handlePreview)
+  .get('/s/:slug/:track', handleStream)
 
   .get('/admin/export', handleExport)
 
