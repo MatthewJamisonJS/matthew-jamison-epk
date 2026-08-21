@@ -39,6 +39,14 @@
       "name": "CHECKOUT_LIMITER",
       "namespace_id": "1002",
       "simple": { "limit": 10, "period": 60 }
+    },
+    {
+      // Admin surface (export + mpu). Generous enough for sequential
+      // multipart uploads, hostile to scanners. The 256-bit bearer is the
+      // real wall; this just makes noise cheap to shed.
+      "name": "ADMIN_LIMITER",
+      "namespace_id": "1003",
+      "simple": { "limit": 30, "period": 60 }
     }
   ],
 

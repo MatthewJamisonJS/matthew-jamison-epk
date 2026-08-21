@@ -252,6 +252,29 @@ export async function handleReissue(
     return html(page('something is wrong', problemBody()), { status: 500 });
   }
 
+  // Cap the chain: 1 original + 3 reissues per purchase. Past that, a human
+  // looks at it — unlimited reissue would let anyone holding one expired
+  // token mint links (and emails to the buyer) forever.
+  const minted = await env.DB.prepare(
+    `SELECT COUNT(*) AS n FROM download_tokens WHERE purchase_id = ?1`,
+  )
+    .bind(purchase.id)
+    .first<{ n: number }>();
+  if ((minted?.n ?? 0) >= 4) {
+    await alert(
+      env,
+      'reissue_cap_hit',
+      `purchase ${purchase.id} (${row.album_slug}) hit the reissue cap; buyer may need manual help`,
+    );
+    return html(
+      page(
+        'limit reached',
+        `<h1>that's the limit on automatic re-sends</h1><p>reply to the email this link came from and matthew will sort it out personally.</p>`,
+      ),
+      { status: 429 },
+    );
+  }
+
   const fresh = await createDownloadToken(env, purchase.id, row.album_slug);
   await logDownloadEvent(env, token, 'reissued', null, ipCountry(req), req.headers.get('User-Agent'));
   await enqueue(env, purchase.email, 'download_reissued', {

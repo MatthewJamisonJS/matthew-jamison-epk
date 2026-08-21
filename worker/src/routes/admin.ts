@@ -29,6 +29,13 @@ export async function authenticate(
   env: Env,
   ctx: Ctx,
 ): Promise<{ actor: Actor } | { error: Response }> {
+  // Rate-limit the whole admin surface before any credential work.
+  const ip = req.headers.get('CF-Connecting-IP') ?? '0.0.0.0';
+  const { success } = await env.ADMIN_LIMITER.limit({ key: ip });
+  if (!success) {
+    return { error: json({ error: 'rate_limited' }, { status: 429 }) };
+  }
+
   const allowlist = env.ADMIN_EMAILS.split(',')
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);

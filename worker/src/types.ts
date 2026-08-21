@@ -20,6 +20,7 @@ export interface Env {
   ALBUMS: R2Bucket;
   DOWNLOAD_LIMITER: RateLimiter;
   CHECKOUT_LIMITER: RateLimiter;
+  ADMIN_LIMITER: RateLimiter;
 
   // vars
   SITE_ORIGIN: string;
