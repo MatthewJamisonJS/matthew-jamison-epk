@@ -632,7 +632,7 @@ star-field {
 
 .store-player-row {
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr) auto minmax(90px, 1fr) auto auto;
+  grid-template-columns: 52px minmax(0, 1fr) auto minmax(90px, 1fr) auto auto auto;
   gap: 12px;
   align-items: center;
 }
@@ -698,6 +698,33 @@ star-field {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
+
+/* stream quality — a text chip, not another transport glyph. The mode reads in
+   muted body colour and the codec in the comment green the rest of the page
+   uses for machine asides, so the bar says what it is actually pushing down the
+   wire. Both words change on press, so the state is never colour alone. */
+.store-quality {
+  padding: 6px 8px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  font-family: var(--mj-font);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.store-quality-now { color: var(--mj-comment-green); }
+
+.store-quality:hover,
+.store-quality:focus-visible { border-color: var(--mj-accent-bright); }
 
 /* scrubber — a real range input, so arrow keys seek for free */
 .store-scrub {
@@ -1031,6 +1058,9 @@ star-field {
   .store-transport { grid-column: 1 / -1; grid-row: 2; justify-content: center; }
   .store-scrub { grid-column: 1 / -1; grid-row: 3; }
   .store-time { grid-column: 1; grid-row: 4; align-self: center; }
+  /* quality and stop share the last cell, pinned to opposite edges — at 375px
+     that cell is ~210px against ~76px + 44px of content, so they never meet */
+  .store-quality { grid-column: 2; grid-row: 4; justify-self: start; align-self: center; }
   .store-ctl-stop { grid-column: 2; grid-row: 4; justify-self: end; }
 
   .section { margin: 20px 12px; padding: 44px 24px; }
@@ -1061,6 +1091,8 @@ star-field {
     min-width: 44px;
     height: 44px;
   }
+
+  .store-quality { min-height: 44px; }
 
   .catalog-more button { min-height: 44px; }
 

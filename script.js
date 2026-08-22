@@ -78,11 +78,11 @@ window.addEventListener('pointerdown', e => {
     // &nbsp; entities become literal non-breaking spaces here.
     btn.textContent = expanded
       ? '→ show fewer'
-      : '→ full catalog \u00a0·\u00a0 30 releases';
+      : '→ full catalog \u00a0·\u00a0 29 releases';
   });
 })();
 
-// store: one shared <audio> for 30 releases, plus Stripe checkout hand-off.
+// store: one shared <audio> for 29 releases, plus Stripe checkout hand-off.
 // Everything below builds DOM with createElement/textContent — the CSP has no
 // 'unsafe-inline' and requires Trusted Types, so innerHTML is not available.
 (function () {
@@ -94,9 +94,43 @@ window.addEventListener('pointerdown', e => {
   // full tracks stream lossless where the browser can decode FLAC (all
   // current engines); anything older falls back to the 128k MP3 previews.
   const probe = document.createElement('audio');
-  const STREAM_PATH = probe.canPlayType && probe.canPlayType('audio/flac')
-    ? '/s/'
-    : '/p/';
+  const canFlac = !!(probe.canPlayType && probe.canPlayType('audio/flac'));
+
+  // stream quality: auto (default) | lossless | saver. Resolved per track load
+  // rather than once at boot — a connection can change mid-session.
+  const QUALITY_KEY = 'mj-stream-quality';
+  const MODES = ['auto', 'lossless', 'saver'];
+  const NEXT_ACTION = {
+    auto: 'press to force lossless',
+    lossless: 'press to force data saver',
+    saver: 'press to use automatic quality'
+  };
+  const STALL_BUDGET = 4000;  // ms of buffering before auto gives up on flac
+
+  let mode = 'auto';
+  try {
+    const saved = localStorage.getItem(QUALITY_KEY);
+    if (MODES.indexOf(saved) !== -1) mode = saved;
+  } catch (e) { /* storage blocked — stay on auto */ }
+
+  // once auto has been burned by a stall it stays on mp3 for the session,
+  // otherwise a marginal connection flaps between the two sources
+  let demoted = false;
+
+  function slowLink() {
+    const c = navigator.connection;
+    if (!c) return false;
+    if (c.saveData === true) return true;
+    const et = c.effectiveType;
+    return et === 'slow-2g' || et === '2g' || et === '3g';
+  }
+
+  function streamPath() {
+    if (mode === 'saver') return '/p/';
+    if (mode === 'lossless') return canFlac ? '/s/' : '/p/';
+    if (demoted || slowLink()) return '/p/';
+    return canFlac ? '/s/' : '/p/';
+  }
 
   const dataEl = document.getElementById('store-data');
   const grid = document.querySelector('.store-grid');
@@ -121,10 +155,16 @@ window.addEventListener('pointerdown', e => {
   const stopBtn = document.getElementById('store-stop');
   const scrub = document.getElementById('store-scrub');
   const timeEl = document.getElementById('store-time');
+  const qualityBtn = document.getElementById('store-quality');
+  const qModeEl = document.getElementById('store-quality-mode');
+  const qNowEl = document.getElementById('store-quality-now');
 
   let slug = null;   // release currently loaded in the bar
   let index = 0;     // 0-based position in that release's track list
   let scrubbing = false;
+  let trackNN = '';    // zero-padded track number of the loaded source
+  let currentPath = '/p/';  // path the loaded source was built from
+  let retried = false; // one mp3 retry per load, so errors can't loop
 
   function clock(s) {
     if (!isFinite(s) || s < 0) s = 0;
@@ -156,6 +196,70 @@ window.addEventListener('pointerdown', e => {
     markCards();
   }
 
+  // the label reads the setting, not the loaded source: a mode change lands on
+  // the next track, so it names the quality the next load will use
+  function paintQuality() {
+    if (!qualityBtn) return;
+    const lossless = streamPath() === '/s/';
+    qModeEl.textContent = mode;
+    qNowEl.textContent = ' · ' + (lossless ? 'flac' : '128k');
+    qualityBtn.setAttribute(
+      'aria-label',
+      'streaming quality: ' + mode + ', ' +
+      (lossless ? 'lossless' : '128 kbps') + ' now. ' + NEXT_ACTION[mode]
+    );
+  }
+
+  // cumulative buffering on the current track. Only auto watches it, and only
+  // while a lossless source is loaded — lossless mode is the user's call.
+  let stallTimer = 0, stallStart = 0, stalledMs = 0;
+
+  function stallReset() {
+    if (stallTimer) clearTimeout(stallTimer);
+    stallTimer = 0;
+    stallStart = 0;
+    stalledMs = 0;
+  }
+
+  function stallBegin() {
+    if (mode !== 'auto' || currentPath !== '/s/' || !slug || stallStart) return;
+    stallStart = Date.now();
+    stallTimer = setTimeout(() => {
+      demoted = true;
+      swapToMp3();
+    }, Math.max(0, STALL_BUDGET - stalledMs));
+  }
+
+  function stallEnd() {
+    if (stallStart) stalledMs += Date.now() - stallStart;
+    stallStart = 0;
+    if (stallTimer) clearTimeout(stallTimer);
+    stallTimer = 0;
+  }
+
+  // reload the same track from the mp3 source at the position it reached.
+  // forcePlay covers the error path, where the element is already paused but
+  // the listener still expects playback to continue.
+  function swapToMp3(forcePlay) {
+    if (!slug || currentPath === '/p/') return;
+    const at = audio.currentTime;   // read before the src assignment resets it
+    const wasPlaying = forcePlay || !audio.paused;
+    stallReset();
+    currentPath = '/p/';
+    const src = API + '/p/' + slug + '/' + trackNN;
+    audio.src = src;
+    audio.addEventListener('loadedmetadata', () => {
+      // a skip can land a different track before this fires — leave it alone
+      if (audio.currentSrc !== src && audio.src !== src) return;
+      try { audio.currentTime = at; } catch (e) { /* not seekable yet */ }
+      if (wasPlaying) {
+        const p = audio.play();
+        if (p && p.catch) p.catch(() => syncToggle());
+      }
+    }, { once: true });
+    paintQuality();
+  }
+
   function load(nextSlug, nextIndex, autoplay) {
     const rel = catalog[nextSlug];
     if (!rel) return;
@@ -167,7 +271,12 @@ window.addEventListener('pointerdown', e => {
     const track = rel.tr[index];      // [trackNumber, title, seconds]
     const nn = track[0] < 10 ? '0' + track[0] : String(track[0]);
 
-    audio.src = API + STREAM_PATH + slug + '/' + nn;
+    trackNN = nn;
+    retried = false;
+    stallReset();
+    currentPath = streamPath();
+    audio.src = API + currentPath + slug + '/' + nn;
+    paintQuality();
     bar.hidden = false;
 
     const c = card(slug);
@@ -203,6 +312,7 @@ window.addEventListener('pointerdown', e => {
   }
 
   function stop() {
+    stallReset();
     audio.pause();
     audio.removeAttribute('src');
     audio.load();
@@ -270,8 +380,23 @@ window.addEventListener('pointerdown', e => {
     syncToggle();
   });
 
+  if (qualityBtn) {
+    // cycles auto → lossless → saver. The change lands on the next track load;
+    // the playing track is left alone.
+    qualityBtn.addEventListener('click', () => {
+      mode = MODES[(MODES.indexOf(mode) + 1) % MODES.length];
+      try { localStorage.setItem(QUALITY_KEY, mode); } catch (e) { /* storage blocked */ }
+      stallEnd();  // a pending demote belongs to the mode that armed it
+      paintQuality();
+    });
+    paintQuality();
+  }
+
   audio.addEventListener('play', syncToggle);
-  audio.addEventListener('pause', syncToggle);
+  audio.addEventListener('pause', () => { stallEnd(); syncToggle(); });
+  audio.addEventListener('waiting', stallBegin);
+  audio.addEventListener('stalled', stallBegin);
+  audio.addEventListener('playing', stallEnd);
   audio.addEventListener('ended', () => {
     if (!slug) return;
     if (index < catalog[slug].tr.length - 1) step(1);
@@ -295,6 +420,14 @@ window.addEventListener('pointerdown', e => {
   audio.addEventListener('error', () => {
     // stop() clears the src, which fires error too — only report a real failure
     if (!slug) return;
+    // a lossless source that fails outright gets one mp3 attempt before the
+    // failure reaches the listener
+    if (currentPath === '/s/' && !retried) {
+      retried = true;
+      swapToMp3(true);
+      return;
+    }
+    stallReset();
     if (status) status.textContent = 'that preview didn’t load. try again in a moment.';
     syncToggle();
   });

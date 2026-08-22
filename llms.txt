@@ -1,7 +1,7 @@
 # Matthew Jamison
 
 > St. Louis, MO instrumental music producer and performer. 6-string MTD maple
-> bass and SP-404 A. 30 releases, sold direct from this site. Full-stack
+> bass and SP-404 A. 29 releases, sold direct from this site. Full-stack
 > software developer during work hours.
 
 Site: https://matthewjamison.dev/
@@ -12,7 +12,7 @@ headings below are its sections.
 
 ## quick stats
 
-- 30+ releases
+- 29 releases
 - started 2015
 - home STL
 
@@ -52,7 +52,7 @@ still healing
 
 ## store
 
-All 30 releases are sold direct from https://matthewjamison.dev/#catalog.
+All 29 releases are sold direct from https://matthewjamison.dev/#catalog.
 Every release previews in full in the browser before you buy. Checkout is
 Stripe; the download link is emailed after purchase.
 
@@ -69,7 +69,7 @@ Singles $2.99 · EPs $5.99 · albums $9.99.
 - perspectives pt.1 — album · 8 tracks · $9.99
 - sp ep: the next chapter — ep · 6 tracks · $5.99
 - hallelujah — single · 1 track · $2.99
-- the journey — album · 56 tracks · $9.99
+- the journey — album · 13 tracks · $9.99
 - perspective — ep · 3 tracks · $5.99
 - (noh)_talent — single · 1 track · $2.99
 - ball so hard — single · 1 track · $2.99
@@ -78,7 +78,6 @@ Singles $2.99 · EPs $5.99 · albums $9.99.
 - beat tape #2 — ep · 6 tracks · $5.99
 - beat tape #1 — ep · 6 tracks · $5.99
 - hold on be strong (edit) — single · 1 track · $2.99
-- dangerous (busta edit) — single · 1 track · $2.99
 - the blessing — single · 1 track · $2.99
 - wedobeatschallenge #9 — single · 1 track · $2.99
 - love bounce — single · 1 track · $2.99
