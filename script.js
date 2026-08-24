@@ -458,3 +458,175 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
     }
   });
 });
+
+// games: click-to-play fullscreen overlay. Static shell lives in index.html;
+// only the iframe is created/destroyed here (createElement — the CSP requires
+// Trusted Types, innerHTML is not available). One overlay instance ever;
+// open/close are idempotent. Native fullscreen is attempted on top of the
+// overlay, and the overlay is the source of truth either way, so the close
+// chrome is identical whether the API worked (desktop/Android/iPadOS) or
+// not (iPhone Safari has no element fullscreen).
+(function () {
+  const grid = document.getElementById('games-grid');
+  const overlay = document.getElementById('game-overlay');
+  const frameHost = document.getElementById('game-frame-host');
+  const closeBtn = document.getElementById('game-close');
+  const nameEl = document.getElementById('game-overlay-name');
+  const creditEl = document.getElementById('game-overlay-credit');
+  const errorEl = document.getElementById('game-error');
+  const retryBtn = document.getElementById('game-retry');
+  const errorCloseBtn = document.getElementById('game-error-close');
+  const musicDialog = document.getElementById('game-music-dialog');
+  const keepBtn = document.getElementById('game-music-keep');
+  const gameAudioBtn = document.getElementById('game-music-game');
+  const storeAudio = document.getElementById('store-audio');
+  if (!grid || !overlay || !frameHost || !closeBtn) return;
+
+  const LOAD_BUDGET = 10000;  // ms before the plain retry/close state shows
+
+  let open = null;      // { tile, slug, muted, scrollY } while open
+  let loadTimer = 0;
+  let pendingTile = null;  // tile awaiting the music dialog's answer
+
+  function musicPlaying() {
+    return !!(storeAudio && storeAudio.currentSrc && !storeAudio.paused);
+  }
+
+  function setInertBackground(on) {
+    // everything except the overlay is inert while a game is open, so
+    // screen readers and tab order can't wander under the game
+    document.querySelectorAll('body > :not(#game-overlay)').forEach(el => {
+      if (on) el.setAttribute('inert', '');
+      else el.removeAttribute('inert');
+    });
+  }
+
+  function showError() {
+    clearTimeout(loadTimer);
+    loadTimer = 0;
+    errorEl.hidden = false;
+  }
+
+  function buildFrame() {
+    const iframe = document.createElement('iframe');
+    iframe.src = '/games/' + open.slug + '/index.html' + (open.muted ? '?mjmute=1' : '');
+    iframe.title = open.tile.dataset.name;
+    // same-origin documentation only — not a security boundary here
+    iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-pointer-lock');
+    iframe.addEventListener('load', () => {
+      clearTimeout(loadTimer);
+      loadTimer = 0;
+      errorEl.hidden = true;
+      try {
+        iframe.contentWindow.focus();
+        // Escape inside the game must still close the overlay; keydown in
+        // the iframe never bubbles to the parent, so listen there directly
+        iframe.contentDocument.addEventListener('keydown', e => {
+          if (e.key === 'Escape') closeGame(false);
+        });
+      } catch (e) { /* frame gone mid-load */ }
+    });
+    return iframe;
+  }
+
+  function mountFrame() {
+    while (frameHost.firstChild) frameHost.removeChild(frameHost.firstChild);
+    errorEl.hidden = true;
+    clearTimeout(loadTimer);
+    loadTimer = setTimeout(showError, LOAD_BUDGET);
+    frameHost.appendChild(buildFrame());
+  }
+
+  function openGame(tile, muted) {
+    if (open) return;   // idempotent: double-click can't stack overlays
+    open = {
+      tile: tile,
+      slug: tile.dataset.slug,
+      muted: muted,
+      scrollY: window.scrollY
+    };
+    nameEl.textContent = tile.dataset.name;
+    creditEl.textContent = ' ·  game by ' + tile.dataset.author;
+    overlay.setAttribute('aria-label', tile.dataset.name);
+    document.body.classList.add('game-locked');
+    setInertBackground(true);
+    history.pushState({ mjGame: open.slug }, '');
+    overlay.hidden = false;
+    mountFrame();
+    if (overlay.requestFullscreen) {
+      overlay.requestFullscreen().catch(() => { /* iPhone: overlay IS fullscreen */ });
+    }
+  }
+
+  function closeGame(fromPopstate) {
+    if (!open) return;  // idempotent: Escape + fullscreenchange can both fire
+    const closed = open;
+    open = null;
+    clearTimeout(loadTimer);
+    loadTimer = 0;
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => { /* already leaving */ });
+    }
+    while (frameHost.firstChild) frameHost.removeChild(frameHost.firstChild);
+    errorEl.hidden = true;
+    overlay.hidden = true;
+    setInertBackground(false);
+    document.body.classList.remove('game-locked');
+    window.scrollTo(0, closed.scrollY);
+    // preventScroll: focus() would otherwise scroll the tile into view and
+    // override the restored position — scrollY is the source of truth here
+    closed.tile.focus({ preventScroll: true });
+    if (!fromPopstate && history.state && history.state.mjGame) {
+      history.back();   // pops our entry; the popstate handler is a no-op now
+    }
+  }
+
+  grid.addEventListener('click', e => {
+    const tile = e.target.closest('.game-tile-btn');
+    if (!tile || open) return;
+    if (musicPlaying() && musicDialog && musicDialog.showModal) {
+      pendingTile = tile;
+      musicDialog.showModal();
+      return;
+    }
+    openGame(tile, false);
+  });
+
+  if (keepBtn) keepBtn.addEventListener('click', () => {
+    musicDialog.close();
+    if (pendingTile) { openGame(pendingTile, true); pendingTile = null; }
+  });
+  if (gameAudioBtn) gameAudioBtn.addEventListener('click', () => {
+    if (storeAudio) storeAudio.pause();
+    musicDialog.close();
+    if (pendingTile) { openGame(pendingTile, false); pendingTile = null; }
+  });
+  if (musicDialog) musicDialog.addEventListener('cancel', () => { pendingTile = null; });
+
+  closeBtn.addEventListener('click', () => closeGame(false));
+  if (errorCloseBtn) errorCloseBtn.addEventListener('click', () => closeGame(false));
+  if (retryBtn) retryBtn.addEventListener('click', () => { if (open) mountFrame(); });
+
+  // Escape on the parent (close button focused, or CSS-overlay path on iPhone)
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && open) closeGame(false);
+  });
+
+  // user exits native fullscreen (browser Esc / gesture) → same close path,
+  // never a stranded headerless overlay
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement && open) closeGame(false);
+  });
+
+  // back button closes the overlay instead of leaving the page
+  window.addEventListener('popstate', () => {
+    if (open) closeGame(true);
+  });
+
+  // clicking overlay chrome hands focus back to the game
+  overlay.addEventListener('pointerdown', e => {
+    if (e.target === closeBtn || errorEl.contains(e.target)) return;
+    const iframe = frameHost.querySelector('iframe');
+    if (iframe) { try { iframe.contentWindow.focus(); } catch (err) { /* gone */ } }
+  });
+})();
