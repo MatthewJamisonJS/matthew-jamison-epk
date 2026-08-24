@@ -44,3 +44,19 @@
 
 /script.js
   Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+
+# ── games routes ─────────────────────────────────────────────────────────
+# Vendored third-party games are framed by index.html only. The site-wide
+# strict CSP + X-Frame-Options: DENY are detached per game route; each slug
+# carries its own least-privilege policy derived from its vendor-time audit
+# (see docs/superpowers/specs/2026-08-24-games-section-design.md §4a).
+# Trusted Types are deliberately NOT enforced here — the games use innerHTML
+# internally; exfiltration is capped by connect-src/form-action instead.
+
+# _test is the Stage 0 lifecycle test page (kept deployed: it is the
+# reference harness for the overlay contract).
+/games/_test/*
+  ! X-Frame-Options
+  ! Content-Security-Policy
+  X-Frame-Options: SAMEORIGIN
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; media-src data:; frame-ancestors 'self'; object-src 'none'; base-uri 'none'; form-action 'none'
