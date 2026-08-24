@@ -60,3 +60,4 @@
   ! Content-Security-Policy
   X-Frame-Options: SAMEORIGIN
   Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; media-src data:; frame-ancestors 'self'; object-src 'none'; base-uri 'none'; form-action 'none'
+  X-Robots-Tag: noindex
