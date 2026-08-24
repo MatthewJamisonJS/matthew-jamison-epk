@@ -1332,6 +1332,10 @@ body.game-locked {
 
 /* ── keep-listening dialog ── */
 .game-music-dialog {
+  /* the page's `* { margin: 0 }` reset overrides the UA's `dialog { margin:
+     auto }`, which is what centres a modal inside its `inset: 0` box — without
+     this the dialog sits in the top-left corner */
+  margin: auto;
   background: var(--plate-gloss), var(--plate);
   border: 1px solid var(--plate-edge);
   border-radius: var(--radius);
