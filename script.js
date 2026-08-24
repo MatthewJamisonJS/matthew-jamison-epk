@@ -487,6 +487,7 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
   let open = null;      // { tile, slug, muted, scrollY } while open
   let loadTimer = 0;
   let pendingTile = null;  // tile awaiting the music dialog's answer
+  let suppressPop = false;  // swallows the popstate our own history.back() will fire
 
   function musicPlaying() {
     return !!(storeAudio && storeAudio.currentSrc && !storeAudio.paused);
@@ -577,7 +578,10 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
     // override the restored position — scrollY is the source of truth here
     closed.tile.focus({ preventScroll: true });
     if (!fromPopstate && history.state && history.state.mjGame) {
-      history.back();   // pops our entry; the popstate handler is a no-op now
+      // history.back() fires popstate asynchronously — a fast close→reopen would
+      // otherwise let that deferred event arrive and close the new game
+      suppressPop = true;
+      history.back();
     }
   }
 
@@ -620,12 +624,13 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
 
   // back button closes the overlay instead of leaving the page
   window.addEventListener('popstate', () => {
+    if (suppressPop) { suppressPop = false; return; }
     if (open) closeGame(true);
   });
 
   // clicking overlay chrome hands focus back to the game
   overlay.addEventListener('pointerdown', e => {
-    if (e.target === closeBtn || errorEl.contains(e.target)) return;
+    if (closeBtn.contains(e.target) || errorEl.contains(e.target)) return;
     const iframe = frameHost.querySelector('iframe');
     if (iframe) { try { iframe.contentWindow.focus(); } catch (err) { /* gone */ } }
   });
