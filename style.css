@@ -1181,11 +1181,15 @@ star-field {
 }
 
 /* stage-0 placeholder art — replaced by <img> thumbnails when games land.
-   Rounds one pixel tighter than the card, like .store-art. */
+   Rounds one pixel tighter than the card, like .store-art.
+   The opacity shift is .store-card's "this card is live" language, at the same
+   0.18s. Hover and press are user-initiated feedback, so — like the store —
+   they are not cut under prefers-reduced-motion. */
 .game-tile-art {
   display: block;
   aspect-ratio: 4 / 3;
   border-radius: calc(var(--radius) - 1px);
+  transition: opacity 0.18s;
   background:
     radial-gradient(ellipse at 30% 20%, rgba(139, 31, 168, 0.28), transparent 60%),
     radial-gradient(ellipse at 75% 80%, rgba(91, 163, 108, 0.14), transparent 55%),
@@ -1206,7 +1210,31 @@ star-field {
   color: var(--text-muted);
   letter-spacing: 0.04em;
 }
+/* the underline carries the link; hover keeps --text rather than taking the
+   global a:hover accent, which measures 2.68:1 on the plate */
 .game-tile-credit a { text-decoration: underline; }
+.game-tile-credit a:hover { color: var(--text); }
+
+/* hover lights the art; press dims it further, so touch gets the same
+   confirmation a pointer gets from hover */
+.game-tile:hover .game-tile-art,
+.game-tile:focus-within .game-tile-art { opacity: 0.78; }
+.game-tile-btn:active .game-tile-art { opacity: 0.6; }
+
+/* focus: the page's accent-only ring measures 2.68:1 against a black plate,
+   under the 3:1 floor for a focus indicator, so games controls pair it with a
+   1px --text ring. Never transitioned — a focus ring has to appear at once. */
+.game-tile-btn:focus-visible,
+.game-tile-credit a:focus-visible,
+.game-close:focus-visible,
+.game-music-actions .btn:focus-visible,
+.game-music-actions .btn-ghost:focus-visible,
+.game-error-actions .btn:focus-visible,
+.game-error-actions .btn-ghost:focus-visible {
+  outline: 2px solid var(--mj-accent-bright);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 1px var(--text);
+}
 
 /* while a game is open the page underneath must not scroll or rubber-band */
 body.game-locked {
@@ -1260,9 +1288,19 @@ body.game-locked {
   font-size: 16px;
   line-height: 1;
   cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
+
+/* .store-play's exact hover recipe: the accent fills the button and the glyph
+   stays --text. The old rule tinted the glyph accent-bright, which is 2.7:1 on
+   the overlay's black — under the 4.5:1 text floor. */
 .game-close:hover,
-.game-close:focus-visible { border-color: var(--mj-accent-bright); color: var(--mj-accent-bright); }
+.game-close:focus-visible {
+  background: var(--mj-accent);
+  border-color: var(--mj-accent-bright);
+  color: var(--text);
+}
+.game-close:active { background: var(--mj-accent-bright); }
 
 .game-frame-host { flex: 1; min-height: 0; }
 .game-frame-host iframe {
@@ -1308,6 +1346,36 @@ body.game-locked {
 .game-music-actions { display: flex; flex-direction: column; gap: 10px; }
 .game-music-actions .btn,
 .game-music-actions .btn-ghost { text-align: left; }
+
+/* ── overlay + dialog control states ── */
+/* .btn-ghost ships `transition: all`, which would ease the focus ring into
+   view; naming the properties keeps box-shadow out of the transition */
+.game-music-actions .btn-ghost,
+.game-error-actions .btn-ghost {
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+/* the ghost's global hover tints the label accent-bright (2.68:1 on the
+   plate); here the border and a dim wash carry the state and the label stays
+   readable */
+.game-music-actions .btn-ghost:hover,
+.game-music-actions .btn-ghost:focus-visible,
+.game-error-actions .btn-ghost:hover,
+.game-error-actions .btn-ghost:focus-visible {
+  background: var(--mj-accent-dim);
+  border-color: var(--mj-accent-bright);
+  color: var(--text);
+}
+
+/* press states — the only feedback a touch device gets before the action runs */
+.game-music-actions .btn:active,
+.game-error-actions .btn:active { background: var(--mj-accent-bright); }
+
+.game-music-actions .btn-ghost:active,
+.game-error-actions .btn-ghost:active {
+  background: var(--mj-accent);
+  border-color: var(--mj-accent-bright);
+}
 
 /* touch: the dialog and error controls join the page's 44px minimum */
 @media (pointer: coarse) {
