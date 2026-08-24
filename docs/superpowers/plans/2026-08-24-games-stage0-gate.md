@@ -17,6 +17,26 @@
 
 ---
 
+### Task 0: Rulings reconciliation (preflight — run BEFORE any dispatch)
+
+Stage 0's controller made rulings on the user's behalf. This gate session must carry them, not re-derive or drift from them. Before Task 1:
+
+- [ ] Read the Stage 0 ledger: `.superpowers/sdd/2026-08-24-games-stage0-shell/progress.md` (Tasks 1–8 are DONE — never re-dispatch them).
+- [ ] Reconcile each ruling below against the current tree (one focused check each; a ruling whose premise no longer holds gets re-ruled and ledgered, not silently dropped):
+
+1. **Branch, not worktree** — work stays on `games-stage0`; main untouched at `4d74440`; deploy fires only on push to main. Verify branch + `git log main..games-stage0` matches the ledger's commits.
+2. **Opus implements, Fable/strong-model reviews** — user-mandated workflow; keep it for any fix dispatches this gate spawns.
+3. **`!` detach-then-set precedence undocumented** — Task 3's deployed curl is BLOCKING; no real game ships until it passes.
+4. **`focus({preventScroll:true})` deviation approved** — present at closeGame; do not "restore" the plan's original line.
+5. **History-marker residual accepted** — coalesced `back()` traversals in a non-human-reachable double-cycle; do NOT redesign the pushState flow.
+6. **404-blank-frame by design** — LOAD_BUDGET catches stalls only; owner confirmation pending (Task 4).
+7. **Focus-on-body report was mis-diagnosed** — code already focuses the tile (script.js `closeGame`); only the async-exitFullscreen hypothesis gets tested (Task 1), with the conditional fix as written.
+8. **AA fixes scoped to games only** — page-wide lift (global focus ring 2.70:1, `a:hover`/`.btn-ghost:hover` 2.68:1) awaits Matthew's sign-off (Task 4); do not lift it unasked.
+9. **Stage-1 carry-ins** (vendor-time): per-game volume read-then-write fade-loop grep (shim pins volume getter to 0); games must not globally swallow Escape; per-slug least-privilege `_headers` policies from vendor audits.
+
+- [ ] Ledger the reconciliation result (per ruling: HOLDS / RE-RULED + why) in this plan's own workspace ledger.
+- [ ] **Wrap-up contract:** the session's final message MUST include the full "Rulings I made" list — these nine carried rulings (with reconciliation outcomes) plus every new ruling this gate session makes — so nothing reaches merge on an undisclosed decision.
+
 ### Task 1: Local verification gate (original plan's Task 9, local half)
 
 REQUIRED SUB-SKILL: `superpowers:verification-before-completion`.
