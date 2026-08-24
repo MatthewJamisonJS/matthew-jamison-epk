@@ -1130,3 +1130,141 @@ star-field {
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
 }
+
+/* ── games ─────────────────────────────────────── */
+.games-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px;
+}
+@media (max-width: 560px) {
+  .games-grid { grid-template-columns: 1fr; }
+}
+
+.game-tile-btn {
+  display: block;
+  width: 100%;
+  padding: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  cursor: pointer;
+  font-family: var(--mj-font);
+  color: var(--text);
+  text-align: left;
+  transition: border-color 0.15s;
+}
+.game-tile-btn:hover,
+.game-tile-btn:focus-visible { border-color: var(--mj-accent-border); }
+
+/* stage-0 placeholder art — replaced by <img> thumbnails when games land */
+.game-tile-art {
+  display: block;
+  aspect-ratio: 16 / 10;
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(139, 31, 168, 0.28), transparent 60%),
+    radial-gradient(ellipse at 75% 80%, rgba(91, 163, 108, 0.14), transparent 55%),
+    var(--surface-2);
+}
+
+.game-tile-name {
+  display: block;
+  padding: 12px 14px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.game-tile-credit {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.game-tile-credit a { text-decoration: underline; }
+
+/* while a game is open the page underneath must not scroll or rubber-band */
+body.game-locked {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+/* ── game overlay ── */
+.game-overlay {
+  position: fixed;
+  inset: 0;
+  height: 100vh;   /* fallback first */
+  height: 100dvh;  /* tracks mobile browser chrome show/hide */
+  z-index: 9999;
+  background: #000;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+           env(safe-area-inset-bottom) env(safe-area-inset-left);
+  display: flex;
+  flex-direction: column;
+}
+.game-overlay[hidden] { display: none; }
+
+.game-overlay-chrome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 6px 6px 14px;
+}
+.game-overlay-title {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-close {
+  flex: none;
+  width: 44px;   /* WCAG target size */
+  height: 44px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.game-close:hover,
+.game-close:focus-visible { border-color: var(--mj-accent-bright); color: var(--mj-accent-bright); }
+
+.game-frame-host { flex: 1; min-height: 0; }
+.game-frame-host iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.game-error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: #000;
+}
+.game-error[hidden] { display: none; }
+.game-error-actions { display: flex; gap: 12px; }
+
+/* ── keep-listening dialog ── */
+.game-music-dialog {
+  background: var(--plate);
+  border: 1px solid var(--plate-edge);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--mj-font);
+  padding: 22px;
+  max-width: 340px;
+}
+.game-music-dialog::backdrop { background: rgba(0, 0, 0, 0.6); }
+.game-music-note { margin: 10px 0 16px; font-size: 12px; }
+.game-music-actions { display: flex; gap: 12px; flex-wrap: wrap; }
