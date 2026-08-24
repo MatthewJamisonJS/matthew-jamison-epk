@@ -1277,15 +1277,20 @@ body.game-locked {
   white-space: nowrap;
 }
 
+/* same construction as .store-play: a 44px box centring a 16px inline svg from
+   the page's icon set, so the glyph can't shift with the font */
 .game-close {
   flex: none;
   width: 44px;   /* WCAG target size */
   height: 44px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   color: var(--text);
-  font-size: 16px;
   line-height: 1;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, color 0.15s;

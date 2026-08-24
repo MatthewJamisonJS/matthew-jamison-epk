@@ -547,7 +547,7 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
       scrollY: window.scrollY
     };
     nameEl.textContent = tile.dataset.name;
-    creditEl.textContent = ' ·  game by ' + tile.dataset.author;
+    creditEl.textContent = ' · game by ' + tile.dataset.author;
     overlay.setAttribute('aria-label', tile.dataset.name);
     document.body.classList.add('game-locked');
     setInertBackground(true);
