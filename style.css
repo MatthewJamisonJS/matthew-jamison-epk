@@ -1046,20 +1046,24 @@ star-field {
 
   .store-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
+  .store-player { padding: 14px 16px; }
+
   /* the bar stacks top-to-bottom rather than squeezing six tracks of grid into
      a phone width: what's playing, then the transport centred on the bar's
      axis, then the scrubber full-width, then time and stop on the outer edges.
      Four rows keeps room for 44px controls without crushing the title. */
   .store-player-row {
-    grid-template-columns: 52px minmax(0, 1fr);
-    row-gap: 12px;
+    /* first column sizes to its widest occupant — 52px of art on row 1, the
+       ~76px nowrap time on row 4 — so the time can't spill into column 2 */
+    grid-template-columns: auto minmax(0, 1fr);
+    row-gap: 14px;
   }
 
   .store-transport { grid-column: 1 / -1; grid-row: 2; justify-content: center; }
   .store-scrub { grid-column: 1 / -1; grid-row: 3; }
   .store-time { grid-column: 1; grid-row: 4; align-self: center; }
-  /* quality and stop share the last cell, pinned to opposite edges — at 375px
-     that cell is ~210px against ~76px + 44px of content, so they never meet */
+  /* time holds column 1 on the last row; quality and stop share column 2,
+     pinned to opposite edges */
   .store-quality { grid-column: 2; grid-row: 4; justify-self: start; align-self: center; }
   .store-ctl-stop { grid-column: 2; grid-row: 4; justify-self: end; }
 
@@ -1076,9 +1080,18 @@ star-field {
   .contact-row { grid-template-columns: 1fr; gap: 4px; }
   /* stacked rows centre with the rest of the phone layout */
   .contact-grid { max-width: none; text-align: center; }
-  .store-grid { gap: 10px; }
-  .store-card { padding: 8px 8px 10px; }
+  .store-grid { gap: 12px; }
+  .store-card { padding: 10px 10px 12px; }
   .store-buy { font-size: 10px; padding: 8px 8px; }
+}
+
+/* under ~360px the row-4 cell can't hold the quality chip and stop button
+   side by side, so the last row splits: time gets the full width, quality
+   and stop drop to a fifth row on opposite edges */
+@media (max-width: 360px) {
+  .store-time { grid-column: 1 / -1; }
+  .store-quality { grid-column: 1; grid-row: 5; }
+  .store-ctl-stop { grid-column: 2; grid-row: 5; }
 }
 
 /* ── touch targets ───────────────────────────── */
