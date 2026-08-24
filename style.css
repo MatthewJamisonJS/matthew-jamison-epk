@@ -1132,36 +1132,60 @@ star-field {
 }
 
 /* ── games ─────────────────────────────────────── */
+/* 2 up, collapsing to 1 up at the same 768px the watch grid uses — these are
+   the page's other pair of screen-shaped media cells, so they share its
+   rhythm (24px gutter, 4/3 stage) rather than inventing a third. */
 .games-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 18px;
-}
-@media (max-width: 560px) {
-  .games-grid { grid-template-columns: 1fr; }
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
 }
 
+/* the games block sits after the responsive section in this file, so its own
+   breakpoints have to live here — a rule up in the 768px block would be
+   overridden by the base rule above at equal specificity */
+@media (max-width: 768px) {
+  .games-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* the tile is a plate card, same construction as .store-card: art, name and
+   credit all live inside one plate, and the card — not the button — carries
+   the state border, so focus anywhere inside lights the whole tile */
+.game-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 10px 12px;
+  background: var(--plate-gloss), var(--plate);
+  border: 1px solid rgba(255, 255, 255, 0.035);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 26px -18px rgba(0, 0, 0, 0.95);
+  transition: border-color 0.18s;
+}
+
+.game-tile:hover,
+.game-tile:focus-within { border-color: var(--mj-accent-border); }
+
 .game-tile-btn {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   width: 100%;
   padding: 0;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  overflow: hidden;
+  background: none;
+  border: 0;
   cursor: pointer;
   font-family: var(--mj-font);
   color: var(--text);
   text-align: left;
-  transition: border-color 0.15s;
 }
-.game-tile-btn:hover,
-.game-tile-btn:focus-visible { border-color: var(--mj-accent-border); }
 
-/* stage-0 placeholder art — replaced by <img> thumbnails when games land */
+/* stage-0 placeholder art — replaced by <img> thumbnails when games land.
+   Rounds one pixel tighter than the card, like .store-art. */
 .game-tile-art {
   display: block;
-  aspect-ratio: 16 / 10;
+  aspect-ratio: 4 / 3;
+  border-radius: calc(var(--radius) - 1px);
   background:
     radial-gradient(ellipse at 30% 20%, rgba(139, 31, 168, 0.28), transparent 60%),
     radial-gradient(ellipse at 75% 80%, rgba(91, 163, 108, 0.14), transparent 55%),
@@ -1170,15 +1194,17 @@ star-field {
 
 .game-tile-name {
   display: block;
-  padding: 12px 14px;
   font-size: 12px;
-  letter-spacing: 0.04em;
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+  overflow-wrap: anywhere;
 }
 
 .game-tile-credit {
-  margin-top: 6px;
+  margin-top: auto;
   font-size: 11px;
   color: var(--text-muted);
+  letter-spacing: 0.04em;
 }
 .game-tile-credit a { text-decoration: underline; }
 
@@ -1203,14 +1229,18 @@ body.game-locked {
 }
 .game-overlay[hidden] { display: none; }
 
+/* symmetric 8px inset; the title takes its own 8px so the copy lines up
+   optically with the close button's edge rather than the overlay's */
 .game-overlay-chrome {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 6px 6px 6px 14px;
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
 }
 .game-overlay-title {
+  padding-inline-start: 8px;
   font-size: 11px;
   letter-spacing: 0.04em;
   color: var(--text);
@@ -1250,21 +1280,39 @@ body.game-locked {
   align-items: center;
   justify-content: center;
   gap: 16px;
+  padding: 24px;
+  text-align: center;
   background: #000;
 }
 .game-error[hidden] { display: none; }
-.game-error-actions { display: flex; gap: 12px; }
+.game-error-actions { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
 
 /* ── keep-listening dialog ── */
 .game-music-dialog {
-  background: var(--plate);
+  background: var(--plate-gloss), var(--plate);
   border: 1px solid var(--plate-edge);
   border-radius: var(--radius);
+  box-shadow: 0 30px 68px -26px rgba(0, 0, 0, 0.94);
   color: var(--text);
   font-family: var(--mj-font);
-  padding: 22px;
+  padding: 24px;
+  /* 340px on a desktop, gutter-respecting on a phone */
+  width: min(340px, calc(100vw - 32px));
   max-width: 340px;
 }
 .game-music-dialog::backdrop { background: rgba(0, 0, 0, 0.6); }
-.game-music-note { margin: 10px 0 16px; font-size: 12px; }
-.game-music-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+.game-music-note { margin: 10px 0 20px; font-size: 12px; }
+/* stacked, not a row: the two labels are too long to sit side by side inside a
+   340px plate at any width, so they get one full-width target each instead of
+   a row that silently wraps */
+.game-music-actions { display: flex; flex-direction: column; gap: 10px; }
+.game-music-actions .btn,
+.game-music-actions .btn-ghost { text-align: left; }
+
+/* touch: the dialog and error controls join the page's 44px minimum */
+@media (pointer: coarse) {
+  .game-music-actions .btn,
+  .game-music-actions .btn-ghost,
+  .game-error-actions .btn,
+  .game-error-actions .btn-ghost { min-height: 44px; }
+}
