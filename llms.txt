@@ -88,12 +88,9 @@ Singles $2.99 · EPs $5.99 · albums $9.99.
 - sideshow — single · 1 track · $2.99
 - new start — album · 15 tracks · $9.99
 
-## games
+## games (free · in-browser)
 
-free · in-browser
-
-- overlay test — game by matthew jamison
-  https://github.com/MatthewJamisonJS
+- overlay test — game by matthew jamison: https://github.com/MatthewJamisonJS
 
 ## services
 
