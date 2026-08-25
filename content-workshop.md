@@ -899,6 +899,98 @@ It only appears once something is playing.
 
 ---
 
+## games (new section — added 2026-08-25; real games land after your words do)
+
+<!-- slot:games.label file:index.html -->
+### games · section label (the `// comment` line)
+
+> current:
+> // games &nbsp;·&nbsp; free &nbsp;·&nbsp; in-browser
+
+<!-- WRITE BELOW -->
+
+<!-- END -->
+
+<!-- slot:games.dialog.q file:index.html -->
+### games · keep-listening dialog — the question
+
+Shows when you open a game while one of your tracks is playing.
+
+> current:
+> // keep listening?
+
+<!-- WRITE BELOW -->
+
+<!-- END -->
+
+<!-- slot:games.dialog.note file:index.html -->
+### games · keep-listening dialog — the explainer line
+
+> current:
+> keep your track playing and the game runs silent — or pause it and hear the game.
+
+<!-- WRITE BELOW -->
+
+<!-- END -->
+
+<!-- slot:games.dialog.buttons file:index.html type:grouped -->
+### games · keep-listening dialog — the two buttons (one per line)
+
+> current:
+> → keep my music
+> → game audio
+
+<!-- WRITE BELOW -->
+
+<!-- END -->
+
+<!-- slot:games.error.text file:index.html -->
+### games · when a game fails to load
+
+> current:
+> the game didn't load.
+
+<!-- WRITE BELOW -->
+
+<!-- END -->
+
+<!-- slot:games.error.buttons file:index.html type:grouped -->
+### games · load-error buttons (one per line)
+
+> current:
+> → retry
+> → back to the page
+
+<!-- WRITE BELOW -->
+
+<!-- END -->
+
+<!-- slot:games.intro file:index.html occurrence-note:"does not exist yet — write it and it gets added as an intro line under the section label; blank = no intro line at all" -->
+### games · optional intro line (currently the section has none)
+
+> current:
+> (none — the grid starts right under the label)
+
+<!-- WRITE BELOW -->
+
+<!-- END -->
+
+<!-- slot:games.tile.convention file:index.html occurrence-note:"convention, not a single string — governs how each real game tile is labeled when 2048 / tiny platformer / floppy bird land" -->
+### games · tile label convention
+
+Each tile shows the game name plus a credit line. Current pattern (from the test tile):
+tile name lowercase (`overlay test`), credit `game by <author linked to their repo>`.
+Write here only if you want a different pattern (e.g. different credit phrasing).
+
+> current:
+> game by [author]
+
+<!-- WRITE BELOW -->
+
+<!-- END -->
+
+---
+
 ## appendix · invisible strings changed by the store (these mentioned bandcamp)
 
 <!-- slot:meta.description2 file:index.html -->
