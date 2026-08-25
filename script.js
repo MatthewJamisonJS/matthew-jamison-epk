@@ -754,6 +754,7 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
 
   let open = null;      // { tile, slug, muted, scrollY } while open
   let loadTimer = 0;
+  let mountSeq = 0;     // only the newest mount attempt may append an iframe
   let pendingTile = null;  // tile awaiting the music dialog's answer
   let suppressPop = false;  // swallows the popstate our own history.back() will fire
 
@@ -778,9 +779,15 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
     errorEl.hidden = false;
   }
 
+  // trailing slash, not /index.html — the edge 308s the file form to this one
+  // (query preserved), so pinning it here saves a redirect on every open
+  function gameUrl() {
+    return '/games/' + open.slug + '/' + (open.muted ? '?mjmute=1' : '');
+  }
+
   function buildFrame() {
     const iframe = document.createElement('iframe');
-    iframe.src = '/games/' + open.slug + '/index.html' + (open.muted ? '?mjmute=1' : '');
+    iframe.src = gameUrl();
     iframe.title = open.tile.dataset.name;
     // same-origin documentation only — not a security boundary here
     iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-pointer-lock');
@@ -803,12 +810,26 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
     return iframe;
   }
 
+  // preflight the URL before mounting: a missing game answers 404 in
+  // milliseconds, so the error state shows at once instead of after the
+  // LOAD_BUDGET stall (an iframe 404 fires `load`, not `error`). The timer
+  // stays as the backstop for a game that answers 200 and then hangs.
   function mountFrame() {
+    const seq = ++mountSeq;
     while (frameHost.firstChild) frameHost.removeChild(frameHost.firstChild);
     errorEl.hidden = true;
     clearTimeout(loadTimer);
     loadTimer = setTimeout(showError, LOAD_BUDGET);
-    frameHost.appendChild(buildFrame());
+    // stale guard: `open` goes null on close, and seq moves on a reopen or a
+    // second retry — either way an in-flight preflight must not mount
+    const live = () => open && seq === mountSeq;
+    fetch(gameUrl(), { method: 'GET', cache: 'no-store' }).then(res => {
+      if (!live()) return;
+      if (!res.ok) { showError(); return; }
+      frameHost.appendChild(buildFrame());
+    }).catch(() => {
+      if (live()) showError();   // offline / DNS — same dead end for the player
+    });
   }
 
   function openGame(tile, muted) {
