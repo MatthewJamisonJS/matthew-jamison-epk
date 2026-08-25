@@ -22,7 +22,7 @@ jobs:
       # their ?v= query with the commit SHA so every deploy is a new URL and
       # returning phones never run stale JS against fresh HTML.
       - name: version assets
-        run: sed -i "s/?v=dev/?v=${GITHUB_SHA::8}/g" index.html
+        run: sed -i "s/?v=dev/?v=${GITHUB_SHA::8}/g" index.html 404.html
       # deploy-time minify only — the repo stays readable, no local build step.
       # starfield.js is left alone: it lives under the immutable /assets/* cache
       # rule, and changing its bytes under the same URL breaks that contract.
