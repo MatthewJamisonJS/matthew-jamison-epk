@@ -857,6 +857,21 @@ still healing</p>
           </button>
           <p class="game-tile-credit">game by <a href="https://github.com/nebez/floppybird" target="_blank" rel="noopener">Nebez Briefkani</a></p>
         </div>
+        <div class="game-tile">
+          <button
+            type="button"
+            class="game-tile-btn"
+            data-slug="sandspiel"
+            data-name="sandspiel"
+            data-author="Max Bittker"
+            data-controls="pick an element · drag to draw"
+            data-info="This is the offline sandbox version of Sandspiel. The community gallery — uploading and browsing other players' creations — is disabled here. Every element and physics interaction works exactly like the original. For the full community experience, visit sandspiel.club."
+          >
+            <img class="game-tile-art" src="assets/games/sandspiel-thumb.webp" alt="" width="700" height="525" loading="lazy" decoding="async">
+            <span class="game-tile-name">sandspiel</span>
+          </button>
+          <p class="game-tile-credit">game by <a href="https://github.com/MaxBittker/sandspiel" target="_blank" rel="noopener">Max Bittker</a></p>
+        </div>
       </div>
     </section>
 
@@ -995,8 +1010,16 @@ github &nbsp;&nbsp;&nbsp;<span class="arrow">→</span> <a href="https://github.
     <div class="game-overlay-chrome">
       <p class="game-overlay-title"><span id="game-overlay-name"></span> <span class="muted" id="game-overlay-credit"></span></p>
       <p class="game-overlay-controls muted" id="game-overlay-controls"></p>
+      <!-- ⓘ note: only shown for a tile carrying data-info (sandspiel's offline-
+           sandbox caveat). aria-expanded drives a sibling panel whose text is set
+           with textContent — Trusted Types forbids innerHTML. -->
+      <button type="button" id="game-info-btn" class="game-info-btn" aria-expanded="false" aria-controls="game-info-panel" hidden>
+        <svg class="icon icon-info" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false"><path d="M10 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16Zm0 1.5a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13ZM9.25 8.75h1.5v5.5h-1.5v-5.5ZM10 5.5a.9.9 0 1 1 0 1.8.9.9 0 0 1 0-1.8Z"/></svg>
+        <span class="game-info-btn-label">about this build</span>
+      </button>
       <button type="button" id="game-close" class="game-close" aria-label="close game"><svg class="icon icon-close" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg></button>
     </div>
+    <p id="game-info-panel" class="game-info-panel muted" hidden></p>
     <div id="game-frame-host" class="game-frame-host"></div>
     <div id="game-error" class="game-error" role="alert" hidden>
       <p class="muted">the game didn't load.</p>

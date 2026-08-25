@@ -740,6 +740,8 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
   const nameEl = document.getElementById('game-overlay-name');
   const creditEl = document.getElementById('game-overlay-credit');
   const controlsEl = document.getElementById('game-overlay-controls');
+  const infoBtn = document.getElementById('game-info-btn');
+  const infoPanel = document.getElementById('game-info-panel');
   const errorEl = document.getElementById('game-error');
   const retryBtn = document.getElementById('game-retry');
   const errorCloseBtn = document.getElementById('game-error-close');
@@ -764,6 +766,24 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
     return Array.prototype.some.call(
       storeAudioEls(), a => a.currentSrc && !a.paused
     );
+  }
+
+  // ⓘ note: only tiles carrying data-info get the button. The panel starts
+  // collapsed on every open, so a note left open on one game can't bleed into
+  // the next. textContent, never innerHTML — Trusted Types is enforced here.
+  function setInfo(text) {
+    if (!infoBtn || !infoPanel) return;
+    infoPanel.textContent = text || '';
+    infoPanel.hidden = true;
+    infoBtn.setAttribute('aria-expanded', 'false');
+    infoBtn.hidden = !text;
+  }
+
+  function toggleInfo() {
+    if (!infoBtn || !infoPanel) return;
+    const nowOpen = infoPanel.hidden;
+    infoPanel.hidden = !nowOpen;
+    infoBtn.setAttribute('aria-expanded', String(nowOpen));
   }
 
   function setInertBackground(on) {
@@ -858,6 +878,7 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
     nameEl.textContent = tile.dataset.name;
     creditEl.textContent = ' · game by ' + tile.dataset.author;
     controlsEl.textContent = tile.dataset.controls || '';
+    setInfo(tile.dataset.info || '');
     overlay.setAttribute('aria-label', tile.dataset.name);
     document.body.classList.add('game-locked');
     setInertBackground(true);
@@ -881,6 +902,7 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
     }
     while (frameHost.firstChild) frameHost.removeChild(frameHost.firstChild);
     controlsEl.textContent = '';
+    setInfo('');
     errorEl.hidden = true;
     overlay.hidden = true;
     setInertBackground(false);
@@ -919,6 +941,8 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
   });
   if (musicDialog) musicDialog.addEventListener('cancel', () => { pendingTile = null; });
 
+  if (infoBtn) infoBtn.addEventListener('click', toggleInfo);
+
   closeBtn.addEventListener('click', () => closeGame(false));
   if (errorCloseBtn) errorCloseBtn.addEventListener('click', () => closeGame(false));
   if (retryBtn) retryBtn.addEventListener('click', () => { if (open) mountFrame(); });
@@ -943,6 +967,10 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
   // clicking overlay chrome hands focus back to the game
   overlay.addEventListener('pointerdown', e => {
     if (closeBtn.contains(e.target) || errorEl.contains(e.target)) return;
+    // the ⓘ button and its panel are chrome the visitor is reading — handing
+    // focus back to the game mid-click would collapse the note they just opened
+    if ((infoBtn && infoBtn.contains(e.target)) ||
+        (infoPanel && infoPanel.contains(e.target))) return;
     const iframe = frameHost.querySelector('iframe');
     if (iframe) { iframe.focus(); }
   });

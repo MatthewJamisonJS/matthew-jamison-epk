@@ -1304,6 +1304,67 @@ body.game-locked {
 }
 .game-overlay-controls:empty { display: none; }
 
+/* ⓘ note button. Only rendered for a tile carrying data-info, so the chrome is
+   unchanged for the other games. Same 44px WCAG target and hover recipe as
+   .game-close; the label sits beside the glyph rather than in an aria-label, so
+   the accessible name is the visible text. */
+.game-info-btn {
+  flex: none;
+  min-height: 44px;   /* WCAG target size */
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.game-info-btn[hidden] { display: none; }
+.game-info-btn:hover,
+.game-info-btn:focus-visible {
+  background: var(--mj-accent);
+  border-color: var(--mj-accent-bright);
+  color: var(--text);
+}
+.game-info-btn:active { background: var(--mj-accent-bright); }
+.game-info-btn[aria-expanded="true"] {
+  border-color: var(--mj-accent-bright);
+  color: var(--text);
+}
+
+/* the panel the button toggles: a full-width band under the chrome, so it
+   pushes the frame down instead of covering the game */
+.game-info-panel {
+  margin: 0;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.game-info-panel[hidden] { display: none; }
+
+/* the label is the accessible name; drop it on narrow screens and let the
+   glyph carry the button, which is why the svg is not aria-hidden-only chrome */
+@media (max-width: 520px) {
+  .game-info-btn-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .game-info-btn { padding: 0; width: 44px; justify-content: center; }
+}
+
 /* same construction as .store-play: a 44px box centring a 16px inline svg from
    the page's icon set, so the glyph can't shift with the font */
 .game-close {
