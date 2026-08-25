@@ -54,7 +54,8 @@
 # internally; exfiltration is capped by connect-src/form-action instead.
 
 # _test is the Stage 0 lifecycle test page (kept deployed: it is the
-# reference harness for the overlay contract).
+# reference harness for the overlay contract). It is no longer a tile on the
+# grid — reach it by direct URL.
 /games/_test/*
   ! X-Frame-Options
   ! Content-Security-Policy

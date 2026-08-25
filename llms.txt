@@ -93,7 +93,6 @@ Singles $2.99 · EPs $5.99 · albums $9.99.
 - 2048 — game by Gabriele Cirulli: https://github.com/gabrielecirulli/2048
 - tiny platformer — game by Jake Gordon: https://github.com/jakesgordon/javascript-tiny-platformer
 - floppy bird — game by Nebez Briefkani: https://github.com/nebez/floppybird
-- overlay test — game by matthew jamison: https://github.com/MatthewJamisonJS
 
 ## services
 
