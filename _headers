@@ -81,3 +81,40 @@
 
 /games/2048/style/*
   Cache-Control: public, max-age=31536000, immutable
+
+# tiny platformer — jakesgordon/javascript-tiny-platformer @ 50cbd06c, MIT.
+# Vendor-time audit: no eval/new Function, no document.write, no style=""
+# attrs, no <form>, no storage APIs, no audio/video, no external hosts (the
+# only http(s):// strings are two source-comment credits). The one inline
+# <style> block was externalized to platformer.css, so style-src 'self' covers
+# the whole page — FPSMeter writes element.style properties, which is CSSOM
+# and not gated. connect-src 'self' IS required: platformer.js fetches
+# level.json over same-origin XMLHttpRequest at startup. img-src, font-src and
+# media-src are omitted deliberately — nothing loads an image (the map is
+# drawn with fillRect; tiles.png ships only because level.json names it as its
+# Tiled tileset, and is never requested), there is no @font-face, and there is
+# no sound. They fall through to default-src 'none'.
+/games/tiny-platformer/*
+  ! X-Frame-Options
+  ! Content-Security-Policy
+  X-Frame-Options: SAMEORIGIN
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'none'; form-action 'none'
+  X-Robots-Tag: noindex
+
+# The game's assets all sit in the slug root next to index.html, so they are
+# pinned per file rather than by directory — index.html itself must stay
+# revalidatable.
+/games/tiny-platformer/platformer.js
+  Cache-Control: public, max-age=31536000, immutable
+
+/games/tiny-platformer/fpsmeter.min.js
+  Cache-Control: public, max-age=31536000, immutable
+
+/games/tiny-platformer/platformer.css
+  Cache-Control: public, max-age=31536000, immutable
+
+/games/tiny-platformer/level.json
+  Cache-Control: public, max-age=31536000, immutable
+
+/games/tiny-platformer/tiles.png
+  Cache-Control: public, max-age=31536000, immutable
