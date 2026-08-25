@@ -604,26 +604,64 @@ star-field {
 .store-grid:not(.expanded) .store-card:nth-child(n+13) { display: none; }
 
 /* full-strength text, not the accent: --mj-accent-bright measures ~2.8:1 on the
-   plate, and a failure message is the one string that has to be readable */
+   plate, and a failure message is the one string that has to be readable.
+   Docked to the viewport on the same measure as the player bar: a checkout can
+   fail from #catalog or from #samples, and the message has to land on screen
+   either way. It floats over content now, so it carries its own plate rather
+   than sitting on the section's.
+   --store-note-lift is written by script.js: 0 when the bar is down, so the
+   note takes the bar's slot, and the bar's height plus a 10px gap when the bar
+   is up, so the two stack instead of overlapping. */
 .store-status {
-  margin-top: 14px;
+  position: fixed;
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  width: calc(100% - 64px);
+  max-width: calc(var(--max-w) - 64px);
+  bottom: calc(12px + var(--store-note-lift, 0px) + env(safe-area-inset-bottom));
+  /* one step above the bar, still under the sticky nav and the game overlay */
+  z-index: 51;
+  padding: 10px 14px;
+  background: var(--plate-gloss), var(--plate);
+  border: 1px solid var(--mj-accent-border);
+  border-radius: var(--radius);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  box-shadow: 0 18px 40px -22px rgba(0, 0, 0, 0.95);
   font-size: 12px;
   color: var(--text);
   letter-spacing: 0.04em;
   text-align: center;
 }
 
+/* the whole affordance is the message: no message, no element. This is also
+   what keeps it out of the at-rest layout entirely. */
 .store-status:empty { display: none; }
 
 /* ── store player ────────────────────────────── */
-/* one bar for the whole store. Sticks to the bottom of the viewport while the
-   store is on screen, so the transport stays reachable while browsing. */
+/* one bar for the whole store, and the store is now two sections apart —
+   #catalog and #samples. It used to be `sticky` inside #catalog, which meant
+   it left the viewport the moment you scrolled past the catalog, so every
+   preview started from #samples played with no transport on screen. Page-level
+   and `fixed` instead: the bar is pinned to the viewport wherever the preview
+   was started from. It stays display:none until a track loads, so nothing is
+   covered while the page is idle; body.store-open opens the matching runway at
+   the foot of the page so the footer is never sealed under it.
+   z-index 50 sits above page content but under the sticky nav (100) and well
+   under the game overlay (9999), so a game still covers the bar. */
 .store-player {
-  position: sticky;
+  position: fixed;
+  /* centred on the page's own measure rather than run edge to edge, so the bar
+     lines up with the section it was launched from */
+  left: 0;
+  right: 0;
+  margin-inline: auto;
+  width: calc(100% - 64px);
+  max-width: calc(var(--max-w) - 64px);
   /* clears the iOS home indicator when the bar parks at the bottom edge */
   bottom: calc(12px + env(safe-area-inset-bottom));
-  z-index: 3;
-  margin-top: 22px;
+  z-index: 50;
   padding: 12px 14px;
   background: var(--plate-gloss), var(--plate);
   border: 1px solid var(--mj-accent-border);
@@ -635,6 +673,21 @@ star-field {
 }
 
 .store-player[hidden] { display: none; }
+
+/* the bar is fixed, so while it is up it would otherwise sit permanently on
+   top of whatever is at the foot of the page — the footer links, in practice.
+   script.js puts .store-open on <body> for exactly as long as the bar is
+   visible, and this opens a runway the height of the bar plus its offset.
+   Padding at the very end of the document: page height changes, nothing above
+   it moves, so docking either strip costs no layout shift. --store-dock-h is
+   the measured height of whatever is docked — the bar, the status note, or
+   both plus the gap between them — written by script.js on every state change
+   and on resize. It cannot be a constant: the bar alone is 105px in one row on
+   the card and 283px in four on a phone. The literal is the no-JS fallback. */
+body.store-open,
+body.store-note {
+  padding-bottom: calc(var(--store-dock-h, 124px) + 24px + env(safe-area-inset-bottom));
+}
 
 .store-player-label {
   font-size: 11px;
@@ -1062,7 +1115,16 @@ star-field {
 
   .store-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
-  .store-player { padding: 14px 16px; }
+  /* the page's own gutter narrows here, so the fixed bar's does too */
+  .store-player {
+    padding: 14px 16px;
+    /* .section drops to a 12px outer margin here, so the bar matches the panel
+       edge above it rather than the text column inside it */
+    width: calc(100% - 24px);
+  }
+
+  /* the note shares the bar's measure at every width */
+  .store-status { width: calc(100% - 24px); }
 
   /* the bar stacks top-to-bottom rather than squeezing six tracks of grid into
      a phone width: what's playing, then the transport centred on the bar's
@@ -1472,4 +1534,131 @@ body.game-locked {
   .game-music-actions .btn-ghost,
   .game-error-actions .btn,
   .game-error-actions .btn-ghost { min-height: 44px; }
+}
+
+/* ── bass samples ──────────────────────────────── */
+/* Three products, not a wall: two peer packs and the bundle that contains
+   them. The grid says so — packs share a row, the bundle spans it. Cards are
+   .store-card underneath (plate, state border, play control, buy button all
+   inherited); everything below only resizes and re-lays them out, and lives at
+   the end of the file so it wins over the base rules at equal specificity.
+   The 768px collapse is the same one .games-grid and the watch grid use. */
+.samples-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+}
+
+/* the art here is the product — bigger than a catalog tile, and the covers are
+   square, so no crop. The body column between art and buy holds the three
+   lines that separate a pack from a release: name, what's inside, price. */
+.sample-card { gap: 12px; padding: 12px 12px 14px; }
+
+.sample-art { border-radius: calc(var(--radius) - 1px); }
+
+.sample-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* one step up from .store-title: at 2-up these names carry the row */
+.sample-title { font-size: 14px; }
+
+/* the substance line. --text-muted is the AA token; the count is the pitch,
+   so it sits directly under the name rather than beside the price. */
+.sample-facts {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+  overflow-wrap: anywhere;
+}
+
+/* every card ends the same way: the price sits on the line with the control it
+   belongs to, so the card closes on a decision rather than on a full-width
+   slab of button. margin-top:auto is .store-buy's column rule, moved up to the
+   row that now carries it. */
+.sample-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 2px;
+}
+
+.sample-foot .store-buy { margin-top: 0; flex: none; }
+
+/* the bundle is both packs, so it spans both columns and turns on its side:
+   art left at a fixed width, copy and price/buy in a row beside it. A shelf,
+   not a third tile — the shape itself says "this one is the pair". */
+.sample-card-bundle {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+}
+
+/* the composite is two covers on one square canvas, so each one is only half
+   the box wide — 148px left them illegible and the 44px play control sat on
+   top of one. 200px is the smallest size where both covers still read and the
+   control lands on the canvas's own dark band. */
+.sample-card-bundle .sample-art {
+  flex: none;
+  width: 200px;
+  border-radius: calc(var(--radius) - 1px);
+}
+
+.sample-card-bundle .sample-body { flex: 1 1 auto; }
+
+/* in the row the foot stops being a footer and becomes the right-hand end:
+   price over button, so the pair still reads as one unit */
+.sample-card-bundle .sample-foot {
+  flex: none;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  margin-top: 0;
+  padding-top: 0;
+}
+
+@media (max-width: 768px) {
+  .samples-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+}
+
+/* below this the bundle's row would squeeze the buy button onto two lines, so
+   the price and button drop to their own full-width line while the art keeps
+   its side */
+@media (max-width: 560px) {
+  .sample-card-bundle {
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .sample-card-bundle .sample-art { width: 132px; }
+  .sample-card-bundle .sample-body { flex: 1 1 140px; }
+  .sample-card-bundle .sample-foot {
+    flex: 1 0 100%;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .sample-title { font-size: 13px; }
+}
+
+/* narrower than this the copy column beside the art is down to ~15 characters
+   and the pack names shred. The art gives up its side and sits on top at a
+   size that still marks the bundle as the odd one out — it never goes
+   full-bleed the way a pack cover does. */
+@media (max-width: 430px) {
+  .sample-card-bundle {
+    flex-direction: column;
+    align-items: stretch;
+    flex-wrap: nowrap;
+  }
+  .sample-card-bundle .sample-art { width: 132px; }
+  .sample-card-bundle .sample-body { flex: 0 0 auto; }
+  .sample-card-bundle .sample-foot { flex: 0 0 auto; }
 }

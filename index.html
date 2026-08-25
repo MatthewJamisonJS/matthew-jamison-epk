@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="description" content="matthew jamison · st. louis instrumental music producer · 6-string MTD bass · sp-404 a performer · 29 releases, buy direct">
+  <meta name="description" content="matthew jamison · st. louis session bassist & instrumental music producer · bass sample packs: original bass grooves, loops, fills & one shots · buy direct">
   <meta name="theme-color" content="#600675">
   <meta property="og:title" content="matthew jamison · epk">
-  <meta property="og:description" content="STL instrumental music artist · 6-string MTD bass · sp-404">
+  <meta property="og:description" content="STL session bassist · bass sample packs · 6-string MTD bass · sp-404">
   <meta property="og:image" content="https://matthewjamison.dev/assets/og-cover.jpg">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://matthewjamison.dev/">
@@ -16,6 +16,8 @@
   <script type="application/ld+json">
 {
   "@context": "https://schema.org",
+  "@graph": [
+  {
   "@type": "Person",
   "@id": "https://matthewjamison.dev/#matthew-jamison",
   "name": "Matthew Jamison",
@@ -74,6 +76,56 @@
       "description": "Real-time arranging. Available alongside SP-404 A sets or standalone."
     }
   ]
+  },
+  {
+    "@type": "Product",
+    "@id": "https://matthewjamison.dev/#infinity-loops",
+    "name": "infinity loops",
+    "description": "over 50 original bass grooves",
+    "image": "https://matthewjamison.dev/assets/covers/infinity-loops-700.webp",
+    "category": "Bass sample pack",
+    "offers": {
+      "@type": "Offer",
+      "url": "https://matthewjamison.dev/#samples",
+      "price": "20.00",
+      "priceCurrency": "USD",
+      "availability": "https://schema.org/InStock",
+      "seller": { "@id": "https://matthewjamison.dev/#matthew-jamison" }
+    }
+  },
+  {
+    "@type": "Product",
+    "@id": "https://matthewjamison.dev/#bass-latin-vol-1",
+    "name": "bass sample pack vol. 1 [latin edition]",
+    "description": "91 bass fills, 47 one shots, 18 slides & more",
+    "image": "https://matthewjamison.dev/assets/covers/bass-latin-vol-1-700.webp",
+    "category": "Bass sample pack",
+    "offers": {
+      "@type": "Offer",
+      "url": "https://matthewjamison.dev/#samples",
+      "price": "20.00",
+      "priceCurrency": "USD",
+      "availability": "https://schema.org/InStock",
+      "seller": { "@id": "https://matthewjamison.dev/#matthew-jamison" }
+    }
+  },
+  {
+    "@type": "Product",
+    "@id": "https://matthewjamison.dev/#bass-samples-bundle",
+    "name": "the bundle",
+    "description": "infinity loops + bass sample pack vol. 1 [latin edition]",
+    "image": "https://matthewjamison.dev/assets/covers/bass-samples-bundle-700.webp",
+    "category": "Bass sample pack",
+    "offers": {
+      "@type": "Offer",
+      "url": "https://matthewjamison.dev/#samples",
+      "price": "35.00",
+      "priceCurrency": "USD",
+      "availability": "https://schema.org/InStock",
+      "seller": { "@id": "https://matthewjamison.dev/#matthew-jamison" }
+    }
+  }
+  ]
 }
   </script>
   <link rel="canonical" href="https://matthewjamison.dev/">
@@ -100,6 +152,7 @@
     <a href="#bio">Bio</a>
     <a href="#watch">Watch</a>
     <a href="#games">Games</a>
+    <a href="#samples">Samples</a>
     <a href="#rider">Gear</a>
     <a href="#press">Press</a>
     <a href="#services">Services</a>
@@ -684,31 +737,7 @@
       </div>
 
       <p class="section-note comment">// all sales final; if your files didn't arrive, email me and I'll make it right</p>
-      <p class="store-status" id="store-status" role="status"></p>
 
-      <!-- one shared player for the whole store: starting a tile stops the last one -->
-      <div class="store-player" id="store-player" hidden>
-        <p class="store-player-label comment">// now playing</p>
-        <div class="store-player-row">
-          <img class="store-player-art" id="store-player-art" src="" alt="" width="52" height="52" decoding="async">
-          <div class="store-player-meta">
-            <p class="store-player-release" id="store-player-release"></p>
-            <p class="store-player-track" id="store-player-track" aria-live="polite"></p>
-          </div>
-          <div class="store-transport">
-            <button type="button" class="store-ctl" id="store-prev" aria-label="previous track"><svg class="icon icon-prev" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false"><path d="M5 4.75a.75.75 0 0 1 1.5 0v3.9l7.35-4.45A.75.75 0 0 1 15 4.84v10.32a.75.75 0 0 1-1.15.64L6.5 11.35v3.9a.75.75 0 0 1-1.5 0V4.75Z"/></svg></button>
-            <button type="button" class="store-ctl is-playing" id="store-toggle" aria-label="pause playback"><svg class="icon icon-play" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false"><path d="M6.3 2.84A1.5 1.5 0 0 0 4 4.11v11.78a1.5 1.5 0 0 0 2.3 1.27l9.344-5.891a1.5 1.5 0 0 0 0-2.538L6.3 2.841Z"/></svg><svg class="icon icon-pause" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false"><path d="M5.75 3.25h2.5c.41 0 .75.34.75.75v12c0 .41-.34.75-.75.75h-2.5a.75.75 0 0 1-.75-.75V4c0-.41.34-.75.75-.75Zm6 0h2.5c.41 0 .75.34.75.75v12c0 .41-.34.75-.75.75h-2.5a.75.75 0 0 1-.75-.75V4c0-.41.34-.75.75-.75Z"/></svg></button>
-            <button type="button" class="store-ctl" id="store-next" aria-label="next track"><svg class="icon icon-next" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false"><path d="M15 4.75a.75.75 0 0 0-1.5 0v3.9L6.15 4.2A.75.75 0 0 0 5 4.84v10.32a.75.75 0 0 0 1.15.64l7.35-4.45v3.9a.75.75 0 0 0 1.5 0V4.75Z"/></svg></button>
-          </div>
-          <input type="range" class="store-scrub" id="store-scrub" min="0" max="100" step="1" value="0" aria-label="seek within track">
-          <span class="store-time" id="store-time">0:00 / 0:00</span>
-          <!-- one button cycles auto → lossless → saver; script.js writes both
-               spans and the aria-label with textContent -->
-          <button type="button" class="store-quality" id="store-quality" aria-label="streaming quality: auto, lossless now. press to force lossless"><span class="store-quality-mode" id="store-quality-mode">auto</span><span class="store-quality-now" id="store-quality-now"> · flac</span></button>
-          <button type="button" class="store-ctl store-ctl-stop" id="store-stop" aria-label="stop playback"><svg class="icon icon-stop" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg></button>
-        </div>
-        <audio id="store-audio" preload="none"></audio>
-      </div>
     </section>
 
     <!-- bio -->
@@ -875,6 +904,88 @@ still healing</p>
       </div>
     </section>
 
+    <!-- bass samples -->
+    <!-- structure is the content: two packs sit as peers, the bundle spans the
+         row beneath them because it *is* both packs. Cards carry .store-card so
+         the player's state classes, play control and checkout binding are the
+         store's, unchanged; .sample-card only changes the size and the layout. -->
+    <section id="samples" class="section" aria-label="bass samples — sample packs">
+      <h2 class="section-label comment">// bass samples &nbsp;·&nbsp; preview before you buy</h2>
+
+      <div class="samples-grid">
+
+        <article class="store-card sample-card" data-slug="infinity-loops">
+          <div class="store-art sample-art">
+            <img src="assets/covers/infinity-loops-350.webp"
+                 srcset="assets/covers/infinity-loops-210.webp 210w,
+                         assets/covers/infinity-loops-350.webp 350w,
+                         assets/covers/infinity-loops-700.webp 700w"
+                 sizes="(max-width: 768px) calc(100vw - 96px), 415px"
+                 alt="" width="350" height="350" loading="lazy" decoding="async">
+            <button type="button" class="store-play" data-slug="infinity-loops" aria-label="play infinity loops">
+              <svg class="icon icon-play" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false"><path d="M6.3 2.84A1.5 1.5 0 0 0 4 4.11v11.78a1.5 1.5 0 0 0 2.3 1.27l9.344-5.891a1.5 1.5 0 0 0 0-2.538L6.3 2.841Z"/></svg>
+              <svg class="icon icon-pause" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false"><path d="M5.75 3.25h2.5c.41 0 .75.34.75.75v12c0 .41-.34.75-.75.75h-2.5a.75.75 0 0 1-.75-.75V4c0-.41.34-.75.75-.75Zm6 0h2.5c.41 0 .75.34.75.75v12c0 .41-.34.75-.75.75h-2.5a.75.75 0 0 1-.75-.75V4c0-.41.34-.75.75-.75Z"/></svg>
+            </button>
+          </div>
+          <div class="sample-body">
+            <h3 class="store-title sample-title">infinity loops</h3>
+            <p class="sample-facts">over 50 original bass grooves</p>
+          </div>
+          <div class="sample-foot">
+            <p class="store-meta">sample pack<span class="muted">&nbsp;·&nbsp;</span>$20.00</p>
+            <button type="button" class="store-buy" data-slug="infinity-loops" aria-label="buy infinity loops for $20.00">→ buy</button>
+          </div>
+        </article>
+
+        <article class="store-card sample-card" data-slug="bass-latin-vol-1">
+          <div class="store-art sample-art">
+            <img src="assets/covers/bass-latin-vol-1-350.webp"
+                 srcset="assets/covers/bass-latin-vol-1-210.webp 210w,
+                         assets/covers/bass-latin-vol-1-350.webp 350w,
+                         assets/covers/bass-latin-vol-1-700.webp 700w"
+                 sizes="(max-width: 768px) calc(100vw - 96px), 415px"
+                 alt="" width="350" height="350" loading="lazy" decoding="async">
+            <button type="button" class="store-play" data-slug="bass-latin-vol-1" aria-label="play bass sample pack vol. 1 [latin edition]">
+              <svg class="icon icon-play" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false"><path d="M6.3 2.84A1.5 1.5 0 0 0 4 4.11v11.78a1.5 1.5 0 0 0 2.3 1.27l9.344-5.891a1.5 1.5 0 0 0 0-2.538L6.3 2.841Z"/></svg>
+              <svg class="icon icon-pause" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false"><path d="M5.75 3.25h2.5c.41 0 .75.34.75.75v12c0 .41-.34.75-.75.75h-2.5a.75.75 0 0 1-.75-.75V4c0-.41.34-.75.75-.75Zm6 0h2.5c.41 0 .75.34.75.75v12c0 .41-.34.75-.75.75h-2.5a.75.75 0 0 1-.75-.75V4c0-.41.34-.75.75-.75Z"/></svg>
+            </button>
+          </div>
+          <div class="sample-body">
+            <h3 class="store-title sample-title">bass sample pack vol. 1 [latin edition]</h3>
+            <p class="sample-facts">91 bass fills, 47 one shots, 18 slides &amp; more</p>
+          </div>
+          <div class="sample-foot">
+            <p class="store-meta">sample pack<span class="muted">&nbsp;·&nbsp;</span>$20.00</p>
+            <button type="button" class="store-buy" data-slug="bass-latin-vol-1" aria-label="buy bass sample pack vol. 1 [latin edition] for $20.00">→ buy</button>
+          </div>
+        </article>
+
+        <article class="store-card sample-card sample-card-bundle" data-slug="bass-samples-bundle">
+          <div class="store-art sample-art">
+            <img src="assets/covers/bass-samples-bundle-350.webp"
+                 srcset="assets/covers/bass-samples-bundle-210.webp 210w,
+                         assets/covers/bass-samples-bundle-350.webp 350w,
+                         assets/covers/bass-samples-bundle-700.webp 700w"
+                 sizes="(max-width: 560px) 132px, 200px"
+                 alt="" width="350" height="350" loading="lazy" decoding="async">
+            <button type="button" class="store-play" data-slug="bass-samples-bundle" aria-label="play the bundle">
+              <svg class="icon icon-play" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false"><path d="M6.3 2.84A1.5 1.5 0 0 0 4 4.11v11.78a1.5 1.5 0 0 0 2.3 1.27l9.344-5.891a1.5 1.5 0 0 0 0-2.538L6.3 2.841Z"/></svg>
+              <svg class="icon icon-pause" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false"><path d="M5.75 3.25h2.5c.41 0 .75.34.75.75v12c0 .41-.34.75-.75.75h-2.5a.75.75 0 0 1-.75-.75V4c0-.41.34-.75.75-.75Zm6 0h2.5c.41 0 .75.34.75.75v12c0 .41-.34.75-.75.75h-2.5a.75.75 0 0 1-.75-.75V4c0-.41.34-.75.75-.75Z"/></svg>
+            </button>
+          </div>
+          <div class="sample-body">
+            <h3 class="store-title sample-title">the bundle</h3>
+            <p class="sample-facts">infinity loops + bass sample pack vol. 1 [latin edition]</p>
+          </div>
+          <div class="sample-foot">
+            <p class="store-meta">bundle<span class="muted">&nbsp;·&nbsp;</span>$35.00</p>
+            <button type="button" class="store-buy" data-slug="bass-samples-bundle" aria-label="buy the bundle for $35.00">→ buy</button>
+          </div>
+        </article>
+
+      </div>
+    </section>
+
     <!-- services -->
     <section id="services" class="section" aria-label="services">
       <h2 class="section-label comment">// services</h2>
@@ -991,6 +1102,40 @@ github &nbsp;&nbsp;&nbsp;<span class="arrow">→</span> <a href="https://github.
 
   </main>
 
+  <!-- store status: checkout and preview failures. Docked page-level for the
+       same reason as the bar below it — a buy can fail from #catalog or from
+       #samples, and a message parked in the catalog was off-screen for one of
+       them. :empty keeps it out of the layout until it has something to say. -->
+  <p class="store-status" id="store-status" role="status"></p>
+
+  <!-- one shared player for the whole store. Page-level and fixed, not sticky
+       inside #catalog: previews start from two different sections now, and a
+       transport that only stuck to the catalog was off-screen for every
+       #samples preview. role=region makes it a landmark, since it sits far
+       from the card that started it in DOM order. -->
+  <div class="store-player" id="store-player" role="region" aria-label="now playing" hidden>
+    <p class="store-player-label comment">// now playing</p>
+    <div class="store-player-row">
+      <img class="store-player-art" id="store-player-art" src="" alt="" width="52" height="52" decoding="async">
+      <div class="store-player-meta">
+        <p class="store-player-release" id="store-player-release"></p>
+        <p class="store-player-track" id="store-player-track" aria-live="polite"></p>
+      </div>
+      <div class="store-transport">
+        <button type="button" class="store-ctl" id="store-prev" aria-label="previous track"><svg class="icon icon-prev" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false"><path d="M5 4.75a.75.75 0 0 1 1.5 0v3.9l7.35-4.45A.75.75 0 0 1 15 4.84v10.32a.75.75 0 0 1-1.15.64L6.5 11.35v3.9a.75.75 0 0 1-1.5 0V4.75Z"/></svg></button>
+        <button type="button" class="store-ctl is-playing" id="store-toggle" aria-label="pause playback"><svg class="icon icon-play" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false"><path d="M6.3 2.84A1.5 1.5 0 0 0 4 4.11v11.78a1.5 1.5 0 0 0 2.3 1.27l9.344-5.891a1.5 1.5 0 0 0 0-2.538L6.3 2.841Z"/></svg><svg class="icon icon-pause" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false"><path d="M5.75 3.25h2.5c.41 0 .75.34.75.75v12c0 .41-.34.75-.75.75h-2.5a.75.75 0 0 1-.75-.75V4c0-.41.34-.75.75-.75Zm6 0h2.5c.41 0 .75.34.75.75v12c0 .41-.34.75-.75.75h-2.5a.75.75 0 0 1-.75-.75V4c0-.41.34-.75.75-.75Z"/></svg></button>
+        <button type="button" class="store-ctl" id="store-next" aria-label="next track"><svg class="icon icon-next" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false"><path d="M15 4.75a.75.75 0 0 0-1.5 0v3.9L6.15 4.2A.75.75 0 0 0 5 4.84v10.32a.75.75 0 0 0 1.15.64l7.35-4.45v3.9a.75.75 0 0 0 1.5 0V4.75Z"/></svg></button>
+      </div>
+      <input type="range" class="store-scrub" id="store-scrub" min="0" max="100" step="1" value="0" aria-label="seek within track">
+      <span class="store-time" id="store-time">0:00 / 0:00</span>
+      <!-- one button cycles auto → lossless → saver; script.js writes both
+           spans and the aria-label with textContent -->
+      <button type="button" class="store-quality" id="store-quality" aria-label="streaming quality: auto, lossless now. press to force lossless"><span class="store-quality-mode" id="store-quality-mode">auto</span><span class="store-quality-now" id="store-quality-now"> · flac</span></button>
+      <button type="button" class="store-ctl store-ctl-stop" id="store-stop" aria-label="stop playback"><svg class="icon icon-stop" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg></button>
+    </div>
+    <audio id="store-audio" preload="none"></audio>
+  </div>
+
   <!-- footer -->
   <footer class="footer">
     <p class="accent footer-peace">peace and long life to you and yours🖖🏿🤎</p>
@@ -1003,7 +1148,7 @@ github &nbsp;&nbsp;&nbsp;<span class="arrow">→</span> <a href="https://github.
 
   <!-- store data: track lists + durations. A data block, not code — no CSP
        script execution here, and no innerHTML anywhere that reads it. -->
-  <script type="application/json" id="store-data">{"it-is-what-it-is":{"t":"it is what it is","k":"album","p":"$9.99","tr":[[1,"Tired",74.0],[2,"MyMyMy",75.9],[3,"I need a hug",37.9],[4,"Camino Sour [SP-404 Edit]",170.5],[5,"God's Love",129.7],[6,"Something (interlude)",57.4],[7,"The Alchemist (ft. Baer & T Y R O N E)",194.0],[8,"Moved twice in a year",91.8],[9,"Nani (extended interlude)",201.0],[10,"ADHD",82.3],[11,"The Dark Night of the Soul",112.0],[12,"It's Over",191.2],[13,"...continue?",128.0],[14,"Self-Love (ft. Baer, DeWatitDo, & T Y R O N E)",167.0]]},"grace-alone":{"t":"grace alone","k":"single","p":"$2.99","tr":[[1,"Grace alone",225.1]]},"shoot-the-j":{"t":"shoot the j","k":"album","p":"$9.99","tr":[[1,"Til' the End of Time by DNLSMKS (ft. Matthew Jamison🎸)",221.8],[2,"Groove 🕺🏿💃🏿",92.1],[3,"Aquatic Psalm by Negrosaki (ft. Matthew Jamison🎸)",123.5],[4,"Wholesome Moments (ft. STLNDRMS🥁)",93.0],[5,"b_strolln.html.erb (ft. STLNDRMS🥁)",85.2],[6,"Black Butter (ft. Lance Anthony🎹)",97.2],[7,"in_and_out.rb (ft. R.A.D.I.C🥁)",80.0],[8,"structure.sql",130.8],[9,"Greed 🏝️ (ft. Bubby Lewis)",122.8],[10,"Road to Descent 🐇🕳️",116.6],[11,"WHOOP = %w{hella loud}.freeze (ft. STLNDRMS🥁)",62.1],[12,"Hope (ft. STLNDRMS🥁)",128.0],[13,"validates :love, presence: true (ft. Ossim Jones🥁)",130.6],[14,"Jelly Asparaguys (ft. Nadi🫎)",160.0],[15,"#{gemfile}.lock",121.5],[16,"love = values.scripture? ? values.value.map(&:to_s).join(\"; \") (ft. Wulf Morpheus)",141.0],[17,"love.nil?",178.4],[18,"bundle update --all (ft. STLNDRMS🥁)",91.4],[19,"Thank you for actually listening this far 💙 (ft. Critikaal👽)",192.1],[20,"Isaiah 12:2",236.4]]},"space-2-be":{"t":"space 2 be","k":"album","p":"$9.99","tr":[[1,"Sidechain Family (Ft. DeWatItDo)",179.3],[2,"What Gives!",171.0],[3,"It was Dark",142.3],[4,"fift.een w the home.ies (Ft. Lance Walker)",83.5],[5,"Nen (Interlude) (Ft. Lance Walker)",78.5],[6,"Came Way Too Far",100.6],[7,"Bassics",118.0],[8,"Campfire Cooling (Ft. Lance Walker)",100.5],[9,"Hakkatsu",127.1],[10,"Moon Lounge (Interlude)",109.9],[11,"Trigun #1",118.8],[12,"we.donewith.thisone",127.4]]},"ryok":{"t":"ryokō","k":"album","p":"$9.99","tr":[[1,"Be Blessed",87.2],[2,"Romans 8:26 Ft. STLNDRMS",134.4],[3,"IDK Where Ft. Pinstrype Kouzin",103.8],[4,"Matthew 5:21-24 (Ft. DJ She Beatz, Noewan, & STLNDRMS)",89.5],[5,"impostersyndrome by Noewan (Ft. Matthew Jamison)",96.9],[6,"Psalm 24:1-2",192.0],[7,"Through the Wire (Matthew Jamison Edit)",185.7]]},"jeremiah-29-11":{"t":"jeremiah 29:11","k":"ep","p":"$5.99","tr":[[1,"Zephaniah 3:17",141.6],[2,"1 Chronicles 16:8",98.7],[3,"2 Samuel 6:14",153.8]]},"bojjis-resolve-2":{"t":"bojji's resolve","k":"album","p":"$9.99","tr":[[1,"Prince Perspective",81.3],[2,"Where Dey At Doe (ft. Wulf Morpheus)",155.8],[3,"Kage Kuran (ft. Wulf Morpheus)",180.0],[4,"Kaizen (ft. RTOBeats)",103.5],[5,"Hakkatsu (ft. Pinstrype Kouzin)",127.1],[6,"We got the Keys (ft. STLNDRMS)",85.3],[7,"Ani { Brothers } (ft. T Y R O N E )",182.3],[8,"ii kanji",65.5],[9,"Ikigai (ft. Tecknowledgy & Antonio Foster)",130.4],[10,"Love Interlaces (ft. Maven Lee)",94.2],[11,"Untitled (ft. Bae)",159.3]]},"perspective-2":{"t":"perspective","k":"album","p":"$9.99","tr":[[1,"Psalm 8 (Opening Prayer) [Matthew Jamison Edit]",132.9],[2,"The Fear of the Lord (ft. Elijah Fox) [Matthew Jamison Edit]",160.0],[3,"1 Peter 5:7 (Anxiety) (ft. Pinstrype Kouzin)",162.2],[4,"Count it all Joy (ft. Bubby Lewis)",193.3],[5,"Revelation 19:1 (ft. Min. Wells Jamison) [Matthew Jamison Edit]",161.6],[6,"Adapt",114.5],[7,"Psalm 24:1 (ft. Dr. S. M. Lockridge)",184.3],[8,"AMAZING [Matthew Jamison Edit]",121.3],[9,"Prays in the night (ft. Tyrone)",140.5],[10,"Forerunner (ft. Tyrone, L/\\W, Jeremy Haymon)",314.9],[11,"Benediction",29.2]]},"perspectives-pt-1":{"t":"perspectives pt.1","k":"album","p":"$9.99","tr":[[1,"Adapt",114.5],[2,"Pivot [Ft. DowJonez]",146.5],[3,"Repeat [Ft. DeWatItDo]",103.6],[4,"Matthew 19:26",118.0],[5,"Psalm 150",162.2],[6,"Psalm 147:4-5",93.1],[7,"Matthew 13:44",100.3],[8,"Revelation 19:1",162.5]]},"sp-ep-the-next-chapter":{"t":"sp ep: the next chapter","k":"ep","p":"$5.99","tr":[[1,"Get Ready Get Ready",72.7],[2,"Psalm 8:1",122.2],[3,"MOVE",104.5],[4,"Matthew 23:26-28",78.5],[5,"Isaiah 43:19",93.5],[6,"James 1:2",72.8]]},"hallelujah":{"t":"hallelujah","k":"single","p":"$2.99","tr":[[1,"Hallelujah",104.1]]},"the-journey":{"t":"the journey","k":"album","p":"$9.99","tr":[[1,"Dawn",182.3],[2,"Guide",177.1],[3,"Self-Doubt",96.3],[4,"The Road to Addiction",104.1],[5,"Denial",77.8],[6,"Harsh Truth",84.0],[7,"Meditation Pt.1 (ft. STLNDRMS)",318.4],[8,"Movement",89.0],[9,"Reset",284.7],[10,"Meditation Pt. 2",250.2],[11,"Acceptance",76.2],[12,"Continuum",237.6],[13,"Gratitude",137.6]]},"perspective":{"t":"perspective","k":"ep","p":"$5.99","tr":[[1,"enter.the.forest",119.8],[2,"ginsu.sprints",109.2],[3,"isaiah 40:31",122.8]]},"noh-talent":{"t":"(noh)_talent","k":"single","p":"$2.99","tr":[[1,"(Noh)_Talent",99.9]]},"ball-so-hard":{"t":"ball so hard","k":"single","p":"$2.99","tr":[[1,"Ball So Hard",173.1]]},"we-got-the-keys":{"t":"we got the keys","k":"single","p":"$2.99","tr":[[1,"We got the keys",85.3]]},"bando-matthew-jamison-edit":{"t":"bando (edit)","k":"single","p":"$2.99","tr":[[1,"Bando (Matthew Jamison Edit)",241.2]]},"beat-tape-2":{"t":"beat tape #2","k":"ep","p":"$5.99","tr":[[1,"Chrysolite",169.8],[2,"Beryl",224.8],[3,"Topaz",117.6],[4,"Chrysoprase",138.7],[5,"Jacinth",228.1],[6,"Amethyst",208.7]]},"beat-tape-1":{"t":"beat tape #1","k":"ep","p":"$5.99","tr":[[1,"Jasper",167.3],[2,"Sapphire",113.0],[3,"Chalcedony",122.8],[4,"Emerald",253.2],[5,"Sardonyx",185.4],[6,"Carnelian",269.7]]},"hold-on-be-strong-matthew-jamison-edit":{"t":"hold on be strong (edit)","k":"single","p":"$2.99","tr":[[1,"Hold On Be Strong (Matthew Jamison Edit)",253.2]]},"the-blessing":{"t":"the blessing","k":"single","p":"$2.99","tr":[[1,"The Blessing",74.7]]},"wedobeatschallenge-9":{"t":"wedobeatschallenge #9","k":"single","p":"$2.99","tr":[[1,"Wedobeatschallenge #9",175.6]]},"love-bounce":{"t":"love bounce","k":"single","p":"$2.99","tr":[[1,"Love Bounce",168.9]]},"twice-matthew-jamison-edit":{"t":"twice (edit)","k":"single","p":"$2.99","tr":[[1,"Twice [Matthew Jamison Edit]",247.7]]},"black-is-beautiful":{"t":"black is beautiful","k":"ep","p":"$5.99","tr":[[1,"She Gone",136.7],[2,"Be My Valentine",141.1],[3,"Running",147.4],[4,"Get Your Ticket (Sideshow)",119.4]]},"black-vegas":{"t":"black vegas","k":"single","p":"$2.99","tr":[[1,"Black Vegas",83.5]]},"sorbet":{"t":"sorbet","k":"ep","p":"$5.99","tr":[[1,"Apple",74.5],[2,"Cherry",103.1],[3,"Peach",76.9],[4,"Tangerine",122.8],[5,"Grape",77.6]]},"sideshow":{"t":"sideshow","k":"single","p":"$2.99","tr":[[1,"Matthew Jamison - Sideshow",119.4]]},"new-start":{"t":"new start","k":"album","p":"$9.99","tr":[[1,"Intro",192.9],[2,"Well",103.8],[3,"Bounce",48.9],[4,"Groove",102.5],[5,"Switch",5.2],[6,"Boomshakalakashaka",164.7],[7,"God is Good",55.1],[8,"God bless the Trap",64.2],[9,"To Love and Trap Legally",109.8],[10,"Be You",19.5],[11,"Keep Moving forward",138.7],[12,"Don't forget the past",55.0],[13,"Heal",76.9],[14,"Steps",38.5],[15,"Thanks for listening !",192.1]]}}</script>
+  <script type="application/json" id="store-data">{"it-is-what-it-is":{"t":"it is what it is","k":"album","p":"$9.99","tr":[[1,"Tired",74.0],[2,"MyMyMy",75.9],[3,"I need a hug",37.9],[4,"Camino Sour [SP-404 Edit]",170.5],[5,"God's Love",129.7],[6,"Something (interlude)",57.4],[7,"The Alchemist (ft. Baer & T Y R O N E)",194.0],[8,"Moved twice in a year",91.8],[9,"Nani (extended interlude)",201.0],[10,"ADHD",82.3],[11,"The Dark Night of the Soul",112.0],[12,"It's Over",191.2],[13,"...continue?",128.0],[14,"Self-Love (ft. Baer, DeWatitDo, & T Y R O N E)",167.0]]},"grace-alone":{"t":"grace alone","k":"single","p":"$2.99","tr":[[1,"Grace alone",225.1]]},"shoot-the-j":{"t":"shoot the j","k":"album","p":"$9.99","tr":[[1,"Til' the End of Time by DNLSMKS (ft. Matthew Jamison🎸)",221.8],[2,"Groove 🕺🏿💃🏿",92.1],[3,"Aquatic Psalm by Negrosaki (ft. Matthew Jamison🎸)",123.5],[4,"Wholesome Moments (ft. STLNDRMS🥁)",93.0],[5,"b_strolln.html.erb (ft. STLNDRMS🥁)",85.2],[6,"Black Butter (ft. Lance Anthony🎹)",97.2],[7,"in_and_out.rb (ft. R.A.D.I.C🥁)",80.0],[8,"structure.sql",130.8],[9,"Greed 🏝️ (ft. Bubby Lewis)",122.8],[10,"Road to Descent 🐇🕳️",116.6],[11,"WHOOP = %w{hella loud}.freeze (ft. STLNDRMS🥁)",62.1],[12,"Hope (ft. STLNDRMS🥁)",128.0],[13,"validates :love, presence: true (ft. Ossim Jones🥁)",130.6],[14,"Jelly Asparaguys (ft. Nadi🫎)",160.0],[15,"#{gemfile}.lock",121.5],[16,"love = values.scripture? ? values.value.map(&:to_s).join(\"; \") (ft. Wulf Morpheus)",141.0],[17,"love.nil?",178.4],[18,"bundle update --all (ft. STLNDRMS🥁)",91.4],[19,"Thank you for actually listening this far 💙 (ft. Critikaal👽)",192.1],[20,"Isaiah 12:2",236.4]]},"space-2-be":{"t":"space 2 be","k":"album","p":"$9.99","tr":[[1,"Sidechain Family (Ft. DeWatItDo)",179.3],[2,"What Gives!",171.0],[3,"It was Dark",142.3],[4,"fift.een w the home.ies (Ft. Lance Walker)",83.5],[5,"Nen (Interlude) (Ft. Lance Walker)",78.5],[6,"Came Way Too Far",100.6],[7,"Bassics",118.0],[8,"Campfire Cooling (Ft. Lance Walker)",100.5],[9,"Hakkatsu",127.1],[10,"Moon Lounge (Interlude)",109.9],[11,"Trigun #1",118.8],[12,"we.donewith.thisone",127.4]]},"ryok":{"t":"ryokō","k":"album","p":"$9.99","tr":[[1,"Be Blessed",87.2],[2,"Romans 8:26 Ft. STLNDRMS",134.4],[3,"IDK Where Ft. Pinstrype Kouzin",103.8],[4,"Matthew 5:21-24 (Ft. DJ She Beatz, Noewan, & STLNDRMS)",89.5],[5,"impostersyndrome by Noewan (Ft. Matthew Jamison)",96.9],[6,"Psalm 24:1-2",192.0],[7,"Through the Wire (Matthew Jamison Edit)",185.7]]},"jeremiah-29-11":{"t":"jeremiah 29:11","k":"ep","p":"$5.99","tr":[[1,"Zephaniah 3:17",141.6],[2,"1 Chronicles 16:8",98.7],[3,"2 Samuel 6:14",153.8]]},"bojjis-resolve-2":{"t":"bojji's resolve","k":"album","p":"$9.99","tr":[[1,"Prince Perspective",81.3],[2,"Where Dey At Doe (ft. Wulf Morpheus)",155.8],[3,"Kage Kuran (ft. Wulf Morpheus)",180.0],[4,"Kaizen (ft. RTOBeats)",103.5],[5,"Hakkatsu (ft. Pinstrype Kouzin)",127.1],[6,"We got the Keys (ft. STLNDRMS)",85.3],[7,"Ani { Brothers } (ft. T Y R O N E )",182.3],[8,"ii kanji",65.5],[9,"Ikigai (ft. Tecknowledgy & Antonio Foster)",130.4],[10,"Love Interlaces (ft. Maven Lee)",94.2],[11,"Untitled (ft. Bae)",159.3]]},"perspective-2":{"t":"perspective","k":"album","p":"$9.99","tr":[[1,"Psalm 8 (Opening Prayer) [Matthew Jamison Edit]",132.9],[2,"The Fear of the Lord (ft. Elijah Fox) [Matthew Jamison Edit]",160.0],[3,"1 Peter 5:7 (Anxiety) (ft. Pinstrype Kouzin)",162.2],[4,"Count it all Joy (ft. Bubby Lewis)",193.3],[5,"Revelation 19:1 (ft. Min. Wells Jamison) [Matthew Jamison Edit]",161.6],[6,"Adapt",114.5],[7,"Psalm 24:1 (ft. Dr. S. M. Lockridge)",184.3],[8,"AMAZING [Matthew Jamison Edit]",121.3],[9,"Prays in the night (ft. Tyrone)",140.5],[10,"Forerunner (ft. Tyrone, L/\\W, Jeremy Haymon)",314.9],[11,"Benediction",29.2]]},"perspectives-pt-1":{"t":"perspectives pt.1","k":"album","p":"$9.99","tr":[[1,"Adapt",114.5],[2,"Pivot [Ft. DowJonez]",146.5],[3,"Repeat [Ft. DeWatItDo]",103.6],[4,"Matthew 19:26",118.0],[5,"Psalm 150",162.2],[6,"Psalm 147:4-5",93.1],[7,"Matthew 13:44",100.3],[8,"Revelation 19:1",162.5]]},"sp-ep-the-next-chapter":{"t":"sp ep: the next chapter","k":"ep","p":"$5.99","tr":[[1,"Get Ready Get Ready",72.7],[2,"Psalm 8:1",122.2],[3,"MOVE",104.5],[4,"Matthew 23:26-28",78.5],[5,"Isaiah 43:19",93.5],[6,"James 1:2",72.8]]},"hallelujah":{"t":"hallelujah","k":"single","p":"$2.99","tr":[[1,"Hallelujah",104.1]]},"the-journey":{"t":"the journey","k":"album","p":"$9.99","tr":[[1,"Dawn",182.3],[2,"Guide",177.1],[3,"Self-Doubt",96.3],[4,"The Road to Addiction",104.1],[5,"Denial",77.8],[6,"Harsh Truth",84.0],[7,"Meditation Pt.1 (ft. STLNDRMS)",318.4],[8,"Movement",89.0],[9,"Reset",284.7],[10,"Meditation Pt. 2",250.2],[11,"Acceptance",76.2],[12,"Continuum",237.6],[13,"Gratitude",137.6]]},"perspective":{"t":"perspective","k":"ep","p":"$5.99","tr":[[1,"enter.the.forest",119.8],[2,"ginsu.sprints",109.2],[3,"isaiah 40:31",122.8]]},"noh-talent":{"t":"(noh)_talent","k":"single","p":"$2.99","tr":[[1,"(Noh)_Talent",99.9]]},"ball-so-hard":{"t":"ball so hard","k":"single","p":"$2.99","tr":[[1,"Ball So Hard",173.1]]},"we-got-the-keys":{"t":"we got the keys","k":"single","p":"$2.99","tr":[[1,"We got the keys",85.3]]},"bando-matthew-jamison-edit":{"t":"bando (edit)","k":"single","p":"$2.99","tr":[[1,"Bando (Matthew Jamison Edit)",241.2]]},"beat-tape-2":{"t":"beat tape #2","k":"ep","p":"$5.99","tr":[[1,"Chrysolite",169.8],[2,"Beryl",224.8],[3,"Topaz",117.6],[4,"Chrysoprase",138.7],[5,"Jacinth",228.1],[6,"Amethyst",208.7]]},"beat-tape-1":{"t":"beat tape #1","k":"ep","p":"$5.99","tr":[[1,"Jasper",167.3],[2,"Sapphire",113.0],[3,"Chalcedony",122.8],[4,"Emerald",253.2],[5,"Sardonyx",185.4],[6,"Carnelian",269.7]]},"hold-on-be-strong-matthew-jamison-edit":{"t":"hold on be strong (edit)","k":"single","p":"$2.99","tr":[[1,"Hold On Be Strong (Matthew Jamison Edit)",253.2]]},"the-blessing":{"t":"the blessing","k":"single","p":"$2.99","tr":[[1,"The Blessing",74.7]]},"wedobeatschallenge-9":{"t":"wedobeatschallenge #9","k":"single","p":"$2.99","tr":[[1,"Wedobeatschallenge #9",175.6]]},"love-bounce":{"t":"love bounce","k":"single","p":"$2.99","tr":[[1,"Love Bounce",168.9]]},"twice-matthew-jamison-edit":{"t":"twice (edit)","k":"single","p":"$2.99","tr":[[1,"Twice [Matthew Jamison Edit]",247.7]]},"black-is-beautiful":{"t":"black is beautiful","k":"ep","p":"$5.99","tr":[[1,"She Gone",136.7],[2,"Be My Valentine",141.1],[3,"Running",147.4],[4,"Get Your Ticket (Sideshow)",119.4]]},"black-vegas":{"t":"black vegas","k":"single","p":"$2.99","tr":[[1,"Black Vegas",83.5]]},"sorbet":{"t":"sorbet","k":"ep","p":"$5.99","tr":[[1,"Apple",74.5],[2,"Cherry",103.1],[3,"Peach",76.9],[4,"Tangerine",122.8],[5,"Grape",77.6]]},"sideshow":{"t":"sideshow","k":"single","p":"$2.99","tr":[[1,"Matthew Jamison - Sideshow",119.4]]},"new-start":{"t":"new start","k":"album","p":"$9.99","tr":[[1,"Intro",192.9],[2,"Well",103.8],[3,"Bounce",48.9],[4,"Groove",102.5],[5,"Switch",5.2],[6,"Boomshakalakashaka",164.7],[7,"God is Good",55.1],[8,"God bless the Trap",64.2],[9,"To Love and Trap Legally",109.8],[10,"Be You",19.5],[11,"Keep Moving forward",138.7],[12,"Don't forget the past",55.0],[13,"Heal",76.9],[14,"Steps",38.5],[15,"Thanks for listening !",192.1]]},"infinity-loops":{"t":"infinity loops","k":"sample pack","p":"$20.00","tr":[[1,"LOOP #1 (102.761 BPM)",11.0],[2,"LOOP #8 (138.325 BPM)",6.0],[3,"LOOP #13 (85.014 BPM)",5.0],[4,"LOOP #27 (142.911 BPM)",13.0],[5,"LOOP #34 (73.527 BPM)",12.0],[6,"LOOP #43 (119.19 BPM)",4.0]]},"bass-latin-vol-1":{"t":"bass sample pack vol. 1 [latin edition]","k":"sample pack","p":"$20.00","tr":[[1,"(C minor) 135 BPM [4 BAR]",7.0],[2,"(B minor) 135 BPM [8 BAR]",14.0],[3,"(D minor) 95 BPM [16 BAR]",20.0],[4,"(C minor) 105 BPM [2 BAR]",4.0],[5,"(G minor) 105BPM [4 BAR]",9.0],[6,"(C minor) 105 BPM [4 BAR]",9.0],[7,"BASS FILL (B minor) #1",3.0]]},"bass-samples-bundle":{"t":"the bundle","k":"bundle","p":"$35.00","tr":[[1,"LOOP #1 (102.761 BPM)",11.0],[2,"LOOP #34 (73.527 BPM)",12.0],[3,"(C minor) 135 BPM [4 BAR]",7.0],[4,"(D minor) 95 BPM [16 BAR]",20.0]]}}</script>
   <script src="assets/js/starfield.js" defer></script>
   <!-- game overlay: static shell, iframe created on demand (Trusted Types — no innerHTML) -->
   <div id="game-overlay" class="game-overlay" role="dialog" aria-modal="true" aria-label="game" hidden>

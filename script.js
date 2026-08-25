@@ -146,7 +146,19 @@ window.addEventListener('pointerdown', e => {
     return et === 'slow-2g' || et === '2g' || et === '3g';
   }
 
-  function streamPath() {
+  // sample packs and the bundle ship preview clips only — there are no
+  // stream/{slug} flac objects behind them, so /s/ would 404 for every mode.
+  // They are pinned to the 128k /p/ path and sit outside the adaptive machine
+  // entirely; music releases are unaffected.
+  const MP3_ONLY_KINDS = { 'sample pack': true, 'bundle': true };
+
+  function mp3Only(s) {
+    const rel = s && catalog ? catalog[s] : null;
+    return !!(rel && MP3_ONLY_KINDS[rel.k] === true);
+  }
+
+  function streamPath(s) {
+    if (mp3Only(s)) return '/p/';
     if (mode === 'saver') return '/p/';
     if (mode === 'lossless') return canFlac ? '/s/' : '/p/';
     if ((demoteCount > 0 && !promotable) || slowLink()) return '/p/';
@@ -155,6 +167,9 @@ window.addEventListener('pointerdown', e => {
 
   const dataEl = document.getElementById('store-data');
   const grid = document.querySelector('.store-grid');
+  // the sample packs live in their own grid further down the page but are the
+  // same kind of card, so both grids share one delegated handler
+  const packGrid = document.querySelector('.samples-grid');
   const bar = document.getElementById('store-player');
   let audio = document.getElementById('store-audio');
   const status = document.getElementById('store-status');
@@ -250,12 +265,76 @@ window.addEventListener('pointerdown', e => {
     return m + ':' + (r < 10 ? '0' : '') + r;
   }
 
+  // the bar is fixed to the viewport now, so while it is up it floats over
+  // whatever is at the foot of the page. body.store-open opens a matching
+  // runway underneath the footer; the two are toggled together and nowhere
+  // else, so the padding can never outlive the bar.
+  function showBar(on) {
+    bar.hidden = !on;
+    document.body.classList.toggle('store-open', on);
+    sizeDock();
+  }
+
+  // the status note is a docked strip too, so it goes through one setter:
+  // content and dock geometry can never disagree. textContent, never
+  // innerHTML — Trusted Types is enforced.
+  function setStatus(msg) {
+    if (!status) return;
+    status.textContent = msg;
+    sizeDock();
+  }
+
+  // the runway is measured, not guessed: the bar restacks from one row to four
+  // under 768px (105px tall against 283px) and grows again when a track title
+  // wraps, and the note's height depends on how far its sentence wraps. A
+  // hard-coded padding would be wrong in most states.
+  // Two properties come out of one pass, so the two strips can never disagree:
+  //   --store-note-lift  how far the note sits above the dock line, which is
+  //                      the bar's height plus a 10px gap when the bar is up
+  //                      and 0 when it is down, so the note takes the bar's
+  //                      slot instead of floating over empty space.
+  //   --store-dock-h     the whole docked stack, for the footer runway.
+  // setProperty writes custom properties through the CSSOM — that is not a
+  // style attribute, and style-src does not gate it.
+  function sizeDock() {
+    const noteOn = !!status && status.textContent !== '';
+    document.body.classList.toggle('store-note', noteOn);
+
+    const barH = bar.hidden ? 0 : bar.offsetHeight;
+    const gap = barH ? 10 : 0;
+    // the lift moves the note, so it has to land before the note is measured
+    document.body.style.setProperty('--store-note-lift', (barH + gap) + 'px');
+
+    // the gap only exists when there are two strips to separate — counting it
+    // against a lone bar would claim runway the dock is not using
+    const noteH = noteOn ? status.offsetHeight : 0;
+    const total = barH + (noteH ? gap + noteH : 0);
+    if (total > 0) {
+      document.body.style.setProperty('--store-dock-h', total + 'px');
+    } else {
+      document.body.style.removeProperty('--store-dock-h');
+      document.body.style.removeProperty('--store-note-lift');
+    }
+  }
+
+  // re-measure on resize, but only while something is docked, and only once
+  // per frame — this is the player's own path, not the starfield's render path
+  let dockFrame = 0;
+  window.addEventListener('resize', () => {
+    if (dockFrame) return;
+    if (bar.hidden && !document.body.classList.contains('store-note')) return;
+    dockFrame = requestAnimationFrame(() => {
+      dockFrame = 0;
+      sizeDock();
+    });
+  });
+
   function card(s) {
-    return grid.querySelector('.store-card[data-slug="' + s + '"]');
+    return document.querySelector('.store-card[data-slug="' + s + '"]');
   }
 
   function markCards() {
-    grid.querySelectorAll('.store-card').forEach(c => {
+    document.querySelectorAll('.store-card').forEach(c => {
       const active = c.dataset.slug === slug;
       c.classList.toggle('is-active', active);
       c.classList.toggle('is-playing', active && !audio.paused);
@@ -277,7 +356,7 @@ window.addEventListener('pointerdown', e => {
   // the next track, so it names the quality the next load will use
   function paintQuality() {
     if (!qualityBtn) return;
-    const lossless = streamPath() === '/s/';
+    const lossless = streamPath(slug) === '/s/';
     qModeEl.textContent = mode;
     qNowEl.textContent = ' · ' + (lossless ? 'flac' : '128k');
     qualityBtn.setAttribute(
@@ -331,7 +410,7 @@ window.addEventListener('pointerdown', e => {
   // to try
   function reportLoadFailure() {
     stallReset();
-    if (status) status.textContent = 'that preview didn’t load. try again in a moment.';
+    setStatus('that preview didn’t load. try again in a moment.');
     syncToggle();
   }
 
@@ -389,7 +468,9 @@ window.addEventListener('pointerdown', e => {
 
   function load(nextSlug, nextIndex, autoplay) {
     const rel = catalog[nextSlug];
-    if (!rel) return;
+    // a release with no preview clips has nothing to load — the markup omits
+    // its play control, and this is the matching runtime guard
+    if (!rel || !rel.tr || !rel.tr.length) return;
     const total = rel.tr.length;
     if (nextIndex < 0 || nextIndex >= total) return;
 
@@ -406,7 +487,7 @@ window.addEventListener('pointerdown', e => {
     lastBufEnd = -1;     // buffer readings don't carry across tracks
     handoffGen++;        // a handoff in flight is for the track being replaced
     clearEl(standby);    // and so is whatever it half-loaded
-    currentPath = streamPath();
+    currentPath = streamPath(slug);
     // a promotion is spent the moment it lands: any later one needs fresh
     // evidence, and demoteCount survives so a re-stall backs off harder
     if (currentPath === '/s/' && promotable) {
@@ -422,7 +503,7 @@ window.addEventListener('pointerdown', e => {
       }, START_DEADLINE);
     }
     paintQuality();
-    bar.hidden = false;
+    showBar(true);
 
     const c = card(slug);
     const img = c ? c.querySelector('img') : null;
@@ -446,6 +527,8 @@ window.addEventListener('pointerdown', e => {
       if (p && p.catch) p.catch(() => syncToggle());
     }
     syncToggle();
+    // measured last: the title above is what decides how tall the bar wraps
+    sizeDock();
   }
 
   function step(delta) {
@@ -464,11 +547,11 @@ window.addEventListener('pointerdown', e => {
     clearEl(audio);
     clearEl(standby);
     slug = null;
-    bar.hidden = true;
+    showBar(false);
     markCards();
   }
 
-  grid.addEventListener('click', e => {
+  function onCardClick(e) {
     const play = e.target.closest ? e.target.closest('.store-play') : null;
     if (play) {
       const s = play.dataset.slug;
@@ -489,12 +572,23 @@ window.addEventListener('pointerdown', e => {
 
     const buy = e.target.closest ? e.target.closest('.store-buy') : null;
     if (buy) checkout(buy);
+  }
+
+  grid.addEventListener('click', onCardClick);
+  if (packGrid) packGrid.addEventListener('click', onCardClick);
+
+  // a card whose catalog entry carries no preview clips gets no play control:
+  // the button would load nothing and read as broken. Removed rather than
+  // disabled — there is no preview to offer, so there is nothing to announce.
+  document.querySelectorAll('.store-card .store-play').forEach(btn => {
+    const rel = catalog[btn.dataset.slug];
+    if (!rel || !rel.tr || !rel.tr.length) btn.remove();
   });
 
   function checkout(btn) {
     if (btn.getAttribute('aria-busy') === 'true') return;
     btn.setAttribute('aria-busy', 'true');
-    if (status) status.textContent = '';
+    setStatus('');
     fetch(API + '/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -507,10 +601,9 @@ window.addEventListener('pointerdown', e => {
       })
       .catch(() => {
         btn.removeAttribute('aria-busy');
-        if (status) {
-          status.textContent =
-            'checkout didn’t open. try again, or email matthewjamisonmusicinquiries@gmail.com';
-        }
+        setStatus(
+          'checkout didn’t open. try again, or email matthewjamisonmusicinquiries@gmail.com'
+        );
       });
   }
 
@@ -615,6 +708,9 @@ window.addEventListener('pointerdown', e => {
   function healthCheck() {
     if (mode !== 'auto' || demoteCount === 0 || promotable) return;
     if (currentPath !== '/p/' || !slug || audio.paused) return;
+    // a pack has no flac source to be promoted to, and probing one would fire a
+    // guaranteed 404 — the session's demote state is left untouched
+    if (mp3Only(slug)) return;
     const now = Date.now();
     if (now - lastSample < SAMPLE_EVERY) return;
     const elapsedSec = lastSample ? (now - lastSample) / 1000 : 0;

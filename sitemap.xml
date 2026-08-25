@@ -2,11 +2,29 @@
 <!-- /thanks/ is deliberately absent: it is a post-purchase receipt page, only
      reachable from a Stripe redirect, with nothing to index. It carries
      <meta name="robots" content="noindex, follow"> for the same reason. -->
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
     <loc>https://matthewjamison.dev/</loc>
-    <lastmod>2026-08-21</lastmod>
+    <lastmod>2026-08-25</lastmod>
     <changefreq>monthly</changefreq>
     <priority>1.0</priority>
+    <!-- the three bass sample pack covers. 700px is the largest variant that
+         ships; the 1200px size is deliberately not built. -->
+    <image:image>
+      <image:loc>https://matthewjamison.dev/assets/covers/infinity-loops-700.webp</image:loc>
+      <image:title>infinity loops</image:title>
+      <image:caption>over 50 original bass grooves</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://matthewjamison.dev/assets/covers/bass-latin-vol-1-700.webp</image:loc>
+      <image:title>bass sample pack vol. 1 [latin edition]</image:title>
+      <image:caption>91 bass fills, 47 one shots, 18 slides &amp; more</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://matthewjamison.dev/assets/covers/bass-samples-bundle-700.webp</image:loc>
+      <image:title>the bundle</image:title>
+      <image:caption>infinity loops + bass sample pack vol. 1 [latin edition]</image:caption>
+    </image:image>
   </url>
 </urlset>

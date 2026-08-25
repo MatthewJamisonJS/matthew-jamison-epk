@@ -88,6 +88,12 @@ Singles $2.99 · EPs $5.99 · albums $9.99.
 - sideshow — single · 1 track · $2.99
 - new start — album · 15 tracks · $9.99
 
+## bass samples (preview before you buy)
+
+- infinity loops — sample pack · $20.00 — over 50 original bass grooves
+- bass sample pack vol. 1 [latin edition] — sample pack · $20.00 — 91 bass fills, 47 one shots, 18 slides & more
+- the bundle — bundle · $35.00 — infinity loops + bass sample pack vol. 1 [latin edition]
+
 ## games (free · in-browser)
 
 - 2048 — game by Gabriele Cirulli: https://github.com/gabrielecirulli/2048
