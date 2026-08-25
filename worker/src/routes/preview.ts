@@ -1,5 +1,5 @@
 import type { Ctx, Env } from '../types';
-import { generic404 } from '../lib/http';
+import { generic404, streamCorsHeaders } from '../lib/http';
 
 /**
  * GET /p/:slug/:track  -- public 128 kbps preview stream (previews/{slug}/{NN}.mp3)
@@ -134,11 +134,27 @@ export async function handlePreview(
   return serveAudio(req, env, ctx, params, 'previews', 'mp3', 'audio/mpeg');
 }
 
+export async function handleStreamPreflight(req: Request, env: Env): Promise<Response> {
+  const cors = streamCorsHeaders(env, req);
+  if (Object.keys(cors).length === 0) {
+    return new Response(null, { status: 403 });
+  }
+  return new Response(null, { status: 204, headers: cors });
+}
+
 export async function handleStream(
   req: Request,
   env: Env,
   ctx: Ctx,
   params: Record<string, string>,
 ): Promise<Response> {
-  return serveAudio(req, env, ctx, params, 'stream', 'flac', 'audio/flac');
+  const res = await serveAudio(req, env, ctx, params, 'stream', 'flac', 'audio/flac');
+  const cors = streamCorsHeaders(env, req);
+  if (Object.keys(cors).length === 0) return res;
+  const headers = new Headers(res.headers);
+  for (const [k, v] of Object.entries(cors)) {
+    if (k === 'Vary') headers.append(k, v);
+    else headers.set(k, v);
+  }
+  return new Response(res.body, { status: res.status, headers });
 }

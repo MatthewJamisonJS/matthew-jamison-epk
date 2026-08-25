@@ -144,6 +144,24 @@ export function corsHeaders(env: Env, req: Request): Record<string, string> {
   };
 }
 
+/**
+ * CORS for the public stream routes. Media element loads are no-cors and
+ * ignore these; they exist for the player's ranged throughput probe, which is
+ * a real CORS fetch. Applied per-request after the cache lookup, so cached
+ * entries stay origin-neutral.
+ */
+export function streamCorsHeaders(env: Env, req: Request): Record<string, string> {
+  const origin = req.headers.get('Origin');
+  if (origin !== env.SITE_ORIGIN) return {};
+  return {
+    'Access-Control-Allow-Origin': env.SITE_ORIGIN,
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Range',
+    'Access-Control-Max-Age': '86400',
+    Vary: 'Origin',
+  };
+}
+
 export function clientIp(req: Request): string {
   return req.headers.get('CF-Connecting-IP') ?? '0.0.0.0';
 }
