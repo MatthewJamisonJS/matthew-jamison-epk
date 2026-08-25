@@ -87,9 +87,10 @@
 # attrs, no <form>, no storage APIs, no audio/video, no external hosts (the
 # only http(s):// strings are two source-comment credits). The one inline
 # <style> block was externalized to platformer.css, so style-src 'self' covers
-# the whole page — FPSMeter writes element.style properties, which is CSSOM
-# and not gated. connect-src 'self' IS required: platformer.js fetches
-# level.json over same-origin XMLHttpRequest at startup. img-src 'self' is
+# the whole page. The vendored FPSMeter HUD was removed (owner call), so there
+# is no longer any script writing element.style. connect-src 'self' IS
+# required: platformer.js fetches level.json over same-origin XMLHttpRequest
+# at startup. img-src 'self' is
 # NOT for the game — nothing loads an image (the map is drawn with fillRect;
 # tiles.png ships only because level.json names it as its Tiled tileset, and
 # is never requested) — it is for the browser's favicon probe, which logs a
@@ -107,9 +108,6 @@
 # pinned per file rather than by directory — index.html itself must stay
 # revalidatable.
 /games/tiny-platformer/platformer.js
-  Cache-Control: public, max-age=31536000, immutable
-
-/games/tiny-platformer/fpsmeter.min.js
   Cache-Control: public, max-age=31536000, immutable
 
 /games/tiny-platformer/platformer.css
