@@ -153,6 +153,7 @@ star-field {
 .press-item,
 .contact-grid,
 .video-caption,
+.collab-ledger,
 .press-slots {
   background: var(--plate-gloss), var(--plate);
   border: 1px solid var(--plate-edge);
@@ -303,6 +304,25 @@ star-field {
   letter-spacing: -0.02em;
   line-height: 1.05;
   margin-bottom: 16px;
+}
+
+/* the keyword line lives inside the single <h1> rather than as a second
+   heading — 60% of screen-reader users prefer one H1 (WebAIM survey 7). Full
+   --text, not muted: this sits over a lit video frame, same reason as .tags. */
+.h1-descriptor {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 0 8px;
+  margin-top: 12px;
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  line-height: 1.5;
+  color: var(--text);
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .tags {
@@ -1027,6 +1047,86 @@ body.store-note {
   color: var(--mj-accent-bright);
 }
 
+/* ── collabs ─────────────────────────────────── */
+/* a credits sheet, not a card grid: one plate holding hairline-separated
+   ledger rows. Three fixed tracks on desktop — name, titles, link — so every
+   row shares the same column edges and the block reads as one sheet. */
+.collab-ledger {
+  max-width: 760px;
+  margin-inline: auto;
+  padding-block: 8px;
+}
+
+.collab-row {
+  display: grid;
+  grid-template-columns: minmax(0, 190px) minmax(0, 1fr) minmax(0, 88px);
+  gap: 6px 20px;
+  align-items: baseline;
+  padding-block: 13px;
+}
+
+/* the separator is between rows only — the plate already draws the outer edge */
+.collab-row + .collab-row { border-top: 1px solid var(--border); }
+
+/* --text, not the accent: the accent measures 2.70:1 on the plate and these
+   names are 13px body-scale text */
+.collab-name {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--text);
+  text-align: left;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+/* each title is its own flex item, so a line breaks at a `·` first and only
+   breaks inside a title when that title alone is wider than the column — and
+   then only at its spaces. No break-all / overflow-wrap:anywhere here: that is
+   what splits "soundcloud" into "soun / dcloud". */
+.collab-tracks {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 2px 8px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  text-align: center;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.collab-track { overflow-wrap: normal; word-break: normal; }
+
+.collab-link {
+  font-size: 13px;
+  color: var(--mj-accent-bright);
+  text-align: right;
+  white-space: nowrap;
+  justify-self: end;
+}
+
+/* same inline marker as the rider list — it has to travel with the label */
+.collab-link::before { content: '→ '; }
+.collab-link:hover { text-decoration: underline; }
+
+/* stacked and centred with the rest of the phone layout, like .contact-grid */
+@media (max-width: 640px) {
+  .collab-ledger { max-width: none; }
+
+  .collab-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 5px;
+    justify-items: center;
+    padding-block: 15px;
+  }
+
+  .collab-name { text-align: center; }
+  .collab-link { text-align: center; justify-self: center; }
+}
+
 /* ── press ───────────────────────────────────── */
 .press-item + .press-item { margin-top: 12px; }
 
@@ -1166,8 +1266,9 @@ body.store-note {
 }
 
 @media (max-width: 480px) {
-  /* 10px type here, so the row box re-caps: first four links run 205px and the
-     first five run 258px — 230px keeps the break after "gear" */
+  /* 10px type here, so the row box re-caps to a narrow measure and the nav
+     wraps to a few short lines instead of one long one. Re-measure this cap if
+     the nav labels change again. */
   .nav { padding-inline: max(12px, calc((100% - 230px) / 2)); }
   .nav a { padding: 12px 10px; font-size: 10px; }
   .url-bar { padding: 8px 16px; }
