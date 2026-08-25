@@ -114,9 +114,28 @@ function button(href: string, label: string): string {
 
 function downloadReady(env: Env, p: Record<string, unknown>): Rendered {
   const title = str(p, 'album_title', 'your record');
+  const kind = str(p, 'album_kind', 'album');
   const url = `${env.WORKER_ORIGIN}/d/${str(p, 'token')}`;
   const hours = str(p, 'ttl_hours', '72');
   const max = str(p, 'max_downloads', '5');
+
+  // What is actually waiting on the download page. A pack is one zip and a
+  // bundle is two separate packs, so neither can promise "both formats".
+  // WORKSHOP: all three variants below are placeholder copy.
+  const whatText =
+    kind === 'pack'
+      ? `here is your download page. the pack is one zip file.`
+      : kind === 'bundle'
+        ? `here is your download page. both packs are on it, one download each.`
+        : `here is your download page. both formats are on it -- WAV and MP3 320.`;
+  const whatHtml =
+    kind === 'pack'
+      ? `here is your download page. the pack is one zip file.`
+      : kind === 'bundle'
+        ? `here is your download page. both packs are on it, one download each.`
+        : `here is your download page. both formats are on it &mdash; WAV and MP3&nbsp;320.`;
+  const countedAcross =
+    kind === 'pack' ? '' : kind === 'bundle' ? ', counted across both packs' : ', counted across both formats';
 
   // WORKSHOP: subject line for the delivery email. Placeholder.
   const subject = `${title} is ready to download`;
@@ -126,11 +145,11 @@ function downloadReady(env: Env, p: Record<string, unknown>): Rendered {
     `thank you for buying ${title}.`,
     ``,
     // WORKSHOP: the instruction line. Placeholder.
-    `here is your download page. both formats are on it -- WAV and MP3 320.`,
+    whatText,
     url,
     ``,
     // WORKSHOP: the limits line. Placeholder. Keep the numbers accurate.
-    `the link works for ${hours} hours and allows ${max} downloads in total, counted across both formats.`,
+    `the link works for ${hours} hours and allows ${max} downloads in total${countedAcross}.`,
     ``,
     // WORKSHOP: the support line. Placeholder.
     `if anything goes wrong, just reply to this email and it reaches me.`,
@@ -141,9 +160,9 @@ function downloadReady(env: Env, p: Record<string, unknown>): Rendered {
   const html = shell(
     `<!-- WORKSHOP: delivery email body. Every line below is placeholder copy. -->
 <p>thank you for buying <strong>${escapeHtml(title)}</strong>.</p>
-<p>here is your download page. both formats are on it &mdash; WAV and MP3&nbsp;320.</p>
+<p>${whatHtml}</p>
 ${button(url, 'open your download page')}
-<p style="color:#5f5f5f;font-size:14px;">the link works for ${escapeHtml(hours)} hours and allows ${escapeHtml(max)} downloads in total, counted across both formats.</p>
+<p style="color:#5f5f5f;font-size:14px;">the link works for ${escapeHtml(hours)} hours and allows ${escapeHtml(max)} downloads in total${countedAcross}.</p>
 <p style="color:#5f5f5f;font-size:14px;">if anything goes wrong, just reply to this email and it reaches me.</p>
 <p>&mdash; matthew</p>`,
   );

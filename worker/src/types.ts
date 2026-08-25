@@ -42,12 +42,24 @@ export interface Env {
   ADMIN_BEARER_TOKEN?: string;
 }
 
+/**
+ * The two R2 key slots on a row. For music these really are formats. For a
+ * 'pack' both slots hold the same zip, and for a 'bundle' they hold the two
+ * pack zips -- so treat this as "which slot", not "which encoding", and read
+ * the customer-facing wording off the album kind instead.
+ */
 export type Format = 'wav' | 'mp3';
+
+/**
+ * 'pack'   -- sample pack: one zip, both key slots identical.
+ * 'bundle' -- two packs sold together: the key slots are the two pack zips.
+ */
+export type AlbumKind = 'single' | 'ep' | 'album' | 'pack' | 'bundle';
 
 export interface AlbumRow {
   slug: string;
   title: string;
-  kind: 'single' | 'ep' | 'album';
+  kind: AlbumKind;
   price_cents: number;
   stripe_price_id: string;
   r2_key_wav: string;

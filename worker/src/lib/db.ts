@@ -36,6 +36,18 @@ export function formatLabel(format: Format): string {
   return format === 'wav' ? 'WAV' : 'MP3 320';
 }
 
+/**
+ * The slug embedded in an R2 key, which is always `albums/{slug}/{file}` --
+ * enforced on write by the /admin/mpu key regex. A bundle row's two key slots
+ * point at other albums' zips, so this is how a bundle finds its parts without
+ * a join table or hardcoded product names. Null for any key that is not that
+ * shape, and callers must handle null rather than guess.
+ */
+export function slugFromR2Key(key: string): string | null {
+  const m = /^albums\/([a-z0-9-]+)\//.exec(key);
+  return m ? m[1]! : null;
+}
+
 export async function getToken(env: Env, token: string): Promise<TokenRow | null> {
   return env.DB.prepare(
     `SELECT token, purchase_id, album_slug, expires_at, max_downloads,

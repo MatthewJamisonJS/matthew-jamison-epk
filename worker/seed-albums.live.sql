@@ -28,3 +28,11 @@ INSERT OR REPLACE INTO albums (slug, title, stripe_price_id, kind, price_cents, 
 INSERT OR REPLACE INTO albums (slug, title, stripe_price_id, kind, price_cents, r2_key_mp3, r2_key_wav, active) VALUES ('twice-matthew-jamison-edit', 'Twice [Matthew Jamison Edit]', 'price_1U6t8GLpcL2yfpNfS2LwBdJz', 'single', 299, 'albums/twice-matthew-jamison-edit/twice-matthew-jamison-edit-mp3-320.zip', 'albums/twice-matthew-jamison-edit/twice-matthew-jamison-edit-wav.zip', 1);
 INSERT OR REPLACE INTO albums (slug, title, stripe_price_id, kind, price_cents, r2_key_mp3, r2_key_wav, active) VALUES ('we-got-the-keys', 'We got the keys', 'price_1U6t8HLpcL2yfpNfh3j46x1e', 'single', 299, 'albums/we-got-the-keys/we-got-the-keys-mp3-320.zip', 'albums/we-got-the-keys/we-got-the-keys-wav.zip', 1);
 INSERT OR REPLACE INTO albums (slug, title, stripe_price_id, kind, price_cents, r2_key_mp3, r2_key_wav, active) VALUES ('wedobeatschallenge-9', 'Wedobeatschallenge #9', 'price_1U6t8JLpcL2yfpNfaJ4KvZja', 'single', 299, 'albums/wedobeatschallenge-9/wedobeatschallenge-9-mp3-320.zip', 'albums/wedobeatschallenge-9/wedobeatschallenge-9-wav.zip', 1);
+-- Bass sample packs. Commented until the LIVE Stripe prices exist -- pasting a
+-- placeholder id here would let a checkout reach Stripe and fail on the buyer.
+-- Uncomment with the real price_... ids, then run this file.
+--
+-- INSERT OR REPLACE INTO albums (slug, title, stripe_price_id, kind, price_cents, r2_key_mp3, r2_key_wav, active) VALUES ('infinity-loops', 'INFINITY LOOPS', 'price_LIVE_TODO', 'pack', 2000, 'albums/infinity-loops/infinity-loops-wav.zip', 'albums/infinity-loops/infinity-loops-wav.zip', 1);
+-- INSERT OR REPLACE INTO albums (slug, title, stripe_price_id, kind, price_cents, r2_key_mp3, r2_key_wav, active) VALUES ('bass-latin-vol-1', 'BASS SAMPLE PACK VOL. 1 [LATIN EDITION]', 'price_LIVE_TODO', 'pack', 2000, 'albums/bass-latin-vol-1/bass-latin-vol-1-wav.zip', 'albums/bass-latin-vol-1/bass-latin-vol-1-wav.zip', 1);
+-- The bundle owns no file: its two key slots are the two pack zips above.
+-- INSERT OR REPLACE INTO albums (slug, title, stripe_price_id, kind, price_cents, r2_key_mp3, r2_key_wav, active) VALUES ('bass-samples-bundle', 'BASS SAMPLE PACKS BUNDLE', 'price_LIVE_TODO', 'bundle', 3500, 'albums/bass-latin-vol-1/bass-latin-vol-1-wav.zip', 'albums/infinity-loops/infinity-loops-wav.zip', 1);

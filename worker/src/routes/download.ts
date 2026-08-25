@@ -9,6 +9,7 @@ import {
   logDownloadEvent,
   r2KeyFor,
   refundDownload,
+  slugFromR2Key,
 } from '../lib/db';
 import { clientIp, escapeHtml, generic404, html, ipCountry, page } from '../lib/http';
 import { alert, drainOutbox, enqueue } from '../lib/outbox';
@@ -44,6 +45,71 @@ function parseFormat(url: URL): Format | null {
 }
 
 /* ------------------------------------------------------------------ */
+/* what a given album actually offers                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Music ships as two encodings of one record. A sample pack ships as one zip,
+ * and a bundle ships as two different packs. Same two key slots underneath,
+ * three different things to say about them -- so every customer-facing name
+ * comes through here rather than off `formatLabel`, which only knows encodings.
+ */
+interface DownloadPart {
+  format: Format;
+  label: string;
+}
+
+/**
+ * A bundle's parts are ordinary album rows; the bundle row just points its two
+ * key slots at their zips. Reading the part title back out of D1 keeps product
+ * names in the catalog where the rest of them live. Null when the key is not
+ * `albums/{slug}/...` or the row is gone -- callers fall back to a positional
+ * name rather than mislabelling a download.
+ */
+async function partTitle(env: Env, album: AlbumRow, format: Format): Promise<string | null> {
+  const slug = slugFromR2Key(r2KeyFor(album, format));
+  if (!slug) return null;
+  const part = await getAlbum(env, slug);
+  return part?.title ?? null;
+}
+
+// WORKSHOP: the button labels and fallbacks below are placeholder copy.
+async function partsFor(env: Env, album: AlbumRow): Promise<DownloadPart[]> {
+  if (album.kind === 'pack') {
+    // One zip. The mp3 slot holds the same key, so a second button would be a
+    // second name for the same file.
+    return [{ format: 'wav', label: 'download pack (wav)' }];
+  }
+  if (album.kind === 'bundle') {
+    const [wav, mp3] = await Promise.all([
+      partTitle(env, album, 'wav'),
+      partTitle(env, album, 'mp3'),
+    ]);
+    return [
+      { format: 'wav', label: wav ?? 'download the first pack' },
+      { format: 'mp3', label: mp3 ?? 'download the second pack' },
+    ];
+  }
+  return [
+    { format: 'wav', label: 'download WAV' },
+    { format: 'mp3', label: 'download MP3 320' },
+  ];
+}
+
+/**
+ * The name the file lands under. Packs are WAV whichever slot was asked for,
+ * and a bundle's two slots are two separate packs, so neither can use the
+ * plain encoding label.
+ */
+async function downloadFilename(env: Env, album: AlbumRow, format: Format): Promise<string> {
+  if (album.kind === 'pack') return `${album.title} (WAV).zip`;
+  if (album.kind === 'bundle') {
+    return `${(await partTitle(env, album, format)) ?? album.title} (WAV).zip`;
+  }
+  return `${album.title} (${formatLabel(format)}).zip`;
+}
+
+/* ------------------------------------------------------------------ */
 /* GET /d/:token -- landing page                                       */
 /* ------------------------------------------------------------------ */
 
@@ -74,22 +140,52 @@ export async function handleLanding(
   const state = stateOf(row);
   await logDownloadEvent(env, token, `landing_${state}`, null, ipCountry(req), req.headers.get('User-Agent'));
 
-  if (state === 'ok') return html(page(album.title, okBody(album, row, token)));
+  if (state === 'ok') {
+    const parts = await partsFor(env, album);
+    return html(page(album.title, okBody(album, row, token, parts)));
+  }
   return html(page(album.title, blockedBody(album, token, state)), { status: 403 });
 }
 
 // WORKSHOP: every customer-facing line in the three page bodies below is
 // placeholder copy. Matthew's wording replaces it verbatim.
-function okBody(album: AlbumRow, row: TokenRow, token: string): string {
+function okBody(
+  album: AlbumRow,
+  row: TokenRow,
+  token: string,
+  parts: DownloadPart[],
+): string {
   const remaining = row.max_downloads - row.download_count;
   const base = `/d/${encodeURIComponent(token)}/file`;
+
+  const buttons = parts
+    .map(
+      (part, i) =>
+        `  <a class="btn${i === 0 ? '' : ' secondary'}" href="${escapeHtml(base)}?format=${part.format}">${escapeHtml(part.label)}</a>`,
+    )
+    .join('\n');
+
+  // The "shared across" wording has to match what is actually on the page: two
+  // formats of one record, one zip, or two separate packs.
+  const lead =
+    album.kind === 'pack'
+      ? 'your pack is ready.'
+      : album.kind === 'bundle'
+        ? 'both packs are on this page.'
+        : 'your download is ready. pick a format.';
+  const sharedAcross =
+    album.kind === 'pack'
+      ? ''
+      : album.kind === 'bundle'
+        ? ', shared across both packs'
+        : ', shared across both formats';
+
   return `<h1>${escapeHtml(album.title)}</h1>
-<p class="lead">your download is ready. pick a format.</p>
+<p class="lead">${escapeHtml(lead)}</p>
 <div class="actions">
-  <a class="btn" href="${escapeHtml(base)}?format=wav">download WAV</a>
-  <a class="btn secondary" href="${escapeHtml(base)}?format=mp3">download MP3 320</a>
+${buttons}
 </div>
-<p class="meta">${remaining} download${remaining === 1 ? '' : 's'} left, shared across both formats.
+<p class="meta">${remaining} download${remaining === 1 ? '' : 's'} left${sharedAcross}.
 link expires ${escapeHtml(row.expires_at.slice(0, 16).replace('T', ' '))} UTC.</p>
 <hr>
 <p class="meta">opening this page costs nothing &mdash; only the buttons above count.</p>`;
@@ -202,7 +298,7 @@ export async function handleFile(
 
   const headers = new Headers({
     'Content-Type': 'application/zip',
-    'Content-Disposition': contentDisposition(`${album.title} (${formatLabel(format)}).zip`),
+    'Content-Disposition': contentDisposition(await downloadFilename(env, album, format)),
     'Cache-Control': 'no-store',
     'X-Content-Type-Options': 'nosniff',
     'Referrer-Policy': 'no-referrer',

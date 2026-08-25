@@ -305,6 +305,9 @@ async function fulfill(env: Env, session: Stripe.Checkout.Session): Promise<void
       token,
       album_title: album.title,
       album_slug: slug,
+      // The delivery email describes what is on the page, and that differs for
+      // a pack (one zip) and a bundle (two packs).
+      album_kind: album.kind,
       ttl_hours: intVar(env.DOWNLOAD_TTL_HOURS, 72),
       max_downloads: intVar(env.MAX_DOWNLOADS, 5),
     });
