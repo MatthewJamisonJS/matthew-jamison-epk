@@ -979,6 +979,23 @@ body.store-note {
 .dev-body a { color: var(--mj-accent-bright); }
 .dev-body a:hover { text-decoration: underline; }
 
+/* the inquiry email is 38 characters of mono — it cannot fit a phone at 15px,
+   and .dev-body's break-word was shattering it mid-address. At phone widths
+   each contact row becomes a left-aligned label/value stack: the value line
+   (arrow + link) gets its own line at 12px, which holds the full address on
+   one line down to 320px, and never breaks inside a word. Desktop unchanged. */
+@media (max-width: 430px) {
+  .dev-contact { display: block; text-align: left; }
+  .dev-contact-value {
+    display: block;
+    /* 38ch of mono + card padding: 12px clears 390-wide phones, 320 needs ~10px */
+    font-size: clamp(10px, 3.1vw, 12px);
+    line-height: 1.8;
+    overflow-wrap: normal;
+    word-break: keep-all;
+  }
+}
+
 /* ── rider ───────────────────────────────────── */
 .rider-grid {
   display: grid;
