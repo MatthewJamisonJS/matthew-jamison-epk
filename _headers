@@ -61,3 +61,23 @@
   X-Frame-Options: SAMEORIGIN
   Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; media-src data:; frame-ancestors 'self'; object-src 'none'; base-uri 'none'; form-action 'none'
   X-Robots-Tag: noindex
+
+# 2048 — gabrielecirulli/2048 @ 478b6ec, MIT. Vendor-time audit: no eval/new
+# Function, no document.write, no inline <script>/<style>, no style="" attrs,
+# no fetch/XHR/WebSocket/sendBeacon, no <form>, no audio. So connect-src and
+# media-src are left to fall through to default-src 'none'. font-src 'self' IS
+# required: style/main.css @imports style/fonts/clear-sans.css, which loads the
+# bundled Clear Sans faces via @font-face. img-src 'self' covers favicon.ico
+# and the meta/ apple-touch images.
+/games/2048/*
+  ! X-Frame-Options
+  ! Content-Security-Policy
+  X-Frame-Options: SAMEORIGIN
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'none'; form-action 'none'
+  X-Robots-Tag: noindex
+
+/games/2048/js/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/games/2048/style/*
+  Cache-Control: public, max-age=31536000, immutable

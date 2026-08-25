@@ -1200,10 +1200,19 @@ star-field {
    Rounds one pixel tighter than the card, like .store-art.
    The opacity shift is .store-card's "this card is live" language, at the same
    0.18s. Hover and press are user-initiated feedback, so — like the store —
-   they are not cut under prefers-reduced-motion. */
+   they are not cut under prefers-reduced-motion.
+   The class carries both that placeholder <span> and a real <img> thumb, so
+   width + object-fit are here to keep an img inside the 4/3 box rather than
+   laying out at its intrinsic width. Thumbs are authored 4/3; cover never
+   actually crops. */
 .game-tile-art {
   display: block;
+  width: 100%;
+  /* height:auto is load-bearing — the <img>'s height attribute is a
+     presentational hint, and a definite height would make aspect-ratio moot */
+  height: auto;
   aspect-ratio: 4 / 3;
+  object-fit: cover;
   border-radius: calc(var(--radius) - 1px);
   transition: opacity 0.18s;
   background:
