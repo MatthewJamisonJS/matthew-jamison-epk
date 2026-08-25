@@ -129,8 +129,8 @@
 # required twice over: css/main.css has ten url('../assets/*.png')
 # backgrounds, and main.js appends <img> tags for the score digits, medals and
 # replay button. media-src 'self' IS required: js/buzz.min.js builds detached
-# <audio> elements with <source src="assets/sounds/*.ogg">. connect-src and
-# font-src are omitted deliberately — nothing makes a network call (jQuery's
+# <audio> elements with <source src="assets/sounds/*.{ogg,m4a}">. connect-src
+# and font-src are omitted deliberately — nothing makes a network call (jQuery's
 # ajax is never invoked) and the only font-family is `monospace`. They fall
 # through to default-src 'none'. jQuery 1.10.2 contains an eval() inside
 # globalEval, reachable only from .html()/ajax script injection, neither of

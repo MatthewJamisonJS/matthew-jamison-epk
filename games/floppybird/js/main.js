@@ -26,11 +26,13 @@ var replayclickable = false;
 
 //sounds
 var volume = 30;
-var soundJump = new buzz.sound("assets/sounds/sfx_wing.ogg");
-var soundScore = new buzz.sound("assets/sounds/sfx_point.ogg");
-var soundHit = new buzz.sound("assets/sounds/sfx_hit.ogg");
-var soundDie = new buzz.sound("assets/sounds/sfx_die.ogg");
-var soundSwoosh = new buzz.sound("assets/sounds/sfx_swooshing.ogg");
+//ogg for chrome/firefox, m4a so safari/ios are not silent. buzz mutates the
+//options object it is handed, so each sound gets its own literal.
+var soundJump = new buzz.sound("assets/sounds/sfx_wing", { formats: ["ogg", "m4a"] });
+var soundScore = new buzz.sound("assets/sounds/sfx_point", { formats: ["ogg", "m4a"] });
+var soundHit = new buzz.sound("assets/sounds/sfx_hit", { formats: ["ogg", "m4a"] });
+var soundDie = new buzz.sound("assets/sounds/sfx_die", { formats: ["ogg", "m4a"] });
+var soundSwoosh = new buzz.sound("assets/sounds/sfx_swooshing", { formats: ["ogg", "m4a"] });
 buzz.all().setVolume(volume);
 
 //loops
