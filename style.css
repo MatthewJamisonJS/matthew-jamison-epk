@@ -1288,6 +1288,22 @@ body.game-locked {
   white-space: nowrap;
 }
 
+/* how-to-play line, per-tile. margin-inline-end: auto keeps it grouped with the
+   title on the left and leaves the close button on the right — the chrome's
+   space-between would otherwise strand it in the middle. Empty when a tile
+   carries no data-controls, and the flex gap collapses with it. */
+.game-overlay-controls {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-inline-end: auto;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.game-overlay-controls:empty { display: none; }
+
 /* same construction as .store-play: a 44px box centring a 16px inline svg from
    the page's icon set, so the glyph can't shift with the font */
 .game-close {

@@ -739,6 +739,7 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
   const closeBtn = document.getElementById('game-close');
   const nameEl = document.getElementById('game-overlay-name');
   const creditEl = document.getElementById('game-overlay-credit');
+  const controlsEl = document.getElementById('game-overlay-controls');
   const errorEl = document.getElementById('game-error');
   const retryBtn = document.getElementById('game-retry');
   const errorCloseBtn = document.getElementById('game-error-close');
@@ -856,6 +857,7 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
     };
     nameEl.textContent = tile.dataset.name;
     creditEl.textContent = ' · game by ' + tile.dataset.author;
+    controlsEl.textContent = tile.dataset.controls || '';
     overlay.setAttribute('aria-label', tile.dataset.name);
     document.body.classList.add('game-locked');
     setInertBackground(true);
@@ -878,6 +880,7 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
       document.exitFullscreen().catch(() => { /* already leaving */ });
     }
     while (frameHost.firstChild) frameHost.removeChild(frameHost.firstChild);
+    controlsEl.textContent = '';
     errorEl.hidden = true;
     overlay.hidden = true;
     setInertBackground(false);
