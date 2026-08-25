@@ -32,7 +32,7 @@
   # api.matthewjamison.dev is the store worker: connect-src for the checkout
   # POST, media-src for the /p/{slug}/{NN} preview streams. Album art is
   # self-hosted under /assets/covers/, so img-src is back to 'self'.
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-UPpdAxBwVk+nbfHkufBcVM2OPLi70HRWvau9RthMBCY=' 'sha256-OcrbXOPnfYuROn+Hm1rj76tpUi1AM0DX6r9kNiFdI4s=' https://static.cloudflareinsights.com; style-src 'self'; img-src 'self'; font-src 'self'; media-src 'self' https://api.matthewjamison.dev; connect-src 'self' https://cloudflareinsights.com https://api.matthewjamison.dev; form-action 'none'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; require-trusted-types-for 'script'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-B9Us79+UK96rRHLjnuZdygSWci4itSPnrWrq2CP+ZYk=' 'sha256-OcrbXOPnfYuROn+Hm1rj76tpUi1AM0DX6r9kNiFdI4s=' https://static.cloudflareinsights.com; style-src 'self'; img-src 'self'; font-src 'self'; media-src 'self' https://api.matthewjamison.dev; connect-src 'self' https://cloudflareinsights.com https://api.matthewjamison.dev; form-action 'none'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; require-trusted-types-for 'script'
 
 # content-stable: fonts, video, and the retired orb files never change in place
 /assets/*

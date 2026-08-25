@@ -1576,6 +1576,20 @@ body.game-locked {
   overflow-wrap: anywhere;
 }
 
+/* collab pointer (infinity only). Same measure and voice as .game-tile-credit;
+   it adds a line to one pack card, and the grid's equal-height rows plus
+   .sample-foot's margin-top:auto keep the two packs' feet level on desktop —
+   symmetry holds without a spacer on the other card. */
+.sample-collab {
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
+  margin-top: 2px;
+}
+.sample-collab a { text-decoration: underline; }
+
 /* every card ends the same way: the price sits on the line with the control it
    belongs to, so the card closes on a decision rather than on a full-width
    slab of button. margin-top:auto is .store-buy's column rule, moved up to the
