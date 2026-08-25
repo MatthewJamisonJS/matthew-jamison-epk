@@ -118,3 +118,37 @@
 
 /games/tiny-platformer/tiles.png
   Cache-Control: public, max-age=31536000, immutable
+
+# floppy bird — nebez/floppybird @ efd2c7f7, Apache-2.0 (code). Vendor-time
+# audit: no inline <script>/<style> blocks, no document.write, no <form>, no
+# fetch/XHR/WebSocket/sendBeacon. The upstream third-party analytics <script
+# src="https://yummy.nebez.dev/script.js"> was deleted, so no external host is
+# referenced anywhere. The one style="" attribute (the pipe heights, built as
+# an HTML string in js/main.js) was rewritten to jQuery .css() — CSSOM, not
+# gated — so style-src 'self' covers the whole page. img-src 'self' IS
+# required twice over: css/main.css has ten url('../assets/*.png')
+# backgrounds, and main.js appends <img> tags for the score digits, medals and
+# replay button. media-src 'self' IS required: js/buzz.min.js builds detached
+# <audio> elements with <source src="assets/sounds/*.ogg">. connect-src and
+# font-src are omitted deliberately — nothing makes a network call (jQuery's
+# ajax is never invoked) and the only font-family is `monospace`. They fall
+# through to default-src 'none'. jQuery 1.10.2 contains an eval() inside
+# globalEval, reachable only from .html()/ajax script injection, neither of
+# which this game uses: 'unsafe-eval' is NOT granted.
+/games/floppybird/*
+  ! X-Frame-Options
+  ! Content-Security-Policy
+  X-Frame-Options: SAMEORIGIN
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; media-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'none'; form-action 'none'
+  X-Robots-Tag: noindex
+
+# This game keeps its runtime in three directories, so the cache pins are
+# per-directory (index.html at the slug root stays revalidatable).
+/games/floppybird/js/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/games/floppybird/css/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/games/floppybird/assets/*
+  Cache-Control: public, max-age=31536000, immutable
