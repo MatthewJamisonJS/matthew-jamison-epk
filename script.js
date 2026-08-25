@@ -105,7 +105,16 @@ window.addEventListener('pointerdown', e => {
     lossless: 'press to force data saver',
     saver: 'press to use automatic quality'
   };
-  const STALL_BUDGET = 4000;  // ms of buffering before auto gives up on flac
+  const STALL_BUDGET = 2000;  // ms of buffering before auto gives up on flac
+  const START_DEADLINE = 2500;  // ms before an unstarted flac load falls back to mp3
+  const RUNWAY_MIN = 3;      // seconds of buffer ahead of the playhead
+  const RUNWAY_ENDGAME = 5;  // last seconds of a track: a shrinking runway is the end, not a stall
+  const HEALTH_STREAK = 20000;   // ms of healthy mp3 playback before flac is even considered
+  const COOLDOWN_BASE = 60000;   // ms after a demote before the first re-look
+  const COOLDOWN_MAX = 480000;   // ms ceiling on the doubling backoff (8 min)
+  const PROBE_BYTES = 524287;    // range end — 512 KiB of the flac source
+  const PROBE_MIN_BPS = 2000000 / 8;  // 2 Mbps, in bytes per second
+  const SAMPLE_EVERY = 5000;     // ms between passive health samples
 
   let mode = 'auto';
   try {
@@ -113,9 +122,21 @@ window.addEventListener('pointerdown', e => {
     if (MODES.indexOf(saved) !== -1) mode = saved;
   } catch (e) { /* storage blocked — stay on auto */ }
 
-  // once auto has been burned by a stall it stays on mp3 for the session,
-  // otherwise a marginal connection flaps between the two sources
-  let demoted = false;
+  // auto gives up on flac fast and comes back slow. A demote is instant; the way
+  // back needs a long healthy streak, a cooldown that doubles per demote, and a
+  // measured probe — so a marginal connection can't flap between the two sources.
+  let demoteCount = 0;
+  let demotedAt = 0;
+  let healthySince = 0;
+  let promotable = false;
+  let probing = false;
+
+  function recordDemote() {
+    demoteCount++;
+    demotedAt = Date.now();
+    promotable = false;
+    healthySince = 0;
+  }
 
   function slowLink() {
     const c = navigator.connection;
@@ -128,16 +149,72 @@ window.addEventListener('pointerdown', e => {
   function streamPath() {
     if (mode === 'saver') return '/p/';
     if (mode === 'lossless') return canFlac ? '/s/' : '/p/';
-    if (demoted || slowLink()) return '/p/';
+    if ((demoteCount > 0 && !promotable) || slowLink()) return '/p/';
     return canFlac ? '/s/' : '/p/';
   }
 
   const dataEl = document.getElementById('store-data');
   const grid = document.querySelector('.store-grid');
   const bar = document.getElementById('store-player');
-  const audio = document.getElementById('store-audio');
+  let audio = document.getElementById('store-audio');
   const status = document.getElementById('store-status');
   if (!dataEl || !grid || !bar || !audio) return;
+
+  // two elements, one active: a source handoff loads on the idle one while the
+  // active one keeps playing. Attributes are copied over except id, which has
+  // to stay unique. createElement only — the CSP requires Trusted Types.
+  let standby = document.createElement('audio');
+  Array.prototype.forEach.call(audio.attributes, a => {
+    if (a.name !== 'id') standby.setAttribute(a.name, a.value);
+  });
+  audio.after(standby);
+
+  function swapPointers() {
+    const idle = audio;
+    audio = standby;
+    standby = idle;
+  }
+
+  // release an element's connection. Clearing a src-less element would fire a
+  // spurious error event, so the attribute is checked first.
+  function clearEl(el) {
+    el.pause();
+    if (el.hasAttribute('src')) {
+      el.removeAttribute('src');
+      el.load();
+    }
+  }
+
+  // listeners sit on both elements and the wrapper drops events from the idle
+  // one, so handler bodies can keep reading the `audio` pointer.
+  function bindBoth(type, fn) {
+    const guard = e => {
+      if (e.target !== audio) return;
+      fn(e);
+    };
+    audio.addEventListener(type, guard);
+    standby.addEventListener(type, guard);
+  }
+
+  // iOS/Safari only grants playback from a user gesture — the standby element
+  // gets its own silent unlock the first time the user presses play.
+  let unlocked = false;
+
+  function unlockStandby() {
+    if (unlocked) return;
+    unlocked = true;
+    try {
+      standby.muted = true;
+      // load() inside the gesture is what actually lifts webkit's playback
+      // restriction on a src-less element; the muted play is belt-and-braces
+      standby.load();
+      const up = standby.play();
+      if (up && up.then) {
+        up.then(() => { standby.pause(); standby.muted = false; })
+          .catch(() => { standby.muted = false; });
+      }
+    } catch (e) { /* unlock is best-effort */ }
+  }
 
   let catalog;
   try {
@@ -214,6 +291,19 @@ window.addEventListener('pointerdown', e => {
   // while a lossless source is loaded — lossless mode is the user's call.
   let stallTimer = 0, stallStart = 0, stalledMs = 0;
 
+  // a flac load that never produces audio is a stall the stall clock can't see:
+  // no `waiting` fires before playback has begun.
+  let startTimer = 0;
+
+  function startClear() {
+    if (startTimer) clearTimeout(startTimer);
+    startTimer = 0;
+  }
+
+  // previous runway sample, so a buffer that is shrinking can be told apart
+  // from one that is merely small
+  let lastRunway = Infinity;
+
   function stallReset() {
     if (stallTimer) clearTimeout(stallTimer);
     stallTimer = 0;
@@ -225,8 +315,8 @@ window.addEventListener('pointerdown', e => {
     if (mode !== 'auto' || currentPath !== '/s/' || !slug || stallStart) return;
     stallStart = Date.now();
     stallTimer = setTimeout(() => {
-      demoted = true;
-      swapToMp3();
+      recordDemote();
+      handoff('/p/');
     }, Math.max(0, STALL_BUDGET - stalledMs));
   }
 
@@ -237,27 +327,64 @@ window.addEventListener('pointerdown', e => {
     stallTimer = 0;
   }
 
-  // reload the same track from the mp3 source at the position it reached.
-  // forcePlay covers the error path, where the element is already paused but
-  // the listener still expects playback to continue.
-  function swapToMp3(forcePlay) {
-    if (!slug || currentPath === '/p/') return;
-    const at = audio.currentTime;   // read before the src assignment resets it
-    const wasPlaying = forcePlay || !audio.paused;
+  // the end of the line for a source: nothing is playing and nothing is left
+  // to try
+  function reportLoadFailure() {
     stallReset();
-    currentPath = '/p/';
-    const src = API + '/p/' + slug + '/' + trackNN;
-    audio.src = src;
-    audio.addEventListener('loadedmetadata', () => {
-      // a skip can land a different track before this fires — leave it alone
-      if (audio.currentSrc !== src && audio.src !== src) return;
-      try { audio.currentTime = at; } catch (e) { /* not seekable yet */ }
+    if (status) status.textContent = 'that preview didn’t load. try again in a moment.';
+    syncToggle();
+  }
+
+  // hand the current track to the idle element on another source path: it loads
+  // and seeks while the active one keeps playing off its buffer, so the switch
+  // costs no audible gap. Anything that changes what should be playing — load(),
+  // stop(), a mode change — bumps the generation and orphans a handoff in
+  // flight. forcePlay covers the error path, where the active element is already
+  // paused but the listener still expects playback to continue.
+  let handoffGen = 0;
+
+  function handoff(toPath, forcePlay, fromError) {
+    if (!slug || currentPath === toPath) return;
+    const gen = ++handoffGen;
+    lastRunway = Infinity;   // the new source buffers on its own terms
+
+    function done() {
+      standby.removeEventListener('error', failed);
+      if (gen !== handoffGen) return;
+      const at = audio.currentTime;   // read before the active element is released
+      const wasPlaying = forcePlay || !audio.paused;
+      // seek first: the active element is still playing until the line below
+      try { standby.currentTime = at; } catch (e) { /* not seekable yet */ }
+      clearEl(audio);
+      swapPointers();
+      currentPath = toPath;
+      stallReset();
+      paintQuality();
       if (wasPlaying) {
         const p = audio.play();
         if (p && p.catch) p.catch(() => syncToggle());
+      } else {
+        syncToggle();
       }
-    }, { once: true });
-    paintQuality();
+    }
+
+    function failed() {
+      standby.removeEventListener('canplay', done);
+      if (gen !== handoffGen) return;
+      handoffGen++;   // nothing left to honour from this attempt
+      clearEl(standby);
+      // a demote can just give up and leave the current source playing, but an
+      // error-path handoff has no live source behind it — the listener's
+      // message is all that is left
+      if (fromError) reportLoadFailure();
+    }
+
+    standby.addEventListener('canplay', done, { once: true });
+    standby.addEventListener('error', failed, { once: true });
+    // the element was cloned from a preload="none" tag, so a bare src assignment
+    // would download nothing
+    standby.preload = 'auto';
+    standby.src = API + toPath + slug + '/' + trackNN;
   }
 
   function load(nextSlug, nextIndex, autoplay) {
@@ -274,8 +401,26 @@ window.addEventListener('pointerdown', e => {
     trackNN = nn;
     retried = false;
     stallReset();
+    startClear();        // a rapid skip re-arms the deadline below
+    lastRunway = Infinity;
+    lastBufEnd = -1;     // buffer readings don't carry across tracks
+    handoffGen++;        // a handoff in flight is for the track being replaced
+    clearEl(standby);    // and so is whatever it half-loaded
     currentPath = streamPath();
+    // a promotion is spent the moment it lands: any later one needs fresh
+    // evidence, and demoteCount survives so a re-stall backs off harder
+    if (currentPath === '/s/' && promotable) {
+      promotable = false;
+      healthySince = 0;
+    }
     audio.src = API + currentPath + slug + '/' + nn;
+    if (autoplay && mode === 'auto' && currentPath === '/s/') {
+      startTimer = setTimeout(() => {
+        startTimer = 0;
+        recordDemote();
+        handoff('/p/', true);
+      }, START_DEADLINE);
+    }
     paintQuality();
     bar.hidden = false;
 
@@ -313,9 +458,11 @@ window.addEventListener('pointerdown', e => {
 
   function stop() {
     stallReset();
-    audio.pause();
-    audio.removeAttribute('src');
-    audio.load();
+    startClear();
+    lastRunway = Infinity;
+    handoffGen++;
+    clearEl(audio);
+    clearEl(standby);
     slug = null;
     bar.hidden = true;
     markCards();
@@ -325,6 +472,7 @@ window.addEventListener('pointerdown', e => {
     const play = e.target.closest ? e.target.closest('.store-play') : null;
     if (play) {
       const s = play.dataset.slug;
+      unlockStandby();
       if (s === slug) {
         if (audio.paused) {
           const p = audio.play();
@@ -371,6 +519,7 @@ window.addEventListener('pointerdown', e => {
   stopBtn.addEventListener('click', stop);
   toggleBtn.addEventListener('click', () => {
     if (!slug) return;
+    unlockStandby();
     if (audio.paused) {
       const p = audio.play();
       if (p && p.catch) p.catch(() => syncToggle());
@@ -386,24 +535,28 @@ window.addEventListener('pointerdown', e => {
     qualityBtn.addEventListener('click', () => {
       mode = MODES[(MODES.indexOf(mode) + 1) % MODES.length];
       try { localStorage.setItem(QUALITY_KEY, mode); } catch (e) { /* storage blocked */ }
-      stallEnd();  // a pending demote belongs to the mode that armed it
+      stallEnd();     // a pending demote belongs to the mode that armed it
+      startClear();   // as does a startup deadline
+      handoffGen++;   // and so does a handoff it already started
       paintQuality();
     });
     paintQuality();
   }
 
-  audio.addEventListener('play', syncToggle);
-  audio.addEventListener('pause', () => { stallEnd(); syncToggle(); });
-  audio.addEventListener('waiting', stallBegin);
-  audio.addEventListener('stalled', stallBegin);
-  audio.addEventListener('playing', stallEnd);
-  audio.addEventListener('ended', () => {
+  bindBoth('play', syncToggle);
+  // pausing during startup withdraws the deadline: a forced demote would resume
+  // playback the listener just stopped
+  bindBoth('pause', () => { stallEnd(); startClear(); syncToggle(); });
+  bindBoth('waiting', stallBegin);
+  bindBoth('stalled', stallBegin);
+  bindBoth('playing', () => { stallEnd(); startClear(); });
+  bindBoth('ended', () => {
     if (!slug) return;
     if (index < catalog[slug].tr.length - 1) step(1);
     else syncToggle();
   });
 
-  audio.addEventListener('timeupdate', () => {
+  bindBoth('timeupdate', () => {
     if (scrubbing || !slug) return;
     const dur = audio.duration || catalog[slug].tr[index][2] || 0;
     scrub.value = String(Math.round(audio.currentTime));
@@ -411,25 +564,138 @@ window.addEventListener('pointerdown', e => {
     scrub.setAttribute('aria-valuetext', clock(audio.currentTime) + ' of ' + clock(dur));
   });
 
-  audio.addEventListener('loadedmetadata', () => {
+  // demote before the buffer runs dry rather than after: an audible stall is the
+  // thing being avoided, so the swap has to start while there is still audio to
+  // play through it. timeupdate fires ~4/s, cheap enough to sample raw.
+  function runwayCheck() {
+    if (mode !== 'auto' || currentPath !== '/s/' || !slug || audio.paused) return;
+    const t = audio.currentTime;
+    const b = audio.buffered;
+    let end = -1;
+    for (let i = 0; i < b.length; i++) {
+      if (b.start(i) <= t && t < b.end(i)) { end = b.end(i); break; }
+    }
+    if (end < 0) return;   // already dry — the stall clock owns that case
+    const runway = end - t;
+    const dur = audio.duration;
+    // a fully buffered track has nothing left to download, and the last seconds
+    // of any track shrink the runway to zero by design
+    if (dur && (end >= dur - 0.5 || dur - t <= RUNWAY_ENDGAME)) {
+      lastRunway = runway;
+      return;
+    }
+    if (runway < RUNWAY_MIN && runway < lastRunway) {
+      recordDemote();
+      handoff('/p/');
+      // currentPath only flips when the handoff lands, so the monitor has to
+      // disarm itself in the meantime — every tick until then would otherwise
+      // cancel and restart the swap
+      lastRunway = -Infinity;
+      return;
+    }
+    lastRunway = runway;
+  }
+
+  bindBoth('timeupdate', runwayCheck);
+
+  // the way back up. While a demoted session plays mp3, sample the link every
+  // few seconds; a long unbroken healthy streak plus an elapsed cooldown buys
+  // one measured probe of the flac source, and only that sets promotable.
+  let lastSample = 0;
+  let lastBufEnd = -1;
+
+  function bufferedEnd(t) {
+    const b = audio.buffered;
+    for (let i = 0; i < b.length; i++) {
+      if (b.start(i) <= t && t < b.end(i)) return b.end(i);
+    }
+    return -1;
+  }
+
+  function healthCheck() {
+    if (mode !== 'auto' || demoteCount === 0 || promotable) return;
+    if (currentPath !== '/p/' || !slug || audio.paused) return;
+    const now = Date.now();
+    if (now - lastSample < SAMPLE_EVERY) return;
+    const elapsedSec = lastSample ? (now - lastSample) / 1000 : 0;
+    lastSample = now;
+
+    const t = audio.currentTime;
+    const end = bufferedEnd(t);
+    const dur = audio.duration;
+    const whole = end >= 0 && dur && isFinite(dur) && end >= dur - 0.5;
+    // growing at least as fast as the clock is the test — a buffer that only
+    // holds its lead is keeping pace, one that slips is not
+    const growing = end >= 0 && lastBufEnd >= 0 && elapsedSec > 0 &&
+      end - lastBufEnd >= elapsedSec * 0.8;
+    lastBufEnd = end;
+
+    if (!slowLink() && (whole || growing)) {
+      if (healthySince === 0) healthySince = now;
+    } else {
+      healthySince = 0;
+      return;
+    }
+
+    const cooldown = Math.min(COOLDOWN_BASE * Math.pow(2, Math.max(0, demoteCount - 1)), COOLDOWN_MAX);
+    if (now - healthySince >= HEALTH_STREAK && now - demotedAt >= cooldown) {
+      probeLossless();
+    }
+  }
+
+  // one ranged GET of the flac source, wall-clocked. The API answers GET only —
+  // a HEAD comes back 404 — so the first half-megabyte is the measurement.
+  function probeLossless() {
+    if (probing) return;
+    probing = true;
+    const t0 = Date.now();
+    fetch(API + '/s/' + slug + '/' + trackNN, {
+      headers: { Range: 'bytes=0-' + PROBE_BYTES },
+      cache: 'no-store'   // a disk-cache hit would read as a fast link
+    }).then(r => {
+      if (!r.ok) throw new Error('probe rejected');
+      return r.arrayBuffer();
+    }).then(buf => {
+      // the body's own length, not the range we asked for: a short answer must
+      // not read as a fast one
+      const secs = Math.max(0.001, (Date.now() - t0) / 1000);
+      if (buf.byteLength / secs >= PROBE_MIN_BPS) {
+        promotable = true;
+        paintQuality();
+      } else {
+        probeFailed();
+      }
+    }).catch(() => {
+      probeFailed();
+    }).then(() => {
+      probing = false;
+    });
+  }
+
+  function probeFailed() {
+    demotedAt = Date.now();
+    healthySince = 0;
+  }
+
+  bindBoth('timeupdate', healthCheck);
+
+  bindBoth('loadedmetadata', () => {
     if (isFinite(audio.duration) && audio.duration > 0) {
       scrub.max = String(Math.round(audio.duration));
     }
   });
 
-  audio.addEventListener('error', () => {
+  bindBoth('error', () => {
     // stop() clears the src, which fires error too — only report a real failure
     if (!slug) return;
     // a lossless source that fails outright gets one mp3 attempt before the
     // failure reaches the listener
     if (currentPath === '/s/' && !retried) {
       retried = true;
-      swapToMp3(true);
+      handoff('/p/', true, true);
       return;
     }
-    stallReset();
-    if (status) status.textContent = 'that preview didn’t load. try again in a moment.';
-    syncToggle();
+    reportLoadFailure();
   });
 
   scrub.addEventListener('pointerdown', () => { scrubbing = true; });
@@ -479,7 +745,9 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
   const musicDialog = document.getElementById('game-music-dialog');
   const keepBtn = document.getElementById('game-music-keep');
   const gameAudioBtn = document.getElementById('game-music-game');
-  const storeAudio = document.getElementById('store-audio');
+  // the store player runs two audio elements (gapless quality handoff), and
+  // which one is active changes at runtime — always check both
+  const storeAudioEls = () => document.querySelectorAll('#store-player audio');
   if (!grid || !overlay || !frameHost || !closeBtn) return;
 
   const LOAD_BUDGET = 10000;  // ms before the plain retry/close state shows
@@ -490,7 +758,9 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
   let suppressPop = false;  // swallows the popstate our own history.back() will fire
 
   function musicPlaying() {
-    return !!(storeAudio && storeAudio.currentSrc && !storeAudio.paused);
+    return Array.prototype.some.call(
+      storeAudioEls(), a => a.currentSrc && !a.paused
+    );
   }
 
   function setInertBackground(on) {
@@ -601,7 +871,7 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
     if (pendingTile) { openGame(pendingTile, true); pendingTile = null; }
   });
   if (gameAudioBtn) gameAudioBtn.addEventListener('click', () => {
-    if (storeAudio) storeAudio.pause();
+    storeAudioEls().forEach(a => a.pause());
     musicDialog.close();
     if (pendingTile) { openGame(pendingTile, false); pendingTile = null; }
   });
