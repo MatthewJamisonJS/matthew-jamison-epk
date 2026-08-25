@@ -791,7 +791,7 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
     iframe.src = gameUrl();
     iframe.title = open.tile.dataset.name;
     // same-origin documentation only — not a security boundary here
-    iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-pointer-lock');
+    iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-pointer-lock allow-popups');
     iframe.addEventListener('load', () => {
       clearTimeout(loadTimer);
       loadTimer = 0;

@@ -89,16 +89,18 @@
 # <style> block was externalized to platformer.css, so style-src 'self' covers
 # the whole page — FPSMeter writes element.style properties, which is CSSOM
 # and not gated. connect-src 'self' IS required: platformer.js fetches
-# level.json over same-origin XMLHttpRequest at startup. img-src, font-src and
-# media-src are omitted deliberately — nothing loads an image (the map is
-# drawn with fillRect; tiles.png ships only because level.json names it as its
-# Tiled tileset, and is never requested), there is no @font-face, and there is
-# no sound. They fall through to default-src 'none'.
+# level.json over same-origin XMLHttpRequest at startup. img-src 'self' is
+# NOT for the game — nothing loads an image (the map is drawn with fillRect;
+# tiles.png ships only because level.json names it as its Tiled tileset, and
+# is never requested) — it is for the browser's favicon probe, which logs a
+# CSP violation on direct navigation to the route. font-src and media-src are
+# omitted deliberately — there is no @font-face and there is no sound. They
+# fall through to default-src 'none'.
 /games/tiny-platformer/*
   ! X-Frame-Options
   ! Content-Security-Policy
   X-Frame-Options: SAMEORIGIN
-  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'none'; form-action 'none'
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'none'; form-action 'none'
   X-Robots-Tag: noindex
 
 # The game's assets all sit in the slug root next to index.html, so they are
