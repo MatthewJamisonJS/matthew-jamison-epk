@@ -789,7 +789,10 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
       loadTimer = 0;
       errorEl.hidden = true;
       try {
-        iframe.contentWindow.focus();
+        // element focus, NOT contentWindow.focus() — focusing the subframe window
+        // during the fullscreen-enter settle window makes Chrome abort fullscreen
+        // (deployed-latency race); iframe.focus() delivers keys to the frame without that
+        iframe.focus();
         // Escape inside the game must still close the overlay; keydown in
         // the iframe never bubbles to the parent, so listen there directly
         iframe.contentDocument.addEventListener('keydown', e => {
@@ -902,6 +905,6 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
   overlay.addEventListener('pointerdown', e => {
     if (closeBtn.contains(e.target) || errorEl.contains(e.target)) return;
     const iframe = frameHost.querySelector('iframe');
-    if (iframe) { try { iframe.contentWindow.focus(); } catch (err) { /* gone */ } }
+    if (iframe) { iframe.focus(); }
   });
 })();
