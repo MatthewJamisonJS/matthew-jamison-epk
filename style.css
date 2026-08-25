@@ -81,13 +81,23 @@ body {
 }
 
 a { color: inherit; text-decoration: none; }
-a:hover { color: var(--mj-accent-bright); }
+/* hover goes to --text, not the accent: --mj-accent-bright measures 2.70:1 on
+   the plate, under the 4.5:1 floor for body text. --text is 16.16:1. */
+a:hover { color: var(--text); }
 
 .comment { color: var(--mj-comment-green); }
 .muted { color: var(--text-muted); }
 .accent { color: var(--mj-accent-bright); }
 
-:focus-visible { outline: 2px solid var(--mj-accent-bright); outline-offset: 2px; }
+/* one focus vocabulary for the whole page: the accent-only ring measures
+   2.70:1 against a black plate, under the 3:1 floor for a focus indicator, so
+   it is paired with a 1px --text ring (16.16:1). Never transitioned — a focus
+   ring has to appear at once. */
+:focus-visible {
+  outline: 2px solid var(--mj-accent-bright);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 1px var(--text);
+}
 
 /* ── page background: starfield over orb fallback, + pointer glow ─── */
 /* .page-orb is the fallback layer: it shows before starfield.js upgrades the
@@ -337,11 +347,13 @@ star-field {
   letter-spacing: 0.06em;
   border: 1px solid var(--mj-accent-border);
   border-radius: var(--radius);
-  transition: all 0.15s;
+  /* named, not `all`: `all` would ease the global :focus-visible box-shadow
+     ring into view, and a focus ring has to appear at once */
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
   cursor: pointer;
 }
 
-.btn-ghost:hover { border-color: var(--mj-accent-bright); color: var(--mj-accent-bright); }
+.btn-ghost:hover { border-color: var(--mj-accent-bright); color: var(--text); }
 
 /* ── stats ───────────────────────────────────── */
 .stats {
@@ -785,7 +797,8 @@ star-field {
   font-size: 13px;
   letter-spacing: 0.06em;
   cursor: pointer;
-  transition: all 0.15s;
+  /* named, not `all` — keeps the focus ring's box-shadow out of the ease */
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
 .catalog-more button:hover,
@@ -828,7 +841,8 @@ star-field {
   cursor: pointer;
   letter-spacing: 0.06em;
   margin-bottom: -1px;
-  transition: all 0.15s;
+  /* named, not `all` — keeps the focus ring's box-shadow out of the ease */
+  transition: border-color 0.15s, color 0.15s;
 }
 
 .tab-btn.active {
@@ -1210,10 +1224,8 @@ star-field {
   color: var(--text-muted);
   letter-spacing: 0.04em;
 }
-/* the underline carries the link; hover keeps --text rather than taking the
-   global a:hover accent, which measures 2.68:1 on the plate */
+/* the underline carries the link; hover colour comes from the global a:hover */
 .game-tile-credit a { text-decoration: underline; }
-.game-tile-credit a:hover { color: var(--text); }
 
 /* hover lights the art; press dims it further, so touch gets the same
    confirmation a pointer gets from hover */
@@ -1221,20 +1233,8 @@ star-field {
 .game-tile:focus-within .game-tile-art { opacity: 0.78; }
 .game-tile-btn:active .game-tile-art { opacity: 0.6; }
 
-/* focus: the page's accent-only ring measures 2.68:1 against a black plate,
-   under the 3:1 floor for a focus indicator, so games controls pair it with a
-   1px --text ring. Never transitioned — a focus ring has to appear at once. */
-.game-tile-btn:focus-visible,
-.game-tile-credit a:focus-visible,
-.game-close:focus-visible,
-.game-music-actions .btn:focus-visible,
-.game-music-actions .btn-ghost:focus-visible,
-.game-error-actions .btn:focus-visible,
-.game-error-actions .btn-ghost:focus-visible {
-  outline: 2px solid var(--mj-accent-bright);
-  outline-offset: 2px;
-  box-shadow: 0 0 0 1px var(--text);
-}
+/* focus rings: the global :focus-visible rule carries the accent + 1px --text
+   pairing for every control on the page, games included — no local override */
 
 /* while a game is open the page underneath must not scroll or rubber-band */
 body.game-locked {
@@ -1357,16 +1357,8 @@ body.game-locked {
 .game-music-actions .btn-ghost { text-align: left; }
 
 /* ── overlay + dialog control states ── */
-/* .btn-ghost ships `transition: all`, which would ease the focus ring into
-   view; naming the properties keeps box-shadow out of the transition */
-.game-music-actions .btn-ghost,
-.game-error-actions .btn-ghost {
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-
-/* the ghost's global hover tints the label accent-bright (2.68:1 on the
-   plate); here the border and a dim wash carry the state and the label stays
-   readable */
+/* the global ghost hover carries border + label; here a dim wash is added so
+   the state reads against the overlay's flat black */
 .game-music-actions .btn-ghost:hover,
 .game-music-actions .btn-ghost:focus-visible,
 .game-error-actions .btn-ghost:hover,
