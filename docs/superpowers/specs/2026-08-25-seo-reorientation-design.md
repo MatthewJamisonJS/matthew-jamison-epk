@@ -421,6 +421,15 @@ Until then, §2's samples label plus the title/meta in §3 capture the same inte
 
 **Dead end recorded:** `https://ahrefs.com/blog/seo-for-musicians/` returns 404 — no such article exists. Backlinko, Moz, and Search Engine Journal have no musician-specific on-page guide; Google Search Central and Bandzoogle were substituted. Don't re-chase this.
 
+### 10b. Resolutions (Matthew, Aug 25 2026 — gate cleared)
+
+1. **Items 1–5 approved as recommended:** nav labels (Albums / Games / Bass samples / Videos / Session bass / Contact / Gear / Collabs / Press / Bio), title Option A, meta Option B (Grammy clause now sourced — see 2), H1 descriptor Option 1 (`session bassist · producer · bass samples`), section `//` labels as proposed in §2, collabs heading Option 1.
+2. **Grammy credit SOURCED.** STLNDRMS = Christopher Wilkes (https://stlndrms.info/). Rapsody "3:AM (feat. Erykah Badu)" won Best Melodic Rap Performance, 67th Grammys (Feb 2025) — rocnation.com announcement; Shazam credits list Christopher Wilkes as writer; stlndrms.info credits page lists the track "Producer · Composer · Grammy Award–winning". Precision: performance-category statues go to performers; Wilkes is a credited writer/producer on the winning record. Approved phrasing stands: "collaborations with grammy award-winning artists" — never any phrasing implying Matthew won/was nominated. JSON-LD: affiliation goes in `description` prose only, NEVER an `award` field on Matthew.
+3. **sila** = aliases silamack / ComposureSILA / sila. / silalofibeats — resolve a streaming link from these during Phase 1 (verify identity before linking; else plain-text row). **Barrel Proof**: plain-text row (no confirmed DSP page). **R.A.D.I.C.**: YES, include row (MATT x R.A.D.I.C. "Hajime", Bandcamp link) — prominence/styling iterated in Phase 2 before final call.
+4. **DonutxSlinger: use Apple Music** link (music.apple.com/us/artist/donutxslinger/1473218550).
+5. **Track titles source:** Matthew's royalty table (Aug 25 message), Maven Lee rows excluded: jason chu — Animal Crossing, Vibranium; sila — plastic., taste., clean., ride.; Cryptic One — Wild Impala, R-ojo; Barrel Proof — Way Past 21, Your Love; Wulf Morpheus — Where dey at doe; Pinstrype Kouzin — KEEP.DIGGIN; jacuzzi jefferson — the infinite; StlnDrms (with Piklo & Illien Rosewell & Plack Panthers) — Determined; Complete Beats — Tamim A Complete IntroLude, Lookin Up; DonutxSlinger — Gud Gud., Final Form; R.A.D.I.C. — Hajime (duo album).
+6. **YouTube links approved PENDING verification** — fetch both (youtube.com/live/7ajkMPh89fc, youtube.com/live/KkgwLSy_N8w), confirm titles/content actually feature Matthew before any use; candidates for videos section, not required for Phase 1 completion.
+
 ### 10. Open items blocking Phase 1
 
 1. **Matthew's per-element approval** on: nav labels (§2), `<title>` (§3), meta description (§3), H1 descriptor (§4), collabs heading (§5), and the two changed `//` section labels (catalog, services).
