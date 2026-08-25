@@ -247,7 +247,7 @@ star-field {
   transition: color 0.15s;
 }
 
-.nav a:hover { color: var(--mj-accent-bright); }
+.nav a:hover { color: var(--text); }
 
 /* ── hero ────────────────────────────────────── */
 .hero {
@@ -801,10 +801,12 @@ star-field {
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
+/* the border carries the accent; the label goes to --text — accent-bright is
+   2.70:1 on the plate, under the 4.5:1 text floor */
 .catalog-more button:hover,
 .catalog-more button:focus-visible {
   border-color: var(--mj-accent-bright);
-  color: var(--mj-accent-bright);
+  color: var(--text);
 }
 
 /* ── thanks page ─────────────────────────────── */
@@ -1040,7 +1042,7 @@ star-field {
 }
 
 .footer-links a { font-size: 13px; color: var(--text-muted); letter-spacing: 0.05em; }
-.footer-links a:hover { color: var(--mj-accent-bright); }
+.footer-links a:hover { color: var(--text); }
 
 .footer-copy {
   margin-top: 40px;
