@@ -153,3 +153,83 @@
 
 /games/floppybird/assets/*
   Cache-Control: public, max-age=31536000, immutable
+
+# sandspiel — MaxBittker/sandspiel @ dc77827b, MIT. Vendored from a LOCAL
+# webpack build of an offline-sandbox source tree: the AdSense/GA/Sentry/
+# a.sandspiel.club tags, the Firebase community gallery (upload/browse/vote/
+# sign-in) and the workbox service worker were all removed before building, so
+# the bundle references no external host. Vendor-time audit of the SHIPPED
+# bytes: no document.write, no <form>, no fetch/XHR/WebSocket/sendBeacon, no
+# SharedArrayBuffer (0 hits — so NO COOP/COEP is needed and the games page is
+# not cross-origin isolated), no inline <script>, no style="" attrs.
+#
+# Per-directive evidence — this policy is looser than the other three games in
+# exactly two places, both forced by the vendored bundle and both verified by
+# CSP replay rather than assumed:
+#   script-src 'self'          the two hashed chunks + ../mj-mute.js
+#   script-src 'unsafe-eval'   REQUIRED, and not optional: regl 1.7.0 compiles
+#                              every WebGL draw command by string codegen —
+#                              `Function.apply(null, args.concat(src))` in
+#                              931.*.js. Without it the fluid/render layer
+#                              throws at boot and the game renders NOTHING
+#                              (verified: 0 buttons mounted). regl is the
+#                              renderer, so this cannot be stripped short of
+#                              replacing it. Exfiltration stays capped by
+#                              connect-src 'self' + form-action 'none'.
+#                              OWNER RULING (2026-08-25): accepted — earned by
+#                              regl 1.7.0's Function()-based WebGL command
+#                              codegen (blank page without it); scoped to this
+#                              slug only, never the site policy.
+#   script-src 'wasm-unsafe-eval'  the falling-sand crate is WebAssembly.
+#                              Kept explicit even though 'unsafe-eval' implies
+#                              it, so the wasm requirement survives any later
+#                              tightening that drops 'unsafe-eval'.
+#   style-src 'self'           styles.css
+#   style-src 'sha256-NOys…'   dat.gui ships its CSS inside the JS bundle and
+#                              style-loader injects it as a runtime <style>
+#                              element (5852 bytes, injected twice, identical).
+#                              Hash-pinned rather than granting 'unsafe-inline'
+#                              — same treatment as the JSON-LD block on the main
+#                              page. Recompute if the bundle is ever rebuilt.
+#   img-src 'self'             the browser's favicon probe (the vendored page
+#                              ships no <link rel=icon>, same as tiny-platformer)
+#   img-src blob:              the paste-an-SVG affordance: 86.*.js does
+#                              `img.src = URL.createObjectURL(blob)` and draws
+#                              the result to the canvas. Local only — the blob
+#                              is built from the user's own clipboard, never
+#                              fetched. data: is NOT granted: the only data:
+#                              URIs in the bundle are inside the dat.gui CSS,
+#                              which is display:none upstream.
+#   font-src 'self'            @font-face for the self-hosted Inconsolata 400
+#                              (assets/fonts/, SIL OFL) that replaced the
+#                              upstream Google Fonts <link>
+#   connect-src 'self'         webpack instantiates the wasm via fetch()
+#   media-src                  omitted deliberately — Sandspiel has NO audio at
+#                              all (0 hits for AudioContext/new Audio/media
+#                              files), so mj-mute.js is inert here and this
+#                              falls through to default-src 'none'
+/games/sandspiel/*
+  ! X-Frame-Options
+  ! Content-Security-Policy
+  X-Frame-Options: SAMEORIGIN
+  Content-Security-Policy: default-src 'none'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'sha256-NOysBCqoEZQ4w+cB7d5fekIXPgoo1DEVyHhO0OEBfD4='; img-src 'self' blob:; font-src 'self'; connect-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'none'; form-action 'none'
+  X-Robots-Tag: noindex
+
+# webpack content-hashes every emitted asset name, so the chunks, the wasm and
+# the font are safe to pin forever — a rebuild changes the filename. index.html
+# and styles.css sit at the slug root and are NOT hashed, so they are pinned per
+# file and the entry HTML stays revalidatable.
+/games/sandspiel/86.e096e8a7eaac6b8de58d.js
+  Cache-Control: public, max-age=31536000, immutable
+
+/games/sandspiel/931.ef9519c080d98187b4b3.js
+  Cache-Control: public, max-age=31536000, immutable
+
+/games/sandspiel/main.c30c08e17d627644ef6c.js
+  Cache-Control: public, max-age=31536000, immutable
+
+/games/sandspiel/e30295bd182820ced6dd.module.wasm
+  Cache-Control: public, max-age=31536000, immutable
+
+/games/sandspiel/assets/fonts/*
+  Cache-Control: public, max-age=31536000, immutable

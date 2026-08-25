@@ -1,0 +1,198 @@
+/* OFFLINE SANDBOX BUILD — Inconsolata is self-hosted instead of loaded from
+   fonts.googleapis.com. Regular 400, latin subset only: that is exactly what
+   upstream's `?family=Inconsolata` served, and the surviving UI is ASCII.
+   Bold headings synthesize from 400, same as upstream. SIL OFL 1.1 —
+   license text ships at assets/fonts/OFL.txt. */
+@font-face {
+  font-family: "Inconsolata";
+  font-style: normal;
+  font-weight: 400;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("/games/sandspiel/assets/fonts/inconsolata-latin-400.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+    U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+    U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+* {
+  margin: 0;
+  /* font-family: monospace; */
+  font-family: "Inconsolata", monospace;
+}
+
+html,
+body {
+  overscroll-behavior-x: none;
+  overscroll-behavior-y: none;
+  /* overflow-x: hidden; */
+}
+
+body,
+#background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: calc(100% - 2px);
+  /* background-color: rgba(00, 00, 00, 0.2); */
+  background-color: #f3f3f4;
+}
+canvas {
+  position: absolute;
+  bottom: 0;
+  /* top: 0; */
+  right: 0px;
+  left: 0px;
+  z-index: 1;
+  max-width: calc(100% - 3px);
+  /* width: calc(100% - 0px); */
+  /* max-width: ca100%; */
+  margin: auto;
+  box-shadow: 0px 0px 3px 3px rgba(0, 0, 0, 0.1);
+}
+
+#sand-canvas {
+  z-index: 2;
+}
+canvas,
+img {
+  image-rendering: crisp-edges;
+  -ms-interpolation-mode: nearest-neighbor;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: -webkit-crisp-edges;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: -o-crisp-edges;
+  image-rendering: pixelated;
+}
+
+#fluid-canvas {
+}
+button {
+  z-index: 3;
+  position: relative;
+  height: 30px;
+  min-width: 30px;
+  font-size: 19px;
+  padding: 1px 5px;
+  background-color: whitesmoke;
+  color: black;
+  border: 2px solid whitesmoke;
+  border-color: gainsboro;
+  flex-grow: 1;
+  max-width: 150px;
+  fill: black;
+  line-height: 0px;
+  cursor: pointer;
+}
+.active button,
+button.active {
+  background-color: gainsboro;
+}
+
+button:disabled {
+  background-color: gainsboro;
+  color: gray;
+}
+
+button:focus {
+  outline: none;
+}
+
+button.selected {
+  background-color: black;
+  color: whitesmoke;
+  border-color: grey;
+  fill: whitesmoke;
+  /* font-weight: bold; */
+  text-shadow: 1.6px 1.5px 0 grey, -1px -1px 0 grey, 1px -1px 0 grey,
+    -1px 1px 0 grey, 1px 1px 0 grey;
+}
+#ui {
+  display: flex;
+  flex-wrap: wrap;
+  float: right;
+}
+
+#fps {
+  pointer-events: none;
+
+  z-index: 3;
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  padding: 2px;
+  background-color: rgba(255, 255, 255, 0.4);
+  text-align: right;
+  display: inline-block;
+  white-space: pre;
+  /* font-family: monospace; */
+  user-select: none;
+}
+
+#controls {
+  display: flex;
+}
+
+.dg {
+  display: none;
+  /* z-index: 5 !important; */
+}
+
+.menu {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: 10px;
+  /* bottom: 10px; */
+  z-index: 5;
+  background-color: #f3f3f4;
+  border: 1px solid gray;
+  box-shadow: 0px 0px 3px 3px rgba(0, 0, 0, 0.2);
+  padding: 5px;
+  max-width: 900px;
+  margin: auto;
+}
+
+.menu-scrim {
+  position: absolute;
+  left: 0px;
+  right: 0px;
+  top: 0px;
+  bottom: 0px;
+  z-index: 4;
+  background-color: #55555555;
+}
+.x {
+  position: absolute;
+  right: 4px;
+  top: 5px;
+  line-height: 0px;
+}
+input {
+  position: relative;
+  height: 25px;
+  min-width: 30px;
+  font-size: 19px;
+  padding: 1px 5px;
+  background-color: whitesmoke;
+  color: black;
+  border: 1.6px solid whitesmoke;
+  border-color: gainsboro;
+  flex-grow: 1;
+  fill: black;
+}
+img {
+}
+
+@media only screen and (min-width: 700px) {
+}
+
+.benchmark {
+  position: absolute;
+  bottom: 25px;
+  right: 10px;
+  background-color: white;
+  font-size: 18px;
+  z-index: 9999;
+}
