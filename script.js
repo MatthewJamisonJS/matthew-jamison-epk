@@ -755,6 +755,7 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
   let open = null;      // { tile, slug, muted, scrollY } while open
   let loadTimer = 0;
   let mountSeq = 0;     // only the newest mount attempt may append an iframe
+  let preflight = null;  // AbortController for the in-flight game-url preflight
   let pendingTile = null;  // tile awaiting the music dialog's answer
   let suppressPop = false;  // swallows the popstate our own history.back() will fire
 
@@ -823,11 +824,24 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
     // stale guard: `open` goes null on close, and seq moves on a reopen or a
     // second retry — either way an in-flight preflight must not mount
     const live = () => open && seq === mountSeq;
-    fetch(gameUrl(), { method: 'GET', cache: 'no-store' }).then(res => {
+    // a superseded preflight is cancelled, not just ignored — a closed overlay
+    // should not keep a request open
+    if (preflight) preflight.abort();
+    preflight = new AbortController();
+    // `no-cache`, not `no-store`: revalidate so a game pulled from the deploy
+    // still reports 404, but keep the response cacheable so the iframe reuses
+    // it instead of fetching the same HTML a second time
+    fetch(gameUrl(), {
+      method: 'GET',
+      cache: 'no-cache',
+      credentials: 'same-origin',
+      signal: preflight.signal
+    }).then(res => {
       if (!live()) return;
       if (!res.ok) { showError(); return; }
       frameHost.appendChild(buildFrame());
-    }).catch(() => {
+    }).catch(err => {
+      if (err && err.name === 'AbortError') return;  // we cancelled it
       if (live()) showError();   // offline / DNS — same dead end for the player
     });
   }
@@ -859,6 +873,7 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
     open = null;
     clearTimeout(loadTimer);
     loadTimer = 0;
+    if (preflight) { preflight.abort(); preflight = null; }
     if (document.fullscreenElement) {
       document.exitFullscreen().catch(() => { /* already leaving */ });
     }
