@@ -229,6 +229,9 @@ function startGame()
       $(".boundingbox").show();
    }
 
+   if(debugmode)
+      resetHud();
+
    //start up our loops. the pipe spawner is not per-frame, so it stays a timer.
    lastframe = 0;
    frameaccumulator = 0;
@@ -259,6 +262,9 @@ function gameloop(timestamp) {
    //a backgrounded tab hands back a huge delta on return; don't simulate it
    if(delta > 250)
       delta = 250;
+
+   if(debugmode)
+      updateHud(timestamp, delta);
 
    //fixed timestep: as many 60hz physics steps as the elapsed time earned,
    //then one render.
@@ -394,6 +400,77 @@ function rendergame() {
       if(pipes[0] != null)
          $("#pipebox").css({ left: (pipes[0].x - 2) + flyoffset.left, top: pipes[0].top + flyoffset.top, width: pipewidth, height: pipeheight });
    }
+}
+
+//?debug frame hud: counters accumulate per frame, the text flushes twice a
+//second via textContent (trusted-types safe), and nothing here reads layout.
+//no ?debug → updateHud is never called and no node is ever created.
+var hud = null;
+var hudframes = 0;
+var hudlongtotal = 0;
+var hudtotalframes = 0;
+var hudworsts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+var hudworstidx = 0;
+var hudwindowworst = 0;
+var hudlastflush = 0;
+
+function resetHud()
+{
+   hudframes = 0;
+   hudlongtotal = 0;
+   hudtotalframes = 0;
+   hudworsts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+   hudworstidx = 0;
+   hudwindowworst = 0;
+   hudlastflush = 0;
+}
+
+function updateHud(timestamp, delta)
+{
+   hudframes++;
+   hudtotalframes++;
+   if(delta > 33)
+      hudlongtotal++;
+   if(delta > hudwindowworst)
+      hudwindowworst = delta;
+   if(!hudlastflush)
+   {
+      hudlastflush = timestamp;
+      return;
+   }
+   if(timestamp - hudlastflush < 500)
+      return;
+
+   if(!hud)
+   {
+      hud = document.createElement("div");
+      hud.id = "perfhud";
+      var s = hud.style;
+      s.position = "fixed";
+      s.top = "4px";
+      s.right = "4px";
+      s.zIndex = "2000";
+      s.padding = "4px 6px";
+      s.background = "rgba(0,0,0,0.7)";
+      s.color = "#0f0";
+      s.font = "11px/1.4 monospace";
+      s.pointerEvents = "none";
+      s.whiteSpace = "pre";
+      document.body.appendChild(hud);
+   }
+
+   var fps = Math.round(hudframes * 1000 / (timestamp - hudlastflush));
+   hudworsts[hudworstidx] = hudwindowworst;
+   hudworstidx = (hudworstidx + 1) % hudworsts.length;
+   var worst = 0;
+   for(var i = 0; i < hudworsts.length; i++)
+      if(hudworsts[i] > worst)
+         worst = hudworsts[i];
+   hud.textContent = fps + " fps\nworst(5s) " + worst.toFixed(1) + "ms\nlong " + hudlongtotal + "/" + hudtotalframes;
+
+   hudframes = 0;
+   hudwindowworst = 0;
+   hudlastflush = timestamp;
 }
 
 //Handle space bar
