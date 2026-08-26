@@ -17,8 +17,12 @@
       <div id="gamecontainer">
          <div id="gamescreen">
             <div id="sky" class="animated">
+               <!-- the *-scroll children carry the repeating artwork and are the
+                    only things that move; they keep the `animated` class so the
+                    play/pause sweeps in main.js still reach them -->
+               <div id="sky-scroll" class="animated"></div>
                <div id="flyarea">
-                  <div id="ceiling" class="animated"></div>
+                  <div id="ceiling" class="animated"><div id="ceiling-scroll" class="animated"></div></div>
                   <!-- This is the flying and pipe area container -->
                   <div id="player" class="bird animated"></div>
 
@@ -36,7 +40,7 @@
                   <!-- Pipes go here! -->
                </div>
             </div>
-            <div id="land" class="animated"><div id="debug"></div></div>
+            <div id="land" class="animated"><div id="land-scroll" class="animated"></div><div id="debug"></div></div>
          </div>
       </div>
       <div id="footer">

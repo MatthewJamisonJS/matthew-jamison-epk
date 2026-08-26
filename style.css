@@ -1438,6 +1438,15 @@ body.game-locked {
   overscroll-behavior: none;
 }
 
+/* ...and it must not keep animating behind an overlay that fully covers it.
+   The starfield is a canvas, so there is no animation-play-state to set: it
+   parks its own rAF loop when its IntersectionObserver reports the element
+   out of view, and taking it out of the box tree is what triggers that. The
+   sky rebuilds from a fixed seed on close, so the same sky comes back.
+   Only ambient motion stops here — the click pulse and every other
+   user-initiated animation are untouched, same rule as Reduce Motion. */
+body.game-locked star-field { display: none; }
+
 /* ── game overlay ── */
 .game-overlay {
   position: fixed;

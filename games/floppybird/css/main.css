@@ -1,35 +1,40 @@
+/* the three scrolling strips ride a transform instead of background-position:
+   same distance, same duration, but the compositor moves an already-painted
+   layer rather than repainting the strip every frame. each one animates an
+   inner element that is one tile wider than its parent, so translating by
+   exactly one tile width wraps invisibly. */
 @-webkit-keyframes animLand {
-   0% { background-position: 0px 0px; }
-   100% { background-position: -335px 0px; }
+   0% { -webkit-transform: translateX(0px); transform: translateX(0px); }
+   100% { -webkit-transform: translateX(-335px); transform: translateX(-335px); }
 }
 @-moz-keyframes animLand {
-   0% { background-position: 0px 0px; }
-   100% { background-position: -335px 0px; }
+   0% { transform: translateX(0px); }
+   100% { transform: translateX(-335px); }
 }
 @-o-keyframes animLand {
-   0% { background-position: 0px 0px; }
-   100% { background-position: -335px 0px; }
+   0% { transform: translateX(0px); }
+   100% { transform: translateX(-335px); }
 }
 @keyframes animLand {
-   0% { background-position: 0px 0px; }
-   100% { background-position: -335px 0px; }
+   0% { transform: translateX(0px); }
+   100% { transform: translateX(-335px); }
 }
 
 @-webkit-keyframes animSky {
-   0% { background-position: 0px 100%; }
-   100% { background-position: -275px 100%; }
+   0% { -webkit-transform: translateX(0px); transform: translateX(0px); }
+   100% { -webkit-transform: translateX(-275px); transform: translateX(-275px); }
 }
 @-moz-keyframes animSky {
-   0% { background-position: 0px 100%; }
-   100% { background-position: -275px 100%; }
+   0% { transform: translateX(0px); }
+   100% { transform: translateX(-275px); }
 }
 @-o-keyframes animSky {
-   0% { background-position: 0px 100%; }
-   100% { background-position: -275px 100%; }
+   0% { transform: translateX(0px); }
+   100% { transform: translateX(-275px); }
 }
 @keyframes animSky {
-   0% { background-position: 0px 100%; }
-   100% { background-position: -275px 100%; }
+   0% { transform: translateX(0px); }
+   100% { transform: translateX(-275px); }
 }
 
 @-webkit-keyframes animBird {
@@ -49,38 +54,24 @@
    to { background-position: 0px -96px; }
 }
 
-@-webkit-keyframes animPipe {
-   0% { left: 900px; }
-   100% { left: -100px; }
-}
-@-moz-keyframes animPipe {
-   0% { left: 900px; }
-   100% { left: -100px; }
-}
-@-o-keyframes animPipe {
-   0% { left: 900px; }
-   100% { left: -100px; }
-}
-@keyframes animPipe {
-   0% { left: 900px; }
-   100% { left: -100px; }
-}
+/* animPipe is gone: js/main.js moves the pipes numerically and writes the
+   result out as a translateX, so collision never has to measure them. */
 
 @-webkit-keyframes animCeiling {
-   0% { background-position: 0px 0px; }
-   100% { background-position: -63px 0px; }
+   0% { -webkit-transform: translateX(0px); transform: translateX(0px); }
+   100% { -webkit-transform: translateX(-63px); transform: translateX(-63px); }
 }
 @-moz-keyframes animCeiling {
-   0% { background-position: 0px 0px; }
-   100% { background-position: -63px 0px; }
+   0% { transform: translateX(0px); }
+   100% { transform: translateX(-63px); }
 }
 @-o-keyframes animCeiling {
-   0% { background-position: 0px 0px; }
-   100% { background-position: -63px 0px; }
+   0% { transform: translateX(0px); }
+   100% { transform: translateX(-63px); }
 }
 @keyframes animCeiling {
-   0% { background-position: 0px 0px; }
-   100% { background-position: -63px 0px; }
+   0% { transform: translateX(0px); }
+   100% { transform: translateX(-63px); }
 }
 
 
@@ -111,6 +102,9 @@ body
    font-family: monospace;
    font-size: 12px;
    color: #fff;
+   /* no double-tap-zoom wait and no gesture arbitration before a tap is
+      delivered — a flap has to land on the next frame, not 300ms later */
+   touch-action: manipulation;
 }
 
 #gamecontainer
@@ -137,10 +131,30 @@ Screen - Game
    top: 0;
    width: 100%;
    height: 80%;
-   background-image: url('../assets/sky.png');
-   background-repeat: repeat-x;
-   background-position: 0px 100%;
    background-color: #4ec0ca;
+}
+
+/* the scrolling strips: each carries its parent's repeating artwork, is one
+   tile wider than its parent so the wrap is never visible, and is the only
+   thing that actually moves. */
+#sky-scroll,
+#land-scroll,
+#ceiling-scroll
+{
+   position: absolute;
+   top: 0;
+   left: 0;
+   height: 100%;
+   background-repeat: repeat-x;
+
+   will-change: transform;
+}
+
+#sky-scroll
+{
+   width: calc(100% + 275px);
+   background-image: url('../assets/sky.png');
+   background-position: 0px 100%;
 
    -webkit-animation: animSky 7s linear infinite;
    animation: animSky 7s linear infinite;
@@ -160,8 +174,13 @@ Screen - Game
    top: -16px;
    height: 16px;
    width: 100%;
+}
+
+#ceiling-scroll
+{
+   width: calc(100% + 63px);
    background-image: url('../assets/ceiling.png');
-   background-repeat: repeat-x;
+   background-position: 0px 0px;
 
    -webkit-animation: animCeiling 481ms linear infinite;
    animation: animCeiling 481ms linear infinite;
@@ -173,10 +192,14 @@ Screen - Game
    bottom: 0;
    width: 100%;
    height: 20%;
-   background-image: url('../assets/land.png');
-   background-repeat: repeat-x;
-   background-position: 0px 0px;
    background-color: #ded895;
+}
+
+#land-scroll
+{
+   width: calc(100% + 335px);
+   background-image: url('../assets/land.png');
+   background-position: 0px 0px;
 
    -webkit-animation: animLand 2516ms linear infinite;
    animation: animLand 2516ms linear infinite;
@@ -288,7 +311,11 @@ Screen - Game
 #player
 {
    left: 60px;
-   top: 200px;
+   /* the loop drives y and rotation through a single transform, so top stays
+      put and never triggers layout */
+   top: 0;
+
+   will-change: transform;
 }
 
 .bird
@@ -305,13 +332,13 @@ Screen - Game
 .pipe
 {
    position: absolute;
-   left: -100px;
+   /* x lives in the transform js writes on spawn and on every frame after */
+   left: 0;
    width: 52px;
    height: 100%;
    z-index: 10;
 
-   -webkit-animation: animPipe 7500ms linear;
-   animation: animPipe 7500ms linear;
+   will-change: transform;
 }
 
 .pipe_upper

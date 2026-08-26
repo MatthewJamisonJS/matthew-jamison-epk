@@ -20,7 +20,25 @@ var highscore = 0;
 
 var pipeheight = 90;
 var pipewidth = 52;
+//pipes[] is the collision queue (front pipe first, spliced off when scored);
+//livepipes[] is everything still on screen, which is what gets rendered/reaped.
 var pipes = new Array();
+var livepipes = new Array();
+
+//the bird never moves horizontally (#player is left: 60px) and its sprite is a
+//fixed 34x24, so every collision number below is arithmetic instead of layout.
+var playerleft = 60;
+var playerelement;
+//animPipe used to run a pipe's `left` from 900px to -100px over 7500ms. same
+//start, same speed, as numbers the loop owns.
+var pipestartx = 900;
+var pipespeed = 1000.0 / 7500.0; //px per ms
+
+//the bird's bounding box, kept around so debug drawing can reuse it
+var boxleft = 0;
+var boxtop = 0;
+var boxwidth = 0;
+var boxheight = 0;
 
 var replayclickable = false;
 
@@ -38,12 +56,20 @@ buzz.all().setVolume(volume);
 //loops
 var loopGameloop;
 var loopPipeloop;
+//the game loop is vsync-driven (requestAnimationFrame) with a fixed-timestep
+//accumulator, so the physics still ticks at exactly 60hz while drawing happens
+//once per paint instead of on setInterval's own drifting clock.
+var updaterate = 1000.0 / 60.0;
+var lastframe = 0;
+var frameaccumulator = 0;
 
 $(document).ready(function() {
    if(window.location.search == "?debug")
       debugmode = true;
    if(window.location.search == "?easy")
       pipeheight = 200;
+
+   playerelement = document.getElementById("player");
 
    //get the highscore
    var savedscore = getCookie("highscore");
@@ -86,7 +112,7 @@ function showSplash()
 
    //update the player in preparation for the next game
    $("#player").css({ y: 0, x: 0 });
-   updatePlayer($("#player"));
+   updatePlayer();
 
    soundSwoosh.stop();
    soundSwoosh.play();
@@ -94,6 +120,7 @@ function showSplash()
    //clear out all the pipes if there are any
    $(".pipe").remove();
    pipes = new Array();
+   livepipes = new Array();
 
    //make everything animated again
    $(".animated").css('animation-play-state', 'running');
@@ -121,89 +148,109 @@ function startGame()
       $(".boundingbox").show();
    }
 
-   //start up our loops
-   var updaterate = 1000.0 / 60.0 ; //60 times a second
-   loopGameloop = setInterval(gameloop, updaterate);
+   //start up our loops. the pipe spawner is not per-frame, so it stays a timer.
+   lastframe = 0;
+   frameaccumulator = 0;
+   loopGameloop = window.requestAnimationFrame(gameloop);
    loopPipeloop = setInterval(updatePipes, 1400);
 
    //jump from the start!
    playerJump();
 }
 
-function updatePlayer(player)
+function updatePlayer()
 {
-   //rotation
-   rotation = Math.min((velocity / 10) * 90, 90);
-
-   //apply rotation and position
-   $(player).css({ rotate: rotation, top: position });
+   //apply rotation and position in one composited write. element.style is
+   //CSSOM, not an inline style attribute, so this is fine under the CSP the
+   //site ships (style-src has no 'unsafe-inline').
+   playerelement.style.transform = "translate3d(0px, " + position + "px, 0px) rotate(" + rotation + "deg)";
 }
 
-function gameloop() {
-   var player = $("#player");
+function gameloop(timestamp) {
+   //reschedule first: playerDead() cancels the handle we just stored, so a
+   //death inside this frame can't leave a stray frame queued.
+   loopGameloop = window.requestAnimationFrame(gameloop);
 
+   if(!lastframe)
+      lastframe = timestamp;
+   var delta = timestamp - lastframe;
+   lastframe = timestamp;
+   //a backgrounded tab hands back a huge delta on return; don't simulate it
+   if(delta > 250)
+      delta = 250;
+
+   //fixed timestep: as many 60hz physics steps as the elapsed time earned,
+   //then one render.
+   frameaccumulator += delta;
+   while(frameaccumulator >= updaterate)
+   {
+      frameaccumulator -= updaterate;
+      //dead: the loop is already cancelled and the death drop owns the bird
+      if(gamestep() === false)
+         return;
+   }
+
+   rendergame();
+}
+
+//one 1/60s step of physics + collision. every measurement here is arithmetic:
+//no getBoundingClientRect, no offset(), nothing that forces a reflow. all
+//coordinates are relative to #flyarea, which is what the bird and pipes are
+//positioned inside.
+function gamestep() {
    //update the player speed/position
    velocity += gravity;
    position += velocity;
 
-   //update the player
-   updatePlayer(player);
+   //rotation
+   rotation = Math.min((velocity / 10) * 90, 90);
+
+   //move the pipes
+   for(var i = 0; i < livepipes.length; i++)
+      livepipes[i].x -= pipespeed * updaterate;
 
    //create the bounding box
-   var box = document.getElementById('player').getBoundingClientRect();
    var origwidth = 34.0;
    var origheight = 24.0;
 
-   var boxwidth = origwidth - (Math.sin(Math.abs(rotation) / 90) * 8);
-   var boxheight = (origheight + box.height) / 2;
-   var boxleft = ((box.width - boxwidth) / 2) + box.left;
-   var boxtop = ((box.height - boxheight) / 2) + box.top;
+   //the bird rotates about its own centre, so the axis-aligned box the rotated
+   //sprite occupies is derived rather than measured. this reproduces exactly
+   //what getBoundingClientRect used to hand back.
+   var radians = Math.abs(rotation) * Math.PI / 180;
+   var rotatedheight = (origwidth * Math.sin(radians)) + (origheight * Math.cos(radians));
+   var centerx = playerleft + (origwidth / 2);
+   var centery = position + (origheight / 2);
+
+   boxwidth = origwidth - (Math.sin(Math.abs(rotation) / 90) * 8);
+   boxheight = (origheight + rotatedheight) / 2;
+   boxleft = centerx - (boxwidth / 2);
+   boxtop = centery - (boxheight / 2);
    var boxright = boxleft + boxwidth;
    var boxbottom = boxtop + boxheight;
 
-   //if we're in debug mode, draw the bounding box
-   if(debugmode)
-   {
-      var boundingbox = $("#playerbox");
-      boundingbox.css('left', boxleft);
-      boundingbox.css('top', boxtop);
-      boundingbox.css('height', boxheight);
-      boundingbox.css('width', boxwidth);
-   }
-
-   //did we hit the ground?
-   if(box.bottom >= $("#land").offset().top)
+   //did we hit the ground? #land's top edge is #flyarea's bottom edge
+   if(centery + (rotatedheight / 2) >= flyArea)
    {
       playerDead();
-      return;
+      return false;
    }
 
    //have they tried to escape through the ceiling? :o
-   var ceiling = $("#ceiling");
-   if(boxtop <= (ceiling.offset().top + ceiling.height()))
+   //#ceiling spans -16px..0 inside #flyarea, so its bottom edge is simply 0
+   if(boxtop <= 0)
       position = 0;
 
    //we can't go any further without a pipe
    if(pipes[0] == null)
-      return;
+      return true;
 
    //determine the bounding box of the next pipes inner area
    var nextpipe = pipes[0];
-   var nextpipeupper = nextpipe.children(".pipe_upper");
 
-   var pipetop = nextpipeupper.offset().top + nextpipeupper.height();
-   var pipeleft = nextpipeupper.offset().left - 2; // for some reason it starts at the inner pipes offset, not the outer pipes.
+   var pipetop = nextpipe.top;
+   var pipeleft = nextpipe.x - 2; // for some reason it starts at the inner pipes offset, not the outer pipes.
    var piperight = pipeleft + pipewidth;
    var pipebottom = pipetop + pipeheight;
-
-   if(debugmode)
-   {
-      var boundingbox = $("#pipebox");
-      boundingbox.css('left', pipeleft);
-      boundingbox.css('top', pipetop);
-      boundingbox.css('height', pipeheight);
-      boundingbox.css('width', pipewidth);
-   }
 
    //have we gotten inside the pipe yet?
    if(boxright > pipeleft)
@@ -218,7 +265,7 @@ function gameloop() {
       {
          //no! we touched the pipe
          playerDead();
-         return;
+         return false;
       }
    }
 
@@ -231,6 +278,40 @@ function gameloop() {
 
       //and score a point
       playerScore();
+   }
+
+   return true;
+}
+
+//everything the frame draws, once per paint: two transform writes per moving
+//thing and nothing read back.
+function rendergame() {
+   //update the player
+   updatePlayer();
+
+   for(var i = livepipes.length - 1; i >= 0; i--)
+   {
+      var pipe = livepipes[i];
+      pipe.element.style.transform = "translateX(" + pipe.x + "px)";
+
+      //offscreen to the left: gone. this replaces the position().left sweep
+      //updatePipes used to run over every pipe in the dom.
+      if(pipe.x < -100)
+      {
+         pipe.element.remove();
+         livepipes.splice(i, 1);
+      }
+   }
+
+   //if we're in debug mode, draw the bounding boxes. these do read layout, but
+   //only here: debug is off in normal play, and the boxes live outside
+   //#flyarea so they need its offset to line up with the loop's numbers.
+   if(debugmode)
+   {
+      var flyoffset = $("#flyarea").offset();
+      $("#playerbox").css({ left: boxleft + flyoffset.left, top: boxtop + flyoffset.top, width: boxwidth, height: boxheight });
+      if(pipes[0] != null)
+         $("#pipebox").css({ left: (pipes[0].x - 2) + flyoffset.left, top: pipes[0].top + flyoffset.top, width: pipewidth, height: pipeheight });
    }
 }
 
@@ -247,9 +328,11 @@ $(document).keydown(function(e){
    }
 });
 
-//Handle mouse down OR touch start
+//Handle mouse down OR touch start. touchstart is bound natively so it can be
+//passive: jquery's binding cannot be, and a non-passive touch listener makes
+//the browser wait on the handler before it will paint the flap.
 if("ontouchstart" in window)
-   $(document).on("touchstart", screenClick);
+   document.addEventListener("touchstart", screenClick, { passive: true });
 else
    $(document).on("mousedown", screenClick);
 
@@ -336,17 +419,22 @@ function playerDead()
    $(".animated").css('animation-play-state', 'paused');
    $(".animated").css('-webkit-animation-play-state', 'paused');
 
-   //drop the bird to the floor
-   var playerbottom = $("#player").position().top + $("#player").width(); //we use width because he'll be rotated 90 deg
+   //drop the bird to the floor. the loop owns #player's transform while the
+   //game runs, so hand transit the current values first — otherwise it would
+   //tween out of whatever transform it last cached instead of where the bird
+   //actually is. the bird now sits at top: 0, so y is the absolute position.
+   var playerbottom = position + 34; //we use width because he'll be rotated 90 deg
    var floor = flyArea;
    var movey = Math.max(0, floor - playerbottom);
-   $("#player").transition({ y: movey + 'px', rotate: 90}, 1000, 'easeInOutCubic');
+   $("#player").css({ y: position, rotate: rotation });
+   $("#player").transition({ y: (position + movey) + 'px', rotate: 90}, 1000, 'easeInOutCubic');
 
    //it's time to change states. as of now we're considered ScoreScreen to disable left click/flying
    currentstate = states.ScoreScreen;
 
    //destroy our gameloops
-   clearInterval(loopGameloop);
+   if(loopGameloop)
+      window.cancelAnimationFrame(loopGameloop);
    clearInterval(loopPipeloop);
    loopGameloop = null;
    loopPipeloop = null;
@@ -446,8 +534,13 @@ function playerScore()
 
 function updatePipes()
 {
-   //Do any pipes need removal?
-   $(".pipe").filter(function() { return $(this).position().left <= -100; }).remove()
+   //(pipes that have left the screen are reaped in rendergame, where their
+   //position is already known — no dom sweep needed here anymore)
+
+   //rAF is parked while the tab is hidden, so pipes stop moving but this timer
+   //keeps firing — don't stack a new pipe on one that hasn't left the spawn point
+   if(livepipes.length && livepipes[livepipes.length - 1].x >= pipestartx)
+      return;
 
    //add a new pipe (top height + bottom height  + pipeheight == flyArea) and put it in our tracker
    var padding = 80;
@@ -461,7 +554,14 @@ function updatePipes()
    newpipe.children(".pipe_upper").css("height", topheight + "px");
    newpipe.children(".pipe_lower").css("height", bottomheight + "px");
    $("#flyarea").append(newpipe);
-   pipes.push(newpipe);
+
+   //tracked as numbers from here on: x is the pipe's left edge inside
+   //#flyarea and top is where its gap starts. the loop moves x and writes it
+   //back out as a translateX, so a pipe never touches layout.
+   var pipe = { element: newpipe[0], x: pipestartx, top: topheight };
+   pipe.element.style.transform = "translateX(" + pipe.x + "px)";
+   pipes.push(pipe);
+   livepipes.push(pipe);
 }
 
 var isIncompatible = {
