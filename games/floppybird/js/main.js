@@ -42,16 +42,82 @@ var boxheight = 0;
 
 var replayclickable = false;
 
-//sounds
-var volume = 30;
-//ogg for chrome/firefox, m4a so safari/ios are not silent. buzz mutates the
-//options object it is handed, so each sound gets its own literal.
-var soundJump = new buzz.sound("assets/sounds/sfx_wing", { formats: ["ogg", "m4a"] });
-var soundScore = new buzz.sound("assets/sounds/sfx_point", { formats: ["ogg", "m4a"] });
-var soundHit = new buzz.sound("assets/sounds/sfx_hit", { formats: ["ogg", "m4a"] });
-var soundDie = new buzz.sound("assets/sounds/sfx_die", { formats: ["ogg", "m4a"] });
-var soundSwoosh = new buzz.sound("assets/sounds/sfx_swooshing", { formats: ["ogg", "m4a"] });
-buzz.all().setVolume(volume);
+//sounds — Web Audio: each effect is decoded once into a buffer and played
+//through one shared gain node. buzz's per-tap stop()/play() on an
+//HTMLMediaElement costs main-thread time on mobile; a buffer source is
+//fire-and-forget on the audio thread. the context is created at boot (it can
+//decode while suspended) and resumed on the first gesture.
+var audioctx = null;
+var sfxgain = null;
+var sfxbuffers = {};
+var sfxplaying = {};
+var sfxnames = ["sfx_wing", "sfx_point", "sfx_hit", "sfx_die", "sfx_swooshing"];
+
+function initAudio()
+{
+   var Ctx = window.AudioContext || window.webkitAudioContext;
+   if(!Ctx || audioctx)
+      return;
+   audioctx = new Ctx();
+   sfxgain = audioctx.createGain();
+   sfxgain.gain.value = 0.3; //parity with buzz's volume 30
+   sfxgain.connect(audioctx.destination);
+
+   //ogg for chrome/firefox; safari's decoder has no ogg, so it gets m4a
+   var format = document.createElement("audio").canPlayType('audio/ogg; codecs="vorbis"') ? "ogg" : "m4a";
+   for(var i = 0; i < sfxnames.length; i++)
+      (function(name) {
+         fetch("assets/sounds/" + name + "." + format)
+            .then(function(res) { return res.arrayBuffer(); })
+            .then(function(data) { return audioctx.decodeAudioData(data); })
+            .then(function(buffer) { sfxbuffers[name] = buffer; })
+            .catch(function() { /* the sound stays silent; the game must not */ });
+      })(sfxnames[i]);
+}
+
+function resumeAudio()
+{
+   //iOS creates the context suspended outside a gesture, and an audio-session
+   //interruption can park it in neither suspended nor running; resume is
+   //idempotent, so nudge anything that isn't already running
+   if(audioctx && audioctx.state !== "running")
+      audioctx.resume();
+}
+
+//fire and forget. a replay of the same effect stops the one still playing,
+//which is what buzz's stop()+play() pairs did. returns the source so the
+//death chain can wait on ended, or null when the effect can't play.
+function playSound(name, onended)
+{
+   if(!audioctx || !sfxbuffers[name])
+      return null;
+   var prev = sfxplaying[name];
+   if(prev)
+   {
+      prev.onended = null;
+      try { prev.stop(); } catch(e) { /* already ended */ }
+   }
+   var source = audioctx.createBufferSource();
+   source.buffer = sfxbuffers[name];
+   source.connect(sfxgain);
+   sfxplaying[name] = source;
+   source.onended = function() {
+      if(sfxplaying[name] === source)
+         sfxplaying[name] = null;
+      if(onended)
+         onended();
+   };
+   source.start(0);
+   return source;
+}
+
+//play a sound and continue when it ends — continuing immediately if it
+//couldn't play, so the score screen never waits on missing audio.
+function playSoundThen(name, next)
+{
+   if(playSound(name, next) === null)
+      next();
+}
 
 //loops
 var loopGameloop;
@@ -70,6 +136,23 @@ $(document).ready(function() {
       pipeheight = 200;
 
    playerelement = document.getElementById("player");
+
+   initAudio();
+
+   //decode the state-transition artwork up front so a first medal or first
+   //score never pays a decode mid-session. Image() warms the cache; decode()
+   //rasterizes where supported.
+   var warmlist = ["splash.png", "scoreboard.png", "replay.png",
+      "medal_bronze.png", "medal_silver.png", "medal_gold.png", "medal_platinum.png"];
+   for(var d = 0; d <= 9; d++)
+      warmlist.push("font_big_" + d + ".png", "font_small_" + d + ".png");
+   for(var w = 0; w < warmlist.length; w++)
+   {
+      var warm = new Image();
+      warm.src = "assets/" + warmlist[w];
+      if(warm.decode)
+         warm.decode().catch(function() { /* decode is best-effort */ });
+   }
 
    //get the highscore
    var savedscore = getCookie("highscore");
@@ -114,11 +197,11 @@ function showSplash()
    $("#player").css({ y: 0, x: 0 });
    updatePlayer();
 
-   soundSwoosh.stop();
-   soundSwoosh.play();
+   playSound("sfx_swooshing");
 
-   //clear out all the pipes if there are any
-   $(".pipe").remove();
+   //clear out all the pipes if there are any — back into the pool, not the gc
+   for(var i = 0; i < livepipes.length; i++)
+      releasePipe(livepipes[i]);
    pipes = new Array();
    livepipes = new Array();
 
@@ -148,6 +231,9 @@ function startGame()
       $(".boundingbox").show();
    }
 
+   if(debugmode)
+      resetHud();
+
    //start up our loops. the pipe spawner is not per-frame, so it stays a timer.
    lastframe = 0;
    frameaccumulator = 0;
@@ -175,9 +261,14 @@ function gameloop(timestamp) {
       lastframe = timestamp;
    var delta = timestamp - lastframe;
    lastframe = timestamp;
+   //the hud reports the real frame time, so a stall shows its true length
+   var rawdelta = delta;
    //a backgrounded tab hands back a huge delta on return; don't simulate it
    if(delta > 250)
       delta = 250;
+
+   if(debugmode)
+      updateHud(timestamp, rawdelta);
 
    //fixed timestep: as many 60hz physics steps as the elapsed time earned,
    //then one render.
@@ -298,7 +389,7 @@ function rendergame() {
       //updatePipes used to run over every pipe in the dom.
       if(pipe.x < -100)
       {
-         pipe.element.remove();
+         releasePipe(pipe);
          livepipes.splice(i, 1);
       }
    }
@@ -313,6 +404,77 @@ function rendergame() {
       if(pipes[0] != null)
          $("#pipebox").css({ left: (pipes[0].x - 2) + flyoffset.left, top: pipes[0].top + flyoffset.top, width: pipewidth, height: pipeheight });
    }
+}
+
+//?debug frame hud: counters accumulate per frame, the text flushes twice a
+//second via textContent (trusted-types safe), and nothing here reads layout.
+//no ?debug → updateHud is never called and no node is ever created.
+var hud = null;
+var hudframes = 0;
+var hudlongtotal = 0;
+var hudtotalframes = 0;
+var hudworsts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+var hudworstidx = 0;
+var hudwindowworst = 0;
+var hudlastflush = 0;
+
+function resetHud()
+{
+   hudframes = 0;
+   hudlongtotal = 0;
+   hudtotalframes = 0;
+   hudworsts = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+   hudworstidx = 0;
+   hudwindowworst = 0;
+   hudlastflush = 0;
+}
+
+function updateHud(timestamp, delta)
+{
+   hudframes++;
+   hudtotalframes++;
+   if(delta > 33)
+      hudlongtotal++;
+   if(delta > hudwindowworst)
+      hudwindowworst = delta;
+   if(!hudlastflush)
+   {
+      hudlastflush = timestamp;
+      return;
+   }
+   if(timestamp - hudlastflush < 500)
+      return;
+
+   if(!hud)
+   {
+      hud = document.createElement("div");
+      hud.id = "perfhud";
+      var s = hud.style;
+      s.position = "fixed";
+      s.top = "4px";
+      s.right = "4px";
+      s.zIndex = "2000";
+      s.padding = "4px 6px";
+      s.background = "rgba(0,0,0,0.7)";
+      s.color = "#0f0";
+      s.font = "11px/1.4 monospace";
+      s.pointerEvents = "none";
+      s.whiteSpace = "pre";
+      document.body.appendChild(hud);
+   }
+
+   var fps = Math.round(hudframes * 1000 / (timestamp - hudlastflush));
+   hudworsts[hudworstidx] = hudwindowworst;
+   hudworstidx = (hudworstidx + 1) % hudworsts.length;
+   var worst = 0;
+   for(var i = 0; i < hudworsts.length; i++)
+      if(hudworsts[i] > worst)
+         worst = hudworsts[i];
+   hud.textContent = fps + " fps\nworst(5s) " + worst.toFixed(1) + "ms\nlong " + hudlongtotal + "/" + hudtotalframes;
+
+   hudframes = 0;
+   hudwindowworst = 0;
+   hudlastflush = timestamp;
 }
 
 //Handle space bar
@@ -338,6 +500,7 @@ else
 
 function screenClick()
 {
+   resumeAudio();
    if(currentstate == states.GameScreen)
    {
       playerJump();
@@ -352,41 +515,56 @@ function playerJump()
 {
    velocity = jump;
    //play jump sound
-   soundJump.stop();
-   soundJump.play();
+   playSound("sfx_wing");
+}
+
+//score digits: the img nodes are reused in place — src swaps only, a node is
+//added only when the number gains a digit, surplus nodes are hidden. the old
+//empty()+append() built fresh imgs every point, which decoded and laid out
+//mid-game.
+function setDigits(container, prefix, value)
+{
+   var digits = value.toString();
+   while(container.children.length < digits.length)
+      container.appendChild(document.createElement("img"));
+   var imgs = container.children;
+   for(var i = 0; i < imgs.length; i++)
+   {
+      if(i < digits.length)
+      {
+         var src = "assets/" + prefix + digits.charAt(i) + ".png";
+         if(imgs[i].getAttribute("src") !== src)
+         {
+            imgs[i].setAttribute("src", src);
+            imgs[i].alt = digits.charAt(i);
+         }
+         imgs[i].style.display = "";
+      }
+      else
+         imgs[i].style.display = "none";
+   }
 }
 
 function setBigScore(erase)
 {
-   var elemscore = $("#bigscore");
-   elemscore.empty();
-
+   var container = document.getElementById("bigscore");
    if(erase)
+   {
+      for(var i = 0; i < container.children.length; i++)
+         container.children[i].style.display = "none";
       return;
-
-   var digits = score.toString().split('');
-   for(var i = 0; i < digits.length; i++)
-      elemscore.append("<img src='assets/font_big_" + digits[i] + ".png' alt='" + digits[i] + "'>");
+   }
+   setDigits(container, "font_big_", score);
 }
 
 function setSmallScore()
 {
-   var elemscore = $("#currentscore");
-   elemscore.empty();
-
-   var digits = score.toString().split('');
-   for(var i = 0; i < digits.length; i++)
-      elemscore.append("<img src='assets/font_small_" + digits[i] + ".png' alt='" + digits[i] + "'>");
+   setDigits(document.getElementById("currentscore"), "font_small_", score);
 }
 
 function setHighScore()
 {
-   var elemscore = $("#highscore");
-   elemscore.empty();
-
-   var digits = highscore.toString().split('');
-   for(var i = 0; i < digits.length; i++)
-      elemscore.append("<img src='assets/font_small_" + digits[i] + ".png' alt='" + digits[i] + "'>");
+   setDigits(document.getElementById("highscore"), "font_small_", highscore);
 }
 
 function setMedal()
@@ -439,7 +617,8 @@ function playerDead()
    loopGameloop = null;
    loopPipeloop = null;
 
-   //mobile browsers don't support buzz bindOnce event
+   //mobile browsers skipped buzz's ended events; keep that shape — straight
+   //to the score screen there, the hit→die chain elsewhere
    if(isIncompatible.any())
    {
       //skip right to showing score
@@ -448,8 +627,8 @@ function playerDead()
    else
    {
       //play the hit sound (then the dead sound) and then show score
-      soundHit.play().bindOnce("ended", function() {
-         soundDie.play().bindOnce("ended", function() {
+      playSoundThen("sfx_hit", function() {
+         playSoundThen("sfx_die", function() {
             showScore();
          });
       });
@@ -479,16 +658,14 @@ function showScore()
    var wonmedal = setMedal();
 
    //SWOOSH!
-   soundSwoosh.stop();
-   soundSwoosh.play();
+   playSound("sfx_swooshing");
 
    //show the scoreboard
    $("#scoreboard").css({ y: '40px', opacity: 0 }); //move it down so we can slide it up
    $("#replay").css({ y: '40px', opacity: 0 });
    $("#scoreboard").transition({ y: '0px', opacity: 1}, 600, 'ease', function() {
       //When the animation is done, animate in the replay button and SWOOSH!
-      soundSwoosh.stop();
-      soundSwoosh.play();
+      playSound("sfx_swooshing");
       $("#replay").transition({ y: '0px', opacity: 1}, 600, 'ease');
 
       //also animate in the MEDAL! WOO!
@@ -510,8 +687,7 @@ $("#replay").click(function() {
    else
       replayclickable = false;
    //SWOOSH!
-   soundSwoosh.stop();
-   soundSwoosh.play();
+   playSound("sfx_swooshing");
 
    //fade out the scoreboard
    $("#scoreboard").transition({ y: '-40px', opacity: 0}, 1000, 'ease', function() {
@@ -527,9 +703,35 @@ function playerScore()
 {
    score += 1;
    //play score sound
-   soundScore.stop();
-   soundScore.play();
+   playSound("sfx_point");
    setBigScore();
+}
+
+//pipes are recycled: an offscreen pipe's element goes back in the pool and the
+//next spawn reuses it, so no dom subtree or will-change layer is built
+//mid-game. four covers the most ever alive at once.
+var pipepool = [];
+
+function acquirePipeElement()
+{
+   if(pipepool.length)
+      return pipepool.pop();
+   var el = document.createElement("div");
+   el.className = "pipe animated";
+   var upper = document.createElement("div");
+   upper.className = "pipe_upper";
+   var lower = document.createElement("div");
+   lower.className = "pipe_lower";
+   el.appendChild(upper);
+   el.appendChild(lower);
+   return el;
+}
+
+function releasePipe(pipe)
+{
+   pipe.element.remove();
+   if(pipepool.length < 4)
+      pipepool.push(pipe.element);
 }
 
 function updatePipes()
@@ -547,19 +749,20 @@ function updatePipes()
    var constraint = flyArea - pipeheight - (padding * 2); //double padding (for top and bottom)
    var topheight = Math.floor((Math.random()*constraint) + padding); //add lower padding
    var bottomheight = (flyArea - pipeheight) - topheight;
-   //heights are applied through CSSOM, not an inline style attribute: the page
-   //ships under a CSP with no style-src 'unsafe-inline', which blocks
-   //attribute styles. .css() writes element.style, which is not gated.
-   var newpipe = $('<div class="pipe animated"><div class="pipe_upper"></div><div class="pipe_lower"></div></div>');
-   newpipe.children(".pipe_upper").css("height", topheight + "px");
-   newpipe.children(".pipe_lower").css("height", bottomheight + "px");
-   $("#flyarea").append(newpipe);
+   //heights and transform are applied through CSSOM, not an inline style
+   //attribute: the page ships under a CSP with no style-src 'unsafe-inline'.
+   //the transform is set before the element is (re)appended so a recycled
+   //pipe can never paint one frame at its old position.
+   var el = acquirePipeElement();
+   el.children[0].style.height = topheight + "px";
+   el.children[1].style.height = bottomheight + "px";
+   el.style.transform = "translateX(" + pipestartx + "px)";
+   document.getElementById("flyarea").appendChild(el);
 
    //tracked as numbers from here on: x is the pipe's left edge inside
    //#flyarea and top is where its gap starts. the loop moves x and writes it
    //back out as a translateX, so a pipe never touches layout.
-   var pipe = { element: newpipe[0], x: pipestartx, top: topheight };
-   pipe.element.style.transform = "translateX(" + pipe.x + "px)";
+   var pipe = { element: el, x: pipestartx, top: topheight };
    pipes.push(pipe);
    livepipes.push(pipe);
 }
