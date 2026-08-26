@@ -127,14 +127,15 @@
 # dropped. No XHR/WebSocket/sendBeacon. The upstream third-party analytics <script
 # src="https://yummy.nebez.dev/script.js"> was deleted, so no external host is
 # referenced anywhere. The one style="" attribute (the pipe heights, built as
-# an HTML string in js/main.js) was rewritten to jQuery .css() — CSSOM, not
-# gated — so style-src 'self' covers the whole page. img-src 'self' IS
-# required twice over: css/main.css has ten url('../assets/*.png')
+# an HTML string in js/main.js) is gone — the heights are applied via CSSOM
+# (element.style), which style-src does not gate — so style-src 'self' covers
+# the whole page. img-src 'self' IS required twice over: css/main.css has ten
+# url('../assets/*.png')
 # backgrounds, and main.js appends <img> tags for the score digits, medals and
 # replay button. connect-src 'self' IS required: main.js fetches
 # assets/sounds/*.{ogg,m4a} as ArrayBuffers to decode into Web Audio buffers.
-# media-src and font-src are omitted deliberately — no HTMLMediaElement is ever
-# constructed (the one canPlayType() probe element loads nothing) and the only
+# media-src and font-src are omitted deliberately — no media element ever loads
+# a resource (the one canPlayType() probe element never gets a src) and the only
 # font-family is `monospace`. They fall through to default-src 'none'. jQuery 1.10.2 contains an eval() inside
 # globalEval, reachable only from .html()/ajax script injection, neither of
 # which this game uses: 'unsafe-eval' is NOT granted.

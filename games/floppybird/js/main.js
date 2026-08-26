@@ -77,8 +77,10 @@ function initAudio()
 
 function resumeAudio()
 {
-   //iOS creates the context suspended outside a gesture; resume is idempotent
-   if(audioctx && audioctx.state === "suspended")
+   //iOS creates the context suspended outside a gesture, and an audio-session
+   //interruption can park it in neither suspended nor running; resume is
+   //idempotent, so nudge anything that isn't already running
+   if(audioctx && audioctx.state !== "running")
       audioctx.resume();
 }
 
@@ -140,7 +142,7 @@ $(document).ready(function() {
    //decode the state-transition artwork up front so a first medal or first
    //score never pays a decode mid-session. Image() warms the cache; decode()
    //rasterizes where supported.
-   var warmlist = ["scoreboard.png", "replay.png",
+   var warmlist = ["splash.png", "scoreboard.png", "replay.png",
       "medal_bronze.png", "medal_silver.png", "medal_gold.png", "medal_platinum.png"];
    for(var d = 0; d <= 9; d++)
       warmlist.push("font_big_" + d + ".png", "font_small_" + d + ".png");
@@ -259,12 +261,14 @@ function gameloop(timestamp) {
       lastframe = timestamp;
    var delta = timestamp - lastframe;
    lastframe = timestamp;
+   //the hud reports the real frame time, so a stall shows its true length
+   var rawdelta = delta;
    //a backgrounded tab hands back a huge delta on return; don't simulate it
    if(delta > 250)
       delta = 250;
 
    if(debugmode)
-      updateHud(timestamp, delta);
+      updateHud(timestamp, rawdelta);
 
    //fixed timestep: as many 60hz physics steps as the elapsed time earned,
    //then one render.

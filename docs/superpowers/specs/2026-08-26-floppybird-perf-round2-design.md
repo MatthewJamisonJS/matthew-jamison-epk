@@ -18,7 +18,7 @@ Scope decision: surgical hot-path pass on floppybird only; the other three games
 ### 1. Web Audio sound engine (replaces buzz on all paths)
 - Fetch + `decodeAudioData` the 5 sfx once at boot; playback = `AudioBufferSourceNode` through a shared `GainNode` at 0.3 (parity with buzz volume 30).
 - Format pick: ogg first, m4a for browsers whose `decodeAudioData` lacks ogg (iOS/Safari). Detect before fetch: `new Audio().canPlayType('audio/ogg; codecs="vorbis"')` — empty string → fetch m4a.
-- `AudioContext` is created/resumed on the first user gesture — the existing touchstart/mousedown handler (main.js:334).
+- `AudioContext` is created at boot (it decodes while suspended), resumed on the first user gesture — the existing touchstart/mousedown handler (main.js:334).
 - Death chain parity: desktop plays hit → die → `showScore()` via `onended`; mobile (`isIncompatible.any()`) skips straight to `showScore()` (main.js:442-456). Preserve exactly.
 - Remove the buzz `<script>` tag from `index.html` once nothing references it.
 - **Mute contract holds without change:** `games/mj-mute.js:64-88` already zero-gains every AudioContext's destination under `?mjmute=1`. mj-mute loads first, so the game's context is constructed through the shadowed constructor.
