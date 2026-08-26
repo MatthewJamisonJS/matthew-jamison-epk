@@ -137,6 +137,21 @@ $(document).ready(function() {
 
    initAudio();
 
+   //decode the state-transition artwork up front so a first medal or first
+   //score never pays a decode mid-session. Image() warms the cache; decode()
+   //rasterizes where supported.
+   var warmlist = ["scoreboard.png", "replay.png",
+      "medal_bronze.png", "medal_silver.png", "medal_gold.png", "medal_platinum.png"];
+   for(var d = 0; d <= 9; d++)
+      warmlist.push("font_big_" + d + ".png", "font_small_" + d + ".png");
+   for(var w = 0; w < warmlist.length; w++)
+   {
+      var warm = new Image();
+      warm.src = "assets/" + warmlist[w];
+      if(warm.decode)
+         warm.decode().catch(function() { /* decode is best-effort */ });
+   }
+
    //get the highscore
    var savedscore = getCookie("highscore");
    if(savedscore != "")
@@ -421,37 +436,53 @@ function playerJump()
    playSound("sfx_wing");
 }
 
+//score digits: the img nodes are reused in place — src swaps only, a node is
+//added only when the number gains a digit, surplus nodes are hidden. the old
+//empty()+append() built fresh imgs every point, which decoded and laid out
+//mid-game.
+function setDigits(container, prefix, value)
+{
+   var digits = value.toString();
+   while(container.children.length < digits.length)
+      container.appendChild(document.createElement("img"));
+   var imgs = container.children;
+   for(var i = 0; i < imgs.length; i++)
+   {
+      if(i < digits.length)
+      {
+         var src = "assets/" + prefix + digits.charAt(i) + ".png";
+         if(imgs[i].getAttribute("src") !== src)
+         {
+            imgs[i].setAttribute("src", src);
+            imgs[i].alt = digits.charAt(i);
+         }
+         imgs[i].style.display = "";
+      }
+      else
+         imgs[i].style.display = "none";
+   }
+}
+
 function setBigScore(erase)
 {
-   var elemscore = $("#bigscore");
-   elemscore.empty();
-
+   var container = document.getElementById("bigscore");
    if(erase)
+   {
+      for(var i = 0; i < container.children.length; i++)
+         container.children[i].style.display = "none";
       return;
-
-   var digits = score.toString().split('');
-   for(var i = 0; i < digits.length; i++)
-      elemscore.append("<img src='assets/font_big_" + digits[i] + ".png' alt='" + digits[i] + "'>");
+   }
+   setDigits(container, "font_big_", score);
 }
 
 function setSmallScore()
 {
-   var elemscore = $("#currentscore");
-   elemscore.empty();
-
-   var digits = score.toString().split('');
-   for(var i = 0; i < digits.length; i++)
-      elemscore.append("<img src='assets/font_small_" + digits[i] + ".png' alt='" + digits[i] + "'>");
+   setDigits(document.getElementById("currentscore"), "font_small_", score);
 }
 
 function setHighScore()
 {
-   var elemscore = $("#highscore");
-   elemscore.empty();
-
-   var digits = highscore.toString().split('');
-   for(var i = 0; i < digits.length; i++)
-      elemscore.append("<img src='assets/font_small_" + digits[i] + ".png' alt='" + digits[i] + "'>");
+   setDigits(document.getElementById("highscore"), "font_small_", highscore);
 }
 
 function setMedal()
