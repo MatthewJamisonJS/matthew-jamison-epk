@@ -197,8 +197,9 @@ function showSplash()
 
    playSound("sfx_swooshing");
 
-   //clear out all the pipes if there are any
-   $(".pipe").remove();
+   //clear out all the pipes if there are any — back into the pool, not the gc
+   for(var i = 0; i < livepipes.length; i++)
+      releasePipe(livepipes[i]);
    pipes = new Array();
    livepipes = new Array();
 
@@ -378,7 +379,7 @@ function rendergame() {
       //updatePipes used to run over every pipe in the dom.
       if(pipe.x < -100)
       {
-         pipe.element.remove();
+         releasePipe(pipe);
          livepipes.splice(i, 1);
       }
    }
@@ -625,6 +626,33 @@ function playerScore()
    setBigScore();
 }
 
+//pipes are recycled: an offscreen pipe's element goes back in the pool and the
+//next spawn reuses it, so no dom subtree or will-change layer is built
+//mid-game. four covers the most ever alive at once.
+var pipepool = [];
+
+function acquirePipeElement()
+{
+   if(pipepool.length)
+      return pipepool.pop();
+   var el = document.createElement("div");
+   el.className = "pipe animated";
+   var upper = document.createElement("div");
+   upper.className = "pipe_upper";
+   var lower = document.createElement("div");
+   lower.className = "pipe_lower";
+   el.appendChild(upper);
+   el.appendChild(lower);
+   return el;
+}
+
+function releasePipe(pipe)
+{
+   pipe.element.remove();
+   if(pipepool.length < 4)
+      pipepool.push(pipe.element);
+}
+
 function updatePipes()
 {
    //(pipes that have left the screen are reaped in rendergame, where their
@@ -640,19 +668,20 @@ function updatePipes()
    var constraint = flyArea - pipeheight - (padding * 2); //double padding (for top and bottom)
    var topheight = Math.floor((Math.random()*constraint) + padding); //add lower padding
    var bottomheight = (flyArea - pipeheight) - topheight;
-   //heights are applied through CSSOM, not an inline style attribute: the page
-   //ships under a CSP with no style-src 'unsafe-inline', which blocks
-   //attribute styles. .css() writes element.style, which is not gated.
-   var newpipe = $('<div class="pipe animated"><div class="pipe_upper"></div><div class="pipe_lower"></div></div>');
-   newpipe.children(".pipe_upper").css("height", topheight + "px");
-   newpipe.children(".pipe_lower").css("height", bottomheight + "px");
-   $("#flyarea").append(newpipe);
+   //heights and transform are applied through CSSOM, not an inline style
+   //attribute: the page ships under a CSP with no style-src 'unsafe-inline'.
+   //the transform is set before the element is (re)appended so a recycled
+   //pipe can never paint one frame at its old position.
+   var el = acquirePipeElement();
+   el.children[0].style.height = topheight + "px";
+   el.children[1].style.height = bottomheight + "px";
+   el.style.transform = "translateX(" + pipestartx + "px)";
+   document.getElementById("flyarea").appendChild(el);
 
    //tracked as numbers from here on: x is the pipe's left edge inside
    //#flyarea and top is where its gap starts. the loop moves x and writes it
    //back out as a translateX, so a pipe never touches layout.
-   var pipe = { element: newpipe[0], x: pipestartx, top: topheight };
-   pipe.element.style.transform = "translateX(" + pipe.x + "px)";
+   var pipe = { element: el, x: pipestartx, top: topheight };
    pipes.push(pipe);
    livepipes.push(pipe);
 }
