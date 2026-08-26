@@ -42,16 +42,80 @@ var boxheight = 0;
 
 var replayclickable = false;
 
-//sounds
-var volume = 30;
-//ogg for chrome/firefox, m4a so safari/ios are not silent. buzz mutates the
-//options object it is handed, so each sound gets its own literal.
-var soundJump = new buzz.sound("assets/sounds/sfx_wing", { formats: ["ogg", "m4a"] });
-var soundScore = new buzz.sound("assets/sounds/sfx_point", { formats: ["ogg", "m4a"] });
-var soundHit = new buzz.sound("assets/sounds/sfx_hit", { formats: ["ogg", "m4a"] });
-var soundDie = new buzz.sound("assets/sounds/sfx_die", { formats: ["ogg", "m4a"] });
-var soundSwoosh = new buzz.sound("assets/sounds/sfx_swooshing", { formats: ["ogg", "m4a"] });
-buzz.all().setVolume(volume);
+//sounds — Web Audio: each effect is decoded once into a buffer and played
+//through one shared gain node. buzz's per-tap stop()/play() on an
+//HTMLMediaElement costs main-thread time on mobile; a buffer source is
+//fire-and-forget on the audio thread. the context is created at boot (it can
+//decode while suspended) and resumed on the first gesture.
+var audioctx = null;
+var sfxgain = null;
+var sfxbuffers = {};
+var sfxplaying = {};
+var sfxnames = ["sfx_wing", "sfx_point", "sfx_hit", "sfx_die", "sfx_swooshing"];
+
+function initAudio()
+{
+   var Ctx = window.AudioContext || window.webkitAudioContext;
+   if(!Ctx || audioctx)
+      return;
+   audioctx = new Ctx();
+   sfxgain = audioctx.createGain();
+   sfxgain.gain.value = 0.3; //parity with buzz's volume 30
+   sfxgain.connect(audioctx.destination);
+
+   //ogg for chrome/firefox; safari's decoder has no ogg, so it gets m4a
+   var format = document.createElement("audio").canPlayType('audio/ogg; codecs="vorbis"') ? "ogg" : "m4a";
+   for(var i = 0; i < sfxnames.length; i++)
+      (function(name) {
+         fetch("assets/sounds/" + name + "." + format)
+            .then(function(res) { return res.arrayBuffer(); })
+            .then(function(data) { return audioctx.decodeAudioData(data); })
+            .then(function(buffer) { sfxbuffers[name] = buffer; })
+            .catch(function() { /* the sound stays silent; the game must not */ });
+      })(sfxnames[i]);
+}
+
+function resumeAudio()
+{
+   //iOS creates the context suspended outside a gesture; resume is idempotent
+   if(audioctx && audioctx.state === "suspended")
+      audioctx.resume();
+}
+
+//fire and forget. a replay of the same effect stops the one still playing,
+//which is what buzz's stop()+play() pairs did. returns the source so the
+//death chain can wait on ended, or null when the effect can't play.
+function playSound(name, onended)
+{
+   if(!audioctx || !sfxbuffers[name])
+      return null;
+   var prev = sfxplaying[name];
+   if(prev)
+   {
+      prev.onended = null;
+      try { prev.stop(); } catch(e) { /* already ended */ }
+   }
+   var source = audioctx.createBufferSource();
+   source.buffer = sfxbuffers[name];
+   source.connect(sfxgain);
+   sfxplaying[name] = source;
+   source.onended = function() {
+      if(sfxplaying[name] === source)
+         sfxplaying[name] = null;
+      if(onended)
+         onended();
+   };
+   source.start(0);
+   return source;
+}
+
+//play a sound and continue when it ends — continuing immediately if it
+//couldn't play, so the score screen never waits on missing audio.
+function playSoundThen(name, next)
+{
+   if(playSound(name, next) === null)
+      next();
+}
 
 //loops
 var loopGameloop;
@@ -70,6 +134,8 @@ $(document).ready(function() {
       pipeheight = 200;
 
    playerelement = document.getElementById("player");
+
+   initAudio();
 
    //get the highscore
    var savedscore = getCookie("highscore");
@@ -114,8 +180,7 @@ function showSplash()
    $("#player").css({ y: 0, x: 0 });
    updatePlayer();
 
-   soundSwoosh.stop();
-   soundSwoosh.play();
+   playSound("sfx_swooshing");
 
    //clear out all the pipes if there are any
    $(".pipe").remove();
@@ -338,6 +403,7 @@ else
 
 function screenClick()
 {
+   resumeAudio();
    if(currentstate == states.GameScreen)
    {
       playerJump();
@@ -352,8 +418,7 @@ function playerJump()
 {
    velocity = jump;
    //play jump sound
-   soundJump.stop();
-   soundJump.play();
+   playSound("sfx_wing");
 }
 
 function setBigScore(erase)
@@ -439,7 +504,8 @@ function playerDead()
    loopGameloop = null;
    loopPipeloop = null;
 
-   //mobile browsers don't support buzz bindOnce event
+   //mobile browsers skipped buzz's ended events; keep that shape — straight
+   //to the score screen there, the hit→die chain elsewhere
    if(isIncompatible.any())
    {
       //skip right to showing score
@@ -448,8 +514,8 @@ function playerDead()
    else
    {
       //play the hit sound (then the dead sound) and then show score
-      soundHit.play().bindOnce("ended", function() {
-         soundDie.play().bindOnce("ended", function() {
+      playSoundThen("sfx_hit", function() {
+         playSoundThen("sfx_die", function() {
             showScore();
          });
       });
@@ -479,16 +545,14 @@ function showScore()
    var wonmedal = setMedal();
 
    //SWOOSH!
-   soundSwoosh.stop();
-   soundSwoosh.play();
+   playSound("sfx_swooshing");
 
    //show the scoreboard
    $("#scoreboard").css({ y: '40px', opacity: 0 }); //move it down so we can slide it up
    $("#replay").css({ y: '40px', opacity: 0 });
    $("#scoreboard").transition({ y: '0px', opacity: 1}, 600, 'ease', function() {
       //When the animation is done, animate in the replay button and SWOOSH!
-      soundSwoosh.stop();
-      soundSwoosh.play();
+      playSound("sfx_swooshing");
       $("#replay").transition({ y: '0px', opacity: 1}, 600, 'ease');
 
       //also animate in the MEDAL! WOO!
@@ -510,8 +574,7 @@ $("#replay").click(function() {
    else
       replayclickable = false;
    //SWOOSH!
-   soundSwoosh.stop();
-   soundSwoosh.play();
+   playSound("sfx_swooshing");
 
    //fade out the scoreboard
    $("#scoreboard").transition({ y: '-40px', opacity: 0}, 1000, 'ease', function() {
@@ -527,8 +590,7 @@ function playerScore()
 {
    score += 1;
    //play score sound
-   soundScore.stop();
-   soundScore.play();
+   playSound("sfx_point");
    setBigScore();
 }
 
