@@ -1178,7 +1178,10 @@ body.store-note {
 }
 
 .contact-label { font-size: 12px; color: var(--text-muted); letter-spacing: 0.1em; }
-.contact-value { font-size: 14px; color: var(--text); overflow-wrap: break-word; word-break: break-all; }
+/* wrap at spaces and designed <wbr> points only — break-all split words
+   mid-token on phones (soun/dcloud, gma/il.com). The email carries a <wbr>
+   before its @ as the one designed break. */
+.contact-value { font-size: 14px; color: var(--text); overflow-wrap: normal; word-break: normal; }
 .contact-value a { color: var(--mj-accent-bright); }
 .contact-value a:hover { text-decoration: underline; }
 
@@ -1268,8 +1271,10 @@ body.store-note {
 @media (max-width: 480px) {
   /* 10px type here, so the row box re-caps to a narrow measure and the nav
      wraps to a few short lines instead of one long one. Re-measure this cap if
-     the nav labels change again. */
-  .nav { padding-inline: max(12px, calc((100% - 230px) / 2)); }
+     the nav labels change again: with the ten 2026 labels (albums … bio) the
+     safe window is 249–264px — 230px strands "Bio" alone on a fifth row, 256px
+     wraps 3/3/4. */
+  .nav { padding-inline: max(12px, calc((100% - 256px) / 2)); }
   .nav a { padding: 12px 10px; font-size: 10px; }
   .url-bar { padding: 8px 16px; }
   .hero h1 { font-size: 30px; }
