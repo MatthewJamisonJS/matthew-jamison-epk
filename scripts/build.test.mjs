@@ -334,7 +334,7 @@ test('post page: markdown subset renders, raw HTML never passes through', () => 
   assert.match(article, /<em>em<\/em>/);
   assert.match(article, /<code>code span<\/code>/);
   assert.match(article, /<a href="https:\/\/example\.com\/" rel="noopener noreferrer">link<\/a>/);
-  assert.match(article, /<img src="\/assets\/blog\/long-post-cover\.webp" alt="a bass leaning on an amp"/);
+  assert.match(article, /<img class="prose-figure" src="\/assets\/blog\/long-post-cover\.webp" alt="a bass leaning on an amp"/);
   assert.match(article, /<ul>\s*<li>di box<\/li>/);
   assert.match(article, /<ol>\s*<li>warm up<\/li>/);
   assert.match(article, /<blockquote>/);
@@ -438,7 +438,7 @@ test('home page: the // notes block lists the latest three and links to /blog/',
 test('no posts: /blog/ still exists with an empty state, feed carries zero items', () => {
   assert.ok(existsSync(join(emptyOut, 'blog', 'index.html')), '/blog/ must exist with no posts');
   const index = readEmpty('blog', 'index.html');
-  assert.match(index, /class="blog-empty"/);
+  assert.match(index, /class="blog-empty/);
   assert.ok(!index.includes('pager__link'), 'pager on an empty listing');
   const xml = readEmpty('feed.xml');
   assert.match(xml, /<rss version="2\.0"/);
