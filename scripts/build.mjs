@@ -398,7 +398,6 @@ function hubPage() {
     .join('\n');
 
   const body = `    <section class="section" aria-label="releases">
-      <h2 class="section-label comment">// every release &nbsp;·&nbsp; ${releases.length} of them &nbsp;·&nbsp; preview + buy on the store</h2>
       <h1 class="release-title release-title-hub">releases</h1>
       <!-- expanded: the home page hides cards 13+ until its button reveals them;
            the hub is the full list, so it opts out of that rule. -->

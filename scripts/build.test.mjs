@@ -301,6 +301,9 @@ test('hub page links every release', () => {
   // the home page hides .store-card:nth-child(n+13) unless the grid is expanded;
   // the hub showed 12 of 29 live (2026-09-04) because it lacked the class
   assert.match(html, /<div class="store-grid expanded">/);
+  // no comment label on the hub: the <h1>releases</h1> already says it, and the
+  // old "// every release · 29 of them · …" ran three lines at 375px (Matthew, Sep 4)
+  assert.ok(!/<h2 class="section-label comment">/.test(html), 'hub still carries a // label');
   assert.equal((html.match(/<h1[\s>]/g) || []).length, 1);
   assert.match(html, /<link rel="canonical" href="https:\/\/matthewjamison\.dev\/music\/">/);
   for (const r of releases) {
