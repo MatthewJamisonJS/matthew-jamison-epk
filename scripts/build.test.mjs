@@ -492,7 +492,7 @@ test('blog: the // comment label is used once per page and nowhere else', () => 
   assert.ok(!/class="section-label/.test(listing), 'listing carries a duplicate // blog label');
   // and the same form on / sits under // contact, so its label is plain too
   const home = readFileSync(join(root, 'index.html'), 'utf8');
-  assert.match(home, /<label class="subscribe-label" for="subscribe-email">get new music \+ blog posts by email<\/label>/);
+  assert.match(home, /<label class="subscribe-label" for="subscribe-email">stay tapped in, blog posts by email<\/label>/);
 });
 
 test('post page: author card holds both video sources and an img fallback', () => {

@@ -807,10 +807,8 @@ const authorCard = () => `      <aside class="author-card">
         </video>
         <div class="author-card__text">
           <p class="author-card__name">matthew jamison</p>
-          <!-- WORKSHOP: the role line and the bio below are Matthew's to rewrite. -->
-          <p class="author-card__role">session&nbsp;bassist&nbsp;· producer&nbsp;· dev</p>
-          <p class="author-card__bio">st. louis. i play bass, make beats, and write the code too.
-these are the notes i keep while i figure things out.</p>
+          <p class="author-card__role">musician&nbsp;· producer&nbsp;· dev</p>
+          <p class="author-card__bio">Beloved son of God, Husband to Bernie, Father of Nadia &amp; Zoe</p>
           <ul class="author-card__social" role="list">
             <li>
               <a class="author-card__social-link" href="https://github.com/MatthewJamisonJS" target="_blank" rel="me noopener">
@@ -828,10 +826,9 @@ these are the notes i keep while i figure things out.</p>
 
 // One subscribe form, one implementation. This exact markup ships on the home
 // page too (index.html, #contact) and subscribe.js drives both.
-// WORKSHOP: the label and the two status lines are Matthew's to rewrite.
 const subscribeCard = id => `      <div class="subscribe-card">
           <form class="subscribe" novalidate>
-            <label class="subscribe-label" for="${id}">get new music + blog posts by email</label>
+            <label class="subscribe-label" for="${id}">stay tapped in, blog posts by email</label>
             <div class="subscribe-row">
               <input class="subscribe-input" type="email" id="${id}" name="email"
                      autocomplete="email" required>
@@ -1014,8 +1011,7 @@ ${cards}
   const canonical = n === 1 ? `${SITE}/blog/` : `${SITE}/blog/page/${n}/`;
   const body = `    <section class="section blog-wrap" aria-label="blog">
       <h1 class="release-title release-title-hub">blog</h1>
-      <!-- WORKSHOP: Matthew replaces this dek in his own words. -->
-      <p class="blog-dek muted">notes on bass, gear, faith &amp; whatever else is on my mind</p>
+      <p class="blog-dek muted">writing about life experiences, music, &amp; whatever else surfaces</p>
 
 ${list}
 

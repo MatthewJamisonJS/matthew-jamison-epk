@@ -12,9 +12,8 @@
 (function () {
   var API = 'https://api.matthewjamison.dev';
 
-  // WORKSHOP: Matthew replaces both lines in his own words.
-  var OK = 'check your inbox — one click to confirm & you’re in';
-  var FAIL = 'that didn’t go through. try again, or email matthewjamisonmusicinquiries@gmail.com';
+  var OK = 'check your inbox (spam folders too) - click and confirm so we can stay tapped in';
+  var FAIL = 'that didn\'t work. try again or email me';
 
   document.querySelectorAll('form.subscribe').forEach(function (form) {
     var email = form.querySelector('input[type="email"]');
