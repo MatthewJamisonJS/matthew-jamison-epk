@@ -17,6 +17,7 @@ export type TemplateName =
   | 'download_ready'
   | 'download_reissued'
   | 'verify_subscription'
+  | 'broadcast'
   | 'payment_failed'
   | 'alert';
 
@@ -79,6 +80,8 @@ export function render(
       return downloadReissued(env, payload);
     case 'verify_subscription':
       return verifySubscription(env, payload);
+    case 'broadcast':
+      return broadcast(env, payload);
     case 'payment_failed':
       return paymentFailed(env, payload);
     case 'alert':
@@ -260,6 +263,55 @@ function verifySubscription(env: Env, p: Record<string, unknown>): Rendered {
 ${button(verifyUrl, 'yes, confirm')}
 <p style="color:#5f5f5f;font-size:14px;">this link expires in ${escapeHtml(days)} days. if you don't click it you simply hear nothing further &mdash; your download is unaffected and already on its way separately.</p>
 <p style="color:#5f5f5f;font-size:13px;"><a href="${escapeHtml(unsubUrl)}" style="color:#5f5f5f;">never want this</a></p>`,
+  );
+
+  return {
+    subject,
+    html,
+    text,
+    headers: {
+      'List-Unsubscribe': `<${unsubUrl}>`,
+      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+    },
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* marketing: ONLY ever queued for `confirmed` subscribers             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The list mail. Subject and body come from POST /admin/broadcast, so the copy
+ * is Matthew's -- there is nothing to workshop here.
+ *
+ * `html` is optional and, when given, is inserted UNESCAPED: it is authored by
+ * the authenticated admin, not by a customer, and escaping it would defeat the
+ * point of offering the field. `text` is always escaped.
+ *
+ * The unsubscribe link is rendered per recipient from their own token, and the
+ * RFC 8058 headers mirror verify_subscription exactly. A marketing mail without
+ * both is the thing that gets a domain blocked.
+ */
+function broadcast(env: Env, p: Record<string, unknown>): Rendered {
+  const subject = str(p, 'subject', 'a note from matthew');
+  const body = str(p, 'text');
+  const url = str(p, 'url');
+  const rawHtml = typeof p.html === 'string' ? p.html : '';
+  const unsubUrl = `${env.WORKER_ORIGIN}/unsubscribe/${str(p, 'unsubscribe_token')}`;
+
+  const text = [body, ...(url ? ['', url] : []), '', `unsubscribe: ${unsubUrl}`, '', `-- matthew`].join('\n');
+
+  const bodyHtml =
+    rawHtml ||
+    body
+      .split(/\n{2,}/)
+      .map((para) => `<p>${escapeHtml(para).replace(/\n/g, '<br>')}</p>`)
+      .join('\n');
+
+  const html = shell(
+    `${bodyHtml}
+${url ? button(url, 'have a listen') : ''}
+<p style="color:#5f5f5f;font-size:13px;"><a href="${escapeHtml(unsubUrl)}" style="color:#5f5f5f;">unsubscribe</a></p>`,
   );
 
   return {
