@@ -1,4 +1,4 @@
-import type { Env, SubscriberRow } from '../types';
+import type { ConsentSource, Env, SubscriberRow } from '../types';
 import { intVar } from './db';
 import { enqueue } from './outbox';
 import { isoIn, isoNow, newToken } from './tokens';
@@ -57,13 +57,19 @@ export function isVerifyExpired(row: SubscriberRow): boolean {
 
 /**
  * Called from webhook fulfilment when, and only when,
- * `session.consent.promotions === 'opt_in'`.
+ * `session.consent.promotions === 'opt_in'`, and from POST /subscribe with
+ * `source = 'site'`.
+ *
+ * The source only ever labels the row. Every state transition below is the
+ * same whichever door the consent came through -- that is deliberate: a site
+ * signup and a checkout tick are the same promise and must not diverge.
  */
 export async function recordConsent(
   env: Env,
   email: string,
   albumSlug: string | null,
   country: string | null,
+  source: ConsentSource = 'checkout',
 ): Promise<'created' | 'reopened' | 'unchanged'> {
   const existing = await getSubscriber(env, email);
   const now = isoNow();
@@ -76,9 +82,9 @@ export async function recordConsent(
          (email, status, consent_source, consent_at, verify_token, verify_sent_at,
           verify_expires_at, confirmed_at, unsubscribed_at, unsubscribe_token,
           first_album_slug, consent_ip_country)
-       VALUES (?1, 'pending', 'checkout', ?2, ?3, ?2, ?4, NULL, NULL, ?5, ?6, ?7)`,
+       VALUES (?1, 'pending', ?8, ?2, ?3, ?2, ?4, NULL, NULL, ?5, ?6, ?7)`,
     )
-      .bind(email, now, verifyToken, isoIn(verifyTtlMs(env)), unsubToken, albumSlug, country)
+      .bind(email, now, verifyToken, isoIn(verifyTtlMs(env)), unsubToken, albumSlug, country, source)
       .run();
 
     await enqueue(env, email, 'verify_subscription', {

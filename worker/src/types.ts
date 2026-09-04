@@ -78,10 +78,17 @@ export interface TokenRow {
   created_at: string;
 }
 
+/**
+ * Which door the consent came through. 'checkout' = the Stripe promotional
+ * checkbox; 'site' = the subscribe form in #contact (POST /subscribe).
+ * Labelling only -- the double opt-in state machine is identical for both.
+ */
+export type ConsentSource = 'checkout' | 'site';
+
 export interface SubscriberRow {
   email: string;
   status: 'pending' | 'confirmed' | 'unsubscribed' | 'bounced';
-  consent_source: string;
+  consent_source: ConsentSource;
   consent_at: string;
   verify_token: string | null;
   verify_sent_at: string | null;
@@ -91,4 +98,20 @@ export interface SubscriberRow {
   unsubscribe_token: string;
   first_album_slug: string | null;
   consent_ip_country: string | null;
+}
+
+/** Per-IP submit counter for POST /subscribe. One row per key per window. */
+export interface IpRateRow {
+  key: string;
+  count: number;
+  window_start: string;
+}
+
+/** One row per sent broadcast. UNIQUE(subject, sent_on) is the idempotency key. */
+export interface BroadcastRow {
+  id: string;
+  subject: string;
+  sent_on: string;
+  recipient_count: number;
+  created_at: string;
 }
