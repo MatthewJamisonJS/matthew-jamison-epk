@@ -131,6 +131,9 @@ test('generated pages carry no inline style or executable inline script', () => 
 
 test('hub page links every release', () => {
   const html = read('music', 'index.html');
+  // the home page hides .store-card:nth-child(n+13) unless the grid is expanded;
+  // the hub showed 12 of 29 live (2026-09-04) because it lacked the class
+  assert.match(html, /<div class="store-grid expanded">/);
   assert.equal((html.match(/<h1[\s>]/g) || []).length, 1);
   assert.match(html, /<link rel="canonical" href="https:\/\/matthewjamison\.dev\/music\/">/);
   for (const r of releases) {
