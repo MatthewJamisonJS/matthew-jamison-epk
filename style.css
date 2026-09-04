@@ -603,10 +603,13 @@ star-field {
 .store-play .icon-pause,
 .store-card.is-playing .store-play .icon-play,
 #store-toggle .icon-pause,
-#store-toggle.is-playing .icon-play { display: none; }
+#store-toggle.is-playing .icon-play,
+#release-toggle .icon-pause,
+#release-toggle.is-playing .icon-play { display: none; }
 
 .store-card.is-playing .store-play .icon-pause,
-#store-toggle.is-playing .icon-pause { display: block; }
+#store-toggle.is-playing .icon-pause,
+#release-toggle.is-playing .icon-pause { display: block; }
 
 .store-title {
   font-size: 14px;
@@ -805,13 +808,16 @@ body.store-note {
   transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
-.store-ctl:hover:not(:disabled),
+.store-ctl:hover:not(:disabled):not([aria-disabled="true"]),
 .store-ctl:focus-visible {
   background: var(--mj-accent);
   border-color: var(--mj-accent-bright);
 }
 
-.store-ctl:disabled { color: var(--text-muted); opacity: 0.45; cursor: default; }
+/* the home bar disables its end stops outright; the release bar marks them with
+   aria-disabled so they stay focusable and stay announced. One look, either way. */
+.store-ctl:disabled,
+.store-ctl[aria-disabled="true"] { color: var(--text-muted); opacity: 0.45; cursor: default; }
 
 .store-ctl-stop { border-color: var(--border); }
 
@@ -993,7 +999,8 @@ body.store-note {
 
 .release-tracks li {
   display: grid;
-  grid-template-columns: 2.2em minmax(0, 1fr) auto;
+  /* the play control leads, then the same three columns the list always had */
+  grid-template-columns: 44px 2.2em minmax(0, 1fr) auto;
   gap: 10px;
   align-items: baseline;
   padding: 7px 0;
@@ -1005,8 +1012,109 @@ body.store-note {
 /* zero-padded, tabular — the same shape the player prints ("01 / 13 · Dawn") */
 .track-num { font-variant-numeric: tabular-nums; }
 
-.track-name { line-height: 1.45; overflow-wrap: break-word; }
+/* No mid-word breaking, at any width. The generator puts a <wbr> after every
+   separator in a title, so the long code-shaped ones (b_strolln.html.erb, and
+   the 32-character values.value.map(&:to_s).join run) have legal turns of their
+   own and the browser never has to invent one. break-word / break-all are
+   deliberately absent — measured at 375px, break-word split five titles on this
+   page mid-token. */
+.track-name { line-height: 1.45; overflow-wrap: normal; word-break: normal; }
 .track-time { font-variant-numeric: tabular-nums; letter-spacing: 0.04em; }
+
+/* ── track previews ─────────────────────────── */
+/* .store-play is written for the 44px control that floats over a catalog cover.
+   In a tracklist row it is a static 32px cell instead — above the 24px WCAG
+   2.5.8 target floor, and small enough that the row stays one line on a phone.
+   Everything else (the plate fill, the accent hover, the two icons) is
+   inherited from .store-play, so the two controls read as one thing. */
+.track-play {
+  position: static;
+  /* 44px, the same touch target .store-play carries on a catalog cover. It is
+     this design's own number, so the row control and the card control are the
+     same size as well as the same shape. */
+  width: 44px;
+  height: 44px;
+  align-self: center;
+}
+
+/* the same fill the home card wears while its preview is loaded. A colour
+   change, not a pulse: this state has to survive Reduce Motion, and the pause
+   glyph below carries it without relying on hue at all. */
+.track-play.is-playing {
+  background: var(--mj-accent);
+  border-color: var(--mj-accent-bright);
+  color: var(--text);
+}
+
+/* the home rule keys off .store-card, which these pages have none of */
+.track-play.is-playing .icon-play { display: none; }
+.track-play.is-playing .icon-pause { display: block; }
+
+.release-tracks li:hover .track-play { border-color: var(--mj-accent-bright); }
+
+/* the loaded row, playing or paused. --mj-accent-bright is 2.70:1 and cannot
+   carry text, so the row is marked with a surface tint and the button's fill. */
+.release-tracks li.is-active { background: var(--surface-2); }
+
+/* the gutters go before the columns do: at 375 the four tracks columns plus
+   three 10px gaps left a long title one word per line. */
+@media (max-width: 480px) {
+  .release-tracks li { gap: 8px; }
+}
+
+/* ── the release page's now-playing bar ─────── */
+/* Everything visual is .store-player's, inherited. The only thing that differs
+   is the column count: the home bar carries seven cells (art, meta, transport,
+   scrubber, time, quality, stop) and this one carries four. The home rules name
+   the missing three by id/class, so they simply don't apply — but the column
+   template is on .store-player-row and does, which is what these two rules fix. */
+.release-player .store-player-row {
+  grid-template-columns: 52px minmax(0, 1fr) auto auto;
+}
+
+/* the home bar's 38x34 controls sit in a row that also carries a scrubber, a
+   quality chip and a stop button, and has no width to spare. This bar carries
+   three buttons and nothing else, so they take the 44px target the rest of the
+   site uses. */
+.release-player .store-ctl {
+  min-width: 44px;
+  height: 44px;
+}
+
+/* the bar is a transport, not a reading surface. Track 16 of shoot the j is 82
+   characters of Ruby and it wrapped the bar to 262px at 375 — a third of the
+   viewport, for a line the tracklist above already prints in full. Two lines,
+   then an ellipsis; textContent is untouched, so the aria-live announcement and
+   the MediaSession title still carry the whole name. */
+.release-player .store-player-track {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  /* three rows, not the home bar's four — there is no scrubber to give one to.
+     What's playing, then the transport centred on the bar's axis, then the
+     clock under it. */
+  .release-player .store-player-row {
+    grid-template-columns: 52px minmax(0, 1fr);
+    row-gap: 12px;
+  }
+
+  .release-player .store-transport {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: center;
+  }
+
+  .release-player .store-time {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    text-align: center;
+  }
+}
 
 /* one column under the tablet break: the cover caps at its rendered size and
    the buy column centres with the rest of the phone layout */

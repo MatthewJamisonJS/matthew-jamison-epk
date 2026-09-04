@@ -138,6 +138,7 @@ const shell = ({
   headLinks = '',
   head = '',
   body,
+  tail = '',
   scripts = '',
   current = ''
 }) => `<!DOCTYPE html>
@@ -187,7 +188,7 @@ ${body}  </main>
     </div>
     <p class="footer-copy">matthew jamison &nbsp;·&nbsp; epk &nbsp;·&nbsp; 2026</p>
   </footer>
-${scripts}
+${tail}${scripts}
 </body>
 </html>
 `;
@@ -232,17 +233,84 @@ function releaseJsonLd(r) {
   return ld;
 }
 
+// The two glyphs every play control on this site carries, copied verbatim from
+// the .store-play buttons in index.html. Both ship in every button and CSS picks
+// one off the .is-playing class — the CSP requires Trusted Types, so nothing
+// can swap markup at runtime.
+const ICON_PLAY =
+  '<svg class="icon icon-play" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false"><path d="M6.3 2.84A1.5 1.5 0 0 0 4 4.11v11.78a1.5 1.5 0 0 0 2.3 1.27l9.344-5.891a1.5 1.5 0 0 0 0-2.538L6.3 2.841Z"/></svg>';
+const ICON_PAUSE =
+  '<svg class="icon icon-pause" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false"><path d="M5.75 3.25h2.5c.41 0 .75.34.75.75v12c0 .41-.34.75-.75.75h-2.5a.75.75 0 0 1-.75-.75V4c0-.41.34-.75.75-.75Zm6 0h2.5c.41 0 .75.34.75.75v12c0 .41-.34.75-.75.75h-2.5a.75.75 0 0 1-.75-.75V4c0-.41.34-.75.75-.75Z"/></svg>';
+
+const ICON_PREV =
+  '<svg class="icon icon-prev" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false"><path d="M5 4.75a.75.75 0 0 1 1.5 0v3.9l7.35-4.45A.75.75 0 0 1 15 4.84v10.32a.75.75 0 0 1-1.15.64L6.5 11.35v3.9a.75.75 0 0 1-1.5 0V4.75Z"/></svg>';
+const ICON_NEXT =
+  '<svg class="icon icon-next" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false"><path d="M15 4.75a.75.75 0 0 0-1.5 0v3.9L6.15 4.2A.75.75 0 0 0 5 4.84v10.32a.75.75 0 0 0 1.15.64l7.35-4.45v3.9a.75.75 0 0 0 1.5 0V4.75Z"/></svg>';
+
+// The now-playing bar. Same component as the home store's, reduced to what a
+// release page needs: no scrubber (the tracklist is the index), no quality chip
+// (the player bar on / owns that setting) and no stop button (the toggle and a
+// navigation both end it). Every class and every glyph is the home bar's.
+//
+// It lives after the footer, not inside the section: .section carries a
+// backdrop-filter, and a filtered ancestor becomes the containing block for a
+// position: fixed descendant — the bar would scroll with the page.
+// Track titles are full of code — `b_strolln.html.erb`, `structure.sql`,
+// `values.value.map(&:to_s).join("; `. At 375px the title column is ~125px, so
+// CSS had two options and both were wrong: overflow-wrap: break-word split them
+// mid-token, and overflow-wrap: normal let a 32-character run push past the
+// plate. <wbr> is the third: a zero-width break opportunity placed at the
+// separators the author already typed, so a line can only turn where a reader
+// would expect it to. The title is escaped first — a separator inside an entity
+// (&#x27;, &quot;) must not become a break point, which is why `#`, `;` and `&`
+// are not in the class.
+const wrappable = title => esc(title).replace(/([._/:=?])(?=[^\s<])/g, '$1<wbr>');
+
+function releaseBar(r) {
+  const ctl = (id, label, icons, extra = '') =>
+    `        <button type="button" class="store-ctl" id="${id}" aria-label="${label}"${extra}>${icons}</button>`;
+
+  return `  <div class="store-player release-player" id="release-player" role="region" aria-label="now playing" hidden>
+    <p class="store-player-label comment">// now playing</p>
+    <div class="store-player-row">
+      <!-- one release, one cover: the art never changes, so it is static markup
+           and the 210px file is the smallest of the three. -->
+      <img class="store-player-art" src="${cover(r, 210)}" alt="" width="52" height="52" decoding="async">
+      <div class="store-player-meta">
+        <p class="store-player-release">${esc(r.title)}</p>
+        <p class="store-player-track" id="release-now" aria-live="polite"></p>
+      </div>
+      <div class="store-transport">
+${ctl('release-prev', 'previous track', ICON_PREV, ' aria-disabled="true"')}
+${ctl('release-toggle', 'pause playback', ICON_PLAY + ICON_PAUSE)}
+${ctl('release-next', 'next track', ICON_NEXT, r.tracks.length > 1 ? '' : ' aria-disabled="true"')}
+      </div>
+      <span class="store-time" id="release-time">0:00 / 0:00</span>
+    </div>
+    <audio id="release-audio" preload="none"></audio>
+  </div>
+`;
+}
+
 function releasePage(r) {
   const tracks = r.tracks
     .map(
       // the number comes from the data, not a CSS counter: the player zero-pads
       // the same way ("01 / 13 · Dawn"), and a capped tracklist must not be
       // renumbered by the stylesheet into disagreeing with what was sold.
-      t => `        <li>
-          <span class="track-num muted">${String(t.n).padStart(2, '0')}</span>
-          <span class="track-name">${esc(t.title)}</span>
+      //
+      // data-track is the zero-padded NN the API takes literally: /p/:slug/:track
+      // and /s/:slug/:track both match on /^\d{2}$/, so the attribute is the URL
+      // segment, not a number release.js has to re-pad.
+      t => {
+        const nn = String(t.n).padStart(2, '0');
+        return `        <li data-track="${nn}">
+          <button type="button" class="store-play track-play" data-slug="${esc(r.slug)}" data-track="${nn}" aria-pressed="false" aria-label="play ${esc(t.title)}">${ICON_PLAY}${ICON_PAUSE}</button>
+          <span class="track-num muted">${nn}</span>
+          <span class="track-name">${wrappable(t.title)}</span>
           <span class="track-time muted">${clock(t.seconds)}</span>
-        </li>`
+        </li>`;
+      }
     )
     .join('\n');
 
@@ -301,6 +369,7 @@ ${JSON.stringify(releaseJsonLd(r), null, 2)}
   </script>
 `,
     body,
+    tail: releaseBar(r),
     scripts: `  <script src="/release.js?v=dev" defer></script>`
   });
 }
