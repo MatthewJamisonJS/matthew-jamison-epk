@@ -444,20 +444,49 @@ function linkTag(href, text) {
 }
 
 // Inline pass. The source is escaped FIRST, then the handful of markers are
-// turned back into elements; code spans, images and links are stashed behind
-// NUL placeholders so emphasis never rewrites the inside of a code span or a
-// URL. The placeholder byte cannot appear in the escaped text.
+// turned back into elements; backslash escapes, code spans, images and links
+// are stashed behind NUL placeholders so emphasis never rewrites the inside of
+// a code span, a URL, or a character he deliberately escaped. The placeholder
+// byte cannot appear in the escaped text.
+//
+// Deliberately absent: any typographic transform. His quotes, ellipses, `&`,
+// `#FrogAndToad`, `;-;` faces, emoji and `{ brace = definitions }` reach the
+// page exactly as he typed them.
 function inlineMd(src) {
   const stash = [];
   const keep = html => `\u0000${stash.push(html) - 1}\u0000`;
   let s = esc(src)
+    // \_ \* \[ \] ... — the scrape is full of them (`\_update`, `\[the\]`)
+    .replace(/\\([\\`*_{}[\]()#+\-.!>~])/g, (_, ch) => keep(ch))
     .replace(/`([^`]+)`/g, (_, code) => keep(`<code>${code}</code>`))
     .replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_, alt, url) => keep(imgTag(url, alt)))
     .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_, text, url) => keep(linkTag(url, text)))
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    .replace(/__([^_]+)__/g, '<strong>$1</strong>')
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+    // `_italic_` is his default emphasis. The guards keep snake_case words and
+    // `new_question` out of it — an underscore only opens emphasis when it is
+    // not sitting between two word characters.
+    .replace(/(^|[^A-Za-z0-9_])_([^_\n]+)_(?![A-Za-z0-9_])/g, '$1<em>$2</em>')
+    .replace(/~~([^~]+)~~/g, '<del>$1</del>');
   return s.replace(/\u0000(\d+)\u0000/g, (_, i) => stash[i]);
 }
+
+const AUDIO_EXT = /\.(mp3|m4a|aac|wav|ogg|opus|flac)(\?|#|$)/i;
+const YOUTUBE = /^https?:\/\/(www\.)?(youtube\.com|youtu\.be|m\.youtube\.com)\//i;
+
+// The CSP has no frame-src, so a YouTube embed is impossible without widening
+// the policy — a contract change nobody has approved. A lone YouTube link
+// therefore renders as a link card carrying his own link text.
+const linkCard = (href, text) =>
+  `<p class="link-card"><a class="link-card__link" href="${esc(href)}" target="_blank" rel="noopener noreferrer">` +
+  `<span class="link-card__kind">watch on youtube</span>` +
+  `<span class="link-card__label">${inlineMd(text)}</span></a></p>`;
+
+const audioTag = src =>
+  SAFE_URL.test(src)
+    ? `<audio class="prose-audio" controls preload="none" src="${esc(src)}"></audio>`
+    : `<p>${esc(src)}</p>`;
 
 const BLOCK_START = /^\s*(#{1,6}\s|>|[-*+]\s|\d+[.)]\s|```|~~~|(-{3,}|\*{3,}|_{3,})\s*$)/;
 
@@ -481,14 +510,21 @@ function renderMarkdown(src) {
     const line = lines[i];
     if (!line.trim()) { i++; continue; }
 
-    const fence = line.match(/^\s*(```|~~~)/);
+    const fence = line.match(/^\s*(```|~~~)\s*(\S*)/);
     if (fence) {
       const close = fence[1];
+      const info = fence[2].toLowerCase();
       const buf = [];
       i++;
       while (i < lines.length && !lines[i].trim().startsWith(close)) { buf.push(lines[i]); i++; }
       i++; // the closing fence
-      out.push(`<pre><code>${esc(buf.join('\n'))}\n</code></pre>`);
+      // ```audio — one path per line. media-src is already 'self', so a clip
+      // dropped in assets/blog/ plays with no policy change.
+      if (info === 'audio') {
+        out.push(buf.map(l => l.trim()).filter(Boolean).map(audioTag).join('\n'));
+      } else {
+        out.push(`<pre><code>${esc(buf.join('\n'))}\n</code></pre>`);
+      }
       continue;
     }
 
@@ -496,7 +532,11 @@ function renderMarkdown(src) {
 
     const h = line.match(/^\s*(#{1,6})\s+(.*)$/);
     if (h) {
-      const level = h[1].length;
+      // The page <h1> is the post title, so every heading in the BODY shifts
+      // down one level: his `#` lines (`# March 12, 2026,`, `# ...`) become
+      // <h2>, his `##` sections <h3>, his `###` subtitle <h4>. The outline
+      // keeps exactly one <h1> per page.
+      const level = Math.min(6, h[1].length + 1);
       const text = h[2].trim().replace(/\s+#+\s*$/, '');
       const base = slugify(text);
       const n = (seen.get(base) || 0) + 1;
@@ -514,7 +554,16 @@ function renderMarkdown(src) {
         buf.push(lines[i].replace(/^\s*>\s?/, ''));
         i++;
       }
-      out.push(`<blockquote>\n<p>${inlineMd(buf.join('\n').trim())}</p>\n</blockquote>`);
+      // A quote keeps its own shape: a blank `>` line starts a new paragraph
+      // (his James 1 and Psalm 46 passages are set that way), and a plain line
+      // break inside one stays a line break.
+      const paras = buf
+        .join('\n')
+        .split(/\n\s*\n/)
+        .map(chunk => chunk.split('\n').map(l => l.trim()).filter(Boolean))
+        .filter(rows => rows.length);
+      const inner = paras.map(rows => `<p>${rows.map(inlineMd).join('<br>\n')}</p>`).join('\n');
+      out.push(`<blockquote>\n${inner}\n</blockquote>`);
       continue;
     }
 
@@ -535,14 +584,82 @@ function renderMarkdown(src) {
       para.push(lines[i].trim());
       i++;
     }
-    // A line that only holds an image is a figure, not a sentence wrapped in a
-    // <p> — the prose measure would clip it.
-    const joined = para.join('\n');
-    const lone = joined.match(/^!\[([^\]]*)\]\(([^)\s]+)\)$/);
-    out.push(lone ? imgTag(lone[2], lone[1], 'prose-figure') : `<p>${inlineMd(joined)}</p>`);
+    for (const block of paragraphBlocks(para)) out.push(block);
   }
 
-  return { html: out.join('\n'), headings };
+  return { html: mergeFigcaptions(out).join('\n'), headings };
+}
+
+// A run of consecutive non-blank lines. Inside it a LONE newline is a line
+// break, not whitespace to collapse — the breath-line cadence ("pause /
+// breathe / sit in silence & solitude… / & then") is the voice, and a
+// commonmark paragraph would flatten it into one line.
+function paragraphBlocks(para) {
+  const blocks = [];
+  let run = [];
+
+  const flush = () => {
+    if (!run.length) return;
+    const rows = run;
+    run = [];
+
+    if (rows.length === 1) {
+      const only = rows[0];
+
+      // ![alt](file) — an image is a figure, and an audio file is a player.
+      const media = only.match(/^!\[([^\]]*)\]\(([^)\s]+)\)$/);
+      if (media) {
+        const [, alt, src] = media;
+        blocks.push(
+          AUDIO_EXT.test(src)
+            ? audioTag(src)
+            : `<figure class="prose-figure">${imgTag(src, alt)}</figure>`
+        );
+        return;
+      }
+
+      // a paragraph that is nothing but a YouTube link becomes a link card
+      const link = only.match(/^\[([^\]]+)\]\((\S+)\)$/);
+      if (link && YOUTUBE.test(link[2])) {
+        blocks.push(linkCard(link[2], link[1]));
+        return;
+      }
+    }
+
+    blocks.push(`<p>${rows.map(inlineMd).join('<br>\n')}</p>`);
+  };
+
+  for (const line of para) {
+    // The scrape leaves `[image] Title` where Substack had an uploaded image.
+    // It is marked, not dropped: a visitor sees a muted placeholder and a
+    // re-scrape is obviously still owed.
+    const missing = line.match(/^\[image\]\s*(.*)$/i);
+    if (missing) {
+      flush();
+      blocks.push(
+        `<p class="img-missing">${missing[1] ? inlineMd(missing[1]) : 'image'}</p>`
+      );
+      continue;
+    }
+    run.push(line);
+  }
+  flush();
+  return blocks;
+}
+
+// An italic line directly under a figure is its caption.
+function mergeFigcaptions(blocks) {
+  const merged = [];
+  for (let n = 0; n < blocks.length; n++) {
+    const cap = blocks[n + 1] && blocks[n + 1].match(/^<p><em>([\s\S]*)<\/em><\/p>$/);
+    if (/^<figure class="prose-figure">/.test(blocks[n]) && cap) {
+      merged.push(blocks[n].replace(/<\/figure>$/, `<figcaption>${cap[1]}</figcaption></figure>`));
+      n++;
+      continue;
+    }
+    merged.push(blocks[n]);
+  }
+  return merged;
 }
 
 // ── blog: posts ──────────────────────────────────────────────────────────

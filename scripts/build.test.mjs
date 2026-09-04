@@ -196,6 +196,10 @@ topic = "gear"
 publish_at = 2026-09-03`,
   `a short intro paragraph with **strong**, *em*, a \`code span\` and a [link](https://example.com/).
 
+pause
+breathe
+& then
+
 ## the room
 
 first heading body.
@@ -329,17 +333,21 @@ test('post page: Contents renders only at 5+ headings', () => {
 test('post page: markdown subset renders, raw HTML never passes through', () => {
   const html = readBlog('blog', 'long-post', 'index.html');
   const article = html.match(/<article class="article prose">([\s\S]*?)<\/article>/)[1];
-  assert.match(article, /<h2 id="the-room">the room<\/h2>/);
+  // body headings shift down one level: the page <h1> is the title
+  assert.match(article, /<h3 id="the-room">the room<\/h3>/);
   assert.match(article, /<strong>strong<\/strong>/);
   assert.match(article, /<em>em<\/em>/);
   assert.match(article, /<code>code span<\/code>/);
   assert.match(article, /<a href="https:\/\/example\.com\/" rel="noopener noreferrer">link<\/a>/);
-  assert.match(article, /<img class="prose-figure" src="\/assets\/blog\/long-post-cover\.webp" alt="a bass leaning on an amp"/);
+  assert.match(article, /<figure class="prose-figure"><img src="\/assets\/blog\/long-post-cover\.webp" alt="a bass leaning on an amp"/);
   assert.match(article, /<ul>\s*<li>di box<\/li>/);
   assert.match(article, /<ol>\s*<li>warm up<\/li>/);
   assert.match(article, /<blockquote>/);
   assert.match(article, /<pre><code>gain: 11 o&#x27;clock/);
   assert.match(article, /<hr>/);
+  // a lone newline is a line break, not whitespace to collapse: the
+  // breath-line cadence is the voice and commonmark would flatten it
+  assert.match(article, /<p>pause<br>\nbreathe<br>\n&amp; then<\/p>/);
   // the injection attempt is text, not markup
   assert.ok(!/<script>alert\(1\)<\/script>/.test(article), 'raw HTML passed through');
   assert.match(article, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
@@ -485,7 +493,7 @@ test('feed.xml: RSS 2.0, newest first, full HTML in CDATA, self link', () => {
   assert.equal(items.length, 11, 'every published post, capped at 20');
   assert.match(items[0], /<link>https:\/\/matthewjamison\.dev\/blog\/long-post\/<\/link>/);
   assert.match(items[0], /<!\[CDATA\[/);
-  assert.match(items[0], /<h2 id="the-room">/);
+  assert.match(items[0], /<h3 id="the-room">/);
   assert.match(items[0], /<pubDate>[A-Z][a-z]{2}, \d{2} [A-Z][a-z]{2} \d{4}/);
 });
 
@@ -547,6 +555,134 @@ test('blog pages carry no inline style or executable inline script', () => {
     for (const tag of inline) {
       assert.match(tag, /type="application\/ld\+json"/, `${p}: executable inline script`);
     }
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// Fidelity against the real Substack corpus.
+//
+// Matthew's ask: "rich text being displayed is necessary for the Substack
+// posts to transition 1:1." These render four of the scraped exemplars
+// verbatim (only the <!-- source --> lines and the leading <h1> come off, the
+// rest is byte-for-byte his) and assert the constructs he actually uses.
+// The corpus lives in a sibling repo; when it is absent — CI, a fresh clone —
+// the block skips instead of failing.
+const CORPUS = '/Users/wwjd_._/Code/mj-writing-room/voice/exemplars/substack';
+const haveCorpus = existsSync(CORPUS);
+
+const EXEMPLARS = [
+  ['update', '_update', '2026-02-02', '_update.md'],
+  ['permission-to-feel', 'permission to feel', '2026-01-12', 'permission-to-feel.md'],
+  ['crumbs', 'crumbs out the corner of the bag', '2026-01-06', 'crumbs-out-the-corner-of-the-bag.md'],
+  ['why-am-i-even-writing', 'why am I even writing', '2026-01-11', 'why-am-i-even-writing.md'],
+  ['whenwordsfail', '_whenWordsFail', '2026-02-14', '_whenwordsfail.md']
+];
+
+let readReal = null;
+const sources = new Map();
+
+if (haveCorpus) {
+  const realContent = mkdtempSync(join(tmpdir(), 'mj-real-content-'));
+  const realOut = mkdtempSync(join(tmpdir(), 'mj-real-'));
+  process.on('exit', () => {
+    for (const d of [realContent, realOut]) rmSync(d, { recursive: true, force: true });
+  });
+
+  for (const [slug, title, date, file] of EXEMPLARS) {
+    const raw = readFileSync(join(CORPUS, file), 'utf8');
+    // strip only the two <!-- source/published --> lines and the leading <h1>
+    const lines = raw.split('\n').filter(l => !l.trim().startsWith('<!--'));
+    const h1 = lines.findIndex(l => l.startsWith('# '));
+    const body = lines.slice(h1 + 1).join('\n').trim();
+    sources.set(slug, body);
+    writeFileSync(
+      join(realContent, `${slug}.md`),
+      `+++\ntitle = "${title}"\ndate = ${date}\ndraft = false\npublish_at = ${date}\n+++\n\n${body}\n`
+    );
+  }
+
+  execFileSync(
+    process.execPath,
+    [join(root, 'scripts', 'build.mjs'), '--out', realOut, '--content', realContent],
+    { stdio: 'pipe' }
+  );
+
+  readReal = slug =>
+    readFileSync(join(realOut, 'blog', slug, 'index.html'), 'utf8')
+      .match(/<article class="article prose">([\s\S]*?)<\/article>/)[1];
+}
+
+test('corpus: every `---` divider survives as an <hr>', { skip: !haveCorpus }, () => {
+  for (const [slug] of EXEMPLARS) {
+    const rules = (sources.get(slug).match(/^-{3,}\s*$/gm) || []).length;
+    assert.equal((readReal(slug).match(/<hr>/g) || []).length, rules, `${slug}: hr count`);
+  }
+});
+
+test('corpus: body headings demote one level and the page keeps one <h1>', { skip: !haveCorpus }, () => {
+  for (const [slug] of EXEMPLARS) {
+    const article = readReal(slug);
+    assert.ok(!/<h1[\s>]/.test(article), `${slug}: a second <h1> in the body`);
+    for (const depth of [1, 2, 3]) {
+      const src = (sources.get(slug).match(new RegExp(`^#{${depth}} `, 'gm')) || []).length;
+      const got = (article.match(new RegExp(`<h${depth + 1} id=`, 'g')) || []).length;
+      assert.equal(got, src, `${slug}: ${'#'.repeat(depth)} -> h${depth + 1}`);
+    }
+  }
+});
+
+test('corpus: brace definitions, hashtags and escapes reach the page untouched', { skip: !haveCorpus }, () => {
+  const why = readReal('why-am-i-even-writing');
+  // the whole brace definition, with the link still inside it
+  assert.match(why, /\{ atomoxetine = a generic strattera-non-stimulant <a href="https:\/\/www\.buzzrx\.com[^"]*"[^>]*>medication<\/a> to treat ADHD \}/);
+  assert.match(why, /<p>#FrogAndToad<\/p>/, 'a hashtag was eaten as a heading');
+  assert.match(why, /🖖🏿💙/, 'emoji heading lost');
+  // \_why is an escaped underscore, not the start of emphasis
+  assert.match(readReal('crumbs'), /_why \(😏iykyk\)</);
+});
+
+test('corpus: his emphasis renders — italic scripture, bold, code ticks', { skip: !haveCorpus }, () => {
+  const why = readReal('why-am-i-even-writing');
+  // the italic must CLOSE before the quotation opens
+  assert.match(why, /<em>1 Corinthians 13:12 NLT -<\/em> &quot;Now we see things imperfectly/);
+  assert.match(readReal('crumbs'), /<code>choose the next action<\/code>/);
+  assert.match(readReal('crumbs'), /<em>sit in silence &amp; solitude…<\/em>/);
+  assert.match(readReal('update'), /<strong>Bell Hooks<\/strong>/);
+});
+
+test('corpus: multi-paragraph quotes keep their own shape', { skip: !haveCorpus }, () => {
+  const ptf = readReal('permission-to-feel');
+  assert.match(
+    ptf,
+    /<blockquote>\s*<p>&quot;First, silence makes us pilgrims\.<\/p>\s*<p>Secondly, silence guards the fire within\./
+  );
+});
+
+test('corpus: [image] placeholders are marked, never dropped', { skip: !haveCorpus }, () => {
+  const why = readReal('why-am-i-even-writing');
+  const src = (sources.get('why-am-i-even-writing').match(/^\[image\]/gm) || []).length;
+  assert.equal(src, 4, 'the fixture should carry four scraped image placeholders');
+  assert.equal((why.match(/class="img-missing"/g) || []).length, src);
+  assert.match(why, /<p class="img-missing">All about Love \(New Visions\)<\/p>/);
+  // emphasis inside a placeholder caption still renders
+  assert.match(why, /<p class="img-missing">The will to change: <em>Men, Masculinity, and Love<\/em><\/p>/);
+});
+
+test('corpus: a lone YouTube link is a card, never an iframe', { skip: !haveCorpus }, () => {
+  const wwf = readReal('whenwordsfail');
+  assert.ok(!/<iframe/.test(wwf), 'an iframe would need a frame-src the CSP does not have');
+  assert.equal((wwf.match(/class="link-card"/g) || []).length, 2);
+  assert.match(wwf, /<span class="link-card__kind">watch on youtube<\/span>/);
+  assert.match(wwf, /href="https:\/\/youtu\.be\/_is_YUjfbgk\?si=gBRHAkC0UoKtf8OB"/);
+});
+
+test('corpus: no raw HTML, no inline style, no smart-quote transform', { skip: !haveCorpus }, () => {
+  for (const [slug] of EXEMPLARS) {
+    const article = readReal(slug);
+    assert.ok(!/<script|<iframe|<style|\sstyle="/.test(article), `${slug}: raw HTML leaked`);
+    // straight quotes stay straight — esc() renders them &quot;/&#x27;, never “ ” ’
+    assert.ok(!/[“”‘’]/.test(article) || /[“”‘’]/.test(sources.get(slug)),
+      `${slug}: a curly quote appeared that he did not type`);
   }
 });
 

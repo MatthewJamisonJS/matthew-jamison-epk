@@ -1090,7 +1090,9 @@ body.store-note {
   overflow-wrap: break-word;
 }
 
-.topic-label { color: var(--mj-comment-green); }
+/* the topic reads as part of the meta line, not as a comment: green is the
+   section label's colour and nothing else's */
+.topic-label { color: var(--text-muted); }
 
 .section-list__desc {
   font-size: 14px;
@@ -1126,16 +1128,16 @@ body.store-note {
    one column width. */
 .article-wrap,
 .blog-wrap {
+  /* the measure is a COLUMN, not a per-child max-width: `ch` resolves against
+     each element's own font-size, so capping every child at 68ch gave the
+     15px label, the 13px Contents box and the 16px article three different
+     widths. One grid track, sized once in the section's own 16px context, and
+     every child stretches to it. */
   --measure: 68ch;
   display: grid;
+  grid-template-columns: minmax(0, var(--measure));
+  justify-content: center;
   gap: 24px;
-  justify-items: center;
-}
-
-.article-wrap > *,
-.blog-wrap > * {
-  width: 100%;
-  max-width: var(--measure);
 }
 
 /* the gap owns the vertical rhythm — the stock heading/dek margins would make
@@ -1242,15 +1244,18 @@ body.store-note {
   font-size: 13px;
 }
 
+/* plain, not a // comment line: the section label at the top of the page is
+   the only comment a post gets */
 .article-toc__summary {
   cursor: pointer;
-  color: var(--mj-comment-green);
+  color: var(--text-muted);
   letter-spacing: 0.05em;
   list-style: none;
 }
 
+.article-toc__summary:hover { color: var(--text); }
+
 .article-toc__summary::-webkit-details-marker { display: none; }
-.article-toc__summary::before { content: '// '; }
 
 .article-toc nav ul { list-style: none; margin-top: 10px; display: grid; gap: 7px; }
 
@@ -1314,6 +1319,11 @@ body.store-note {
   color: var(--text-muted);
 }
 
+/* his scripture and bell hooks passages are set one verse line per `>` block.
+   Paragraph spacing would break a stanza into a list of sentences, so lines
+   inside one quote sit a line apart, not a paragraph apart. */
+.prose blockquote p + p { margin-top: 6px; }
+
 .prose code {
   font-family: var(--mj-font);
   font-size: 0.92em;
@@ -1336,13 +1346,73 @@ body.store-note {
 
 .prose hr { border: none; border-top: 1px solid var(--border); }
 
-.prose img,
-.prose .prose-figure {
+.prose img {
   display: block;
   max-width: 100%;
   height: auto;
   border-radius: var(--radius);
   border: 1px solid rgba(255, 255, 255, 0.035);
+}
+
+.prose .prose-figure { margin: 0; }
+
+.prose figcaption {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* the Substack scrape left `[image] Title` wherever an uploaded image was.
+   It is marked, not hidden: a dashed plate says plainly that the art still
+   has to be re-scraped and dropped into assets/blog/. */
+.img-missing {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.img-missing::before {
+  content: 'image · ';
+  letter-spacing: 0.06em;
+}
+
+.prose-audio { width: 100%; }
+
+/* The CSP carries no frame-src, so a YouTube embed cannot render here without
+   widening the policy. A lone YouTube link becomes a card instead, keeping the
+   link text he wrote. */
+.link-card { max-width: none; }
+
+.link-card__link {
+  display: block;
+  background: var(--plate-gloss), var(--plate);
+  border: 1px solid var(--plate-edge);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  text-decoration: none;
+  transition: border-color 0.15s;
+}
+
+.link-card__link:hover { border-color: var(--mj-accent-bright); }
+
+.link-card__kind {
+  display: block;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.link-card__label {
+  display: block;
+  font-size: 14px;
+  color: var(--text);
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: none;
 }
 
 /* ── share + back ── */
@@ -1402,7 +1472,7 @@ body.store-note {
 
 /* on a post the card is one block in the column, sized by the column, not by
    its own 520px cap — that cap is what the #contact copy on / still uses */
-.article-wrap > .subscribe-card { max-width: var(--measure); margin: 0; }
+.article-wrap > .subscribe-card { max-width: none; margin: 0; }
 
 .subscribe-label {
   display: block;
