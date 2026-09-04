@@ -620,31 +620,33 @@ const authorCard = () => `      <aside class="author-card">
           <img class="author-card__photo author-card__photo--still" src="/assets/blog/avatar-120.webp"
                width="120" height="120" alt="${AVATAR_ALT}" loading="lazy" decoding="async">
         </video>
-        <p class="author-card__name">matthew jamison</p>
-        <p class="author-card__role">session bassist &nbsp;·&nbsp; producer &nbsp;·&nbsp; dev</p>
-        <!-- WORKSHOP: Matthew replaces these two lines in his own words. -->
-        <p class="author-card__bio">st. louis. i play bass, make beats, and write the code too.
+        <div class="author-card__text">
+          <p class="author-card__name">matthew jamison</p>
+          <p class="author-card__role">session&nbsp;bassist&nbsp;· producer&nbsp;· dev</p>
+          <!-- WORKSHOP: Matthew replaces these two lines in his own words. -->
+          <p class="author-card__bio">st. louis. i play bass, make beats, and write the code too.
 these are the notes i keep while i figure things out.</p>
-        <ul class="author-card__social" role="list">
-          <li>
-            <a class="author-card__social-link" href="https://github.com/MatthewJamisonJS" target="_blank" rel="me noopener">
-              ${GITHUB_ICON}<span class="sr-only">matthew jamison on GitHub</span>
-            </a>
-          </li>
-          <li>
-            <a class="author-card__social-link" href="https://matthewjamisonwwjd.substack.com" target="_blank" rel="me noopener">
-              ${SUBSTACK_ICON}<span class="sr-only">matthew jamison on Substack</span>
-            </a>
-          </li>
-        </ul>
+          <ul class="author-card__social" role="list">
+            <li>
+              <a class="author-card__social-link" href="https://github.com/MatthewJamisonJS" target="_blank" rel="me noopener">
+                ${GITHUB_ICON}<span class="sr-only">matthew jamison on GitHub</span>
+              </a>
+            </li>
+            <li>
+              <a class="author-card__social-link" href="https://matthewjamisonwwjd.substack.com" target="_blank" rel="me noopener">
+                ${SUBSTACK_ICON}<span class="sr-only">matthew jamison on Substack</span>
+              </a>
+            </li>
+          </ul>
+        </div>
       </aside>`;
 
 // One subscribe form, one implementation. This exact markup ships on the home
 // page too (index.html, #contact) and subscribe.js drives both.
 // WORKSHOP: the label and the two status lines are Matthew's to rewrite.
-const subscribeCard = id => `        <div class="subscribe-card">
+const subscribeCard = id => `      <div class="subscribe-card">
           <form class="subscribe" novalidate>
-            <label class="subscribe-label comment" for="${id}">// get new music + notes by email</label>
+            <label class="subscribe-label" for="${id}">get new music + notes by email</label>
             <div class="subscribe-row">
               <input class="subscribe-input" type="email" id="${id}" name="email"
                      autocomplete="email" required>
@@ -669,7 +671,7 @@ const CHECK_ICON = `<svg class="post-share__icon-check" width="18" height="18" f
 // copy cube ships hidden and blog.js reveals it only where the Clipboard API
 // exists, so a visitor never meets a dead control.
 const postShare = url => `        <div class="post-share">
-          <span class="post-share__label comment" id="post-share-label">// share this</span>
+          <span class="post-share__label muted" id="post-share-label">share</span>
           <ul class="post-share__list" role="list" aria-labelledby="post-share-label">
             <li>
               <a class="post-share__btn" href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}" target="_blank" rel="noopener noreferrer">
@@ -715,45 +717,45 @@ function postPage(p) {
   const toc =
     p.headings.length >= 5
       ? `
-        <div class="article-toc">
-          <details class="article-toc__box" open>
-            <summary class="article-toc__summary">contents</summary>
-            <nav id="TableOfContents" aria-label="contents">
-              <ul>
-${p.headings.map(h => `                <li><a href="#${esc(h.id)}">${esc(h.text)}</a></li>`).join('\n')}
-              </ul>
-            </nav>
-          </details>
-        </div>`
+      <div class="article-toc">
+        <details class="article-toc__box" open>
+          <summary class="article-toc__summary">contents</summary>
+          <nav id="TableOfContents" aria-label="contents">
+            <ul>
+${p.headings.map(h => `              <li><a href="#${esc(h.id)}">${esc(h.text)}</a></li>`).join('\n')}
+            </ul>
+          </nav>
+        </details>
+      </div>
+`
       : '';
 
+  // One centred column, one axis. Every block below is a direct child of the
+  // section and shares the same max-width, so the left and right edges of the
+  // header, the author card, the Contents, the body, the share row and the
+  // subscribe card all line up at every viewport. There is no side rail and no
+  // second column: this page reads as one page, not a grid of cards.
   const body = `    <section class="section article-wrap" aria-label="${esc(p.title)}">
       <h2 class="section-label comment">// notes</h2>
 
       <header class="post-header">
         <h1 class="post-title">${esc(p.title)}</h1>
         <p class="post-meta muted">
-          <time datetime="${esc(p.date)}">${esc(humanDate(p.date))}</time>
-          <span class="post-meta__sep" aria-hidden="true">&nbsp;·&nbsp;</span>
-          <span>${p.minutes} min read</span>
-          <span class="post-meta__sep" aria-hidden="true">&nbsp;·&nbsp;</span>
-          <span>by matthew jamison</span>
+          <time datetime="${esc(p.date)}">${esc(humanDate(p.date))}</time><span
+            class="post-meta__sep" aria-hidden="true">&nbsp;·&nbsp;</span><span>${p.minutes} min read</span><span
+            class="post-meta__sep" aria-hidden="true">&nbsp;·&nbsp;</span><span>by matthew jamison</span>
         </p>
       </header>
 
-      <div class="article-rail">
-${authorCard()}${toc}
-      </div>
-
+${authorCard()}
+${toc}
       <article class="article prose">
 ${p.html}
       </article>
 
-      <div class="article-end">
 ${postShare(url)}
 ${subscribeCard('subscribe-email')}
-        <p class="post-back"><a href="/blog/" class="link-plain">← all notes</a></p>
-      </div>
+      <p class="post-back"><a href="/blog/" class="link-plain">← all notes</a></p>
     </section>
 `;
 
@@ -788,9 +790,8 @@ function listingPage(n) {
                  width="${size ? size.w : 800}" height="${size ? size.h : 450}" loading="lazy" decoding="async">`
         : '';
       const topic = p.topic
-        ? `
-                <span aria-hidden="true">&nbsp;·&nbsp;</span>
-                <span class="topic-label">${esc(p.topic)}</span>`
+        ? `<span
+                    aria-hidden="true">&nbsp;·&nbsp;</span><span class="topic-label">${esc(p.topic)}</span>`
         : '';
       const desc = p.description
         ? `
@@ -801,9 +802,8 @@ function listingPage(n) {
               <div class="section-list__body">
                 <h2 class="section-list__title">${esc(p.title)}</h2>
                 <p class="section-list__meta muted">
-                  <time datetime="${esc(p.date)}">${esc(humanDate(p.date))}</time>
-                  <span aria-hidden="true">&nbsp;·&nbsp;</span>
-                  <span>${p.minutes} min read</span>${topic}
+                  <time datetime="${esc(p.date)}">${esc(humanDate(p.date))}</time><span
+                    aria-hidden="true">&nbsp;·&nbsp;</span><span>${p.minutes} min read</span>${topic}
                 </p>${desc}
               </div>
             </a>
@@ -825,8 +825,7 @@ ${cards}
     : `        <p class="blog-empty muted">nothing here yet. first note is coming.</p>`;
 
   const canonical = n === 1 ? `${SITE}/blog/` : `${SITE}/blog/page/${n}/`;
-  const body = `    <section class="section" aria-label="notes">
-      <h2 class="section-label comment">// notes</h2>
+  const body = `    <section class="section blog-wrap" aria-label="notes">
       <h1 class="release-title release-title-hub">notes</h1>
       <!-- WORKSHOP: Matthew replaces this dek in his own words. -->
       <p class="blog-dek muted">notes on bass, gear, faith &amp; whatever else is on my mind</p>

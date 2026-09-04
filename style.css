@@ -1116,11 +1116,33 @@ body.store-note {
 .pager__link:hover { color: var(--text); }
 
 /* ── post ── */
-/* Mobile is one reading column in source order: header, rail, article, end
-   strip. Desktop (>= 1024px) puts the rail beside the body and lets the end
-   strip span both columns, so the share row and the subscribe card centre on
-   the page axis rather than on the shifted article column. */
-.article-wrap { display: grid; gap: 24px; }
+/* ONE centred column, one axis, at every viewport. There is no side rail and
+   no second column: every block on a post — the label, the header, the author
+   strip, Contents, the body, the share row, the subscribe card, the back link
+   — is a direct child of the section and caps at the same measure, so their
+   left and right edges line up. Matthew rejected the two-column desktop
+   layout in a real-browser preview for exactly that reason; do not reinstate
+   a grid here. The listing gets the same treatment so /blog/ and a post share
+   one column width. */
+.article-wrap,
+.blog-wrap {
+  --measure: 68ch;
+  display: grid;
+  gap: 24px;
+  justify-items: center;
+}
+
+.article-wrap > *,
+.blog-wrap > * {
+  width: 100%;
+  max-width: var(--measure);
+}
+
+/* the gap owns the vertical rhythm — the stock heading/dek margins would make
+   it uneven */
+.article-wrap > .section-label,
+.blog-wrap > .blog-dek,
+.blog-wrap > .release-title { margin-bottom: 0; }
 
 .post-header { text-align: center; }
 
@@ -1141,26 +1163,34 @@ body.store-note {
   overflow-wrap: break-word;
 }
 
-.article-rail { display: grid; gap: 16px; align-content: start; }
-
+/* a compact horizontal strip, not a portrait card: avatar left, the text
+   block right and left-aligned inside it. The strip itself is a block in the
+   centred column, so it starts and ends on the same axis as the article plate
+   under it. */
 .author-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
   background: var(--plate-gloss), var(--plate);
   border: 1px solid var(--plate-edge);
   border-radius: var(--radius);
   padding: 18px 20px;
-  text-align: center;
+  text-align: left;
 }
 
 .author-card__photo {
-  width: 120px;
-  height: 120px;
+  flex: 0 0 auto;
+  width: 96px;
+  height: 96px;
   border-radius: 50%;
   object-fit: cover;
   border: 1px solid var(--mj-accent-border);
-  margin: 0 auto 12px;
   display: block;
   background: var(--bg);
 }
+
+/* min-width: 0 or a long bio word would push the strip wider than the column */
+.author-card__text { min-width: 0; }
 
 .author-card__name { font-size: 15px; font-weight: 700; letter-spacing: 0.02em; }
 
@@ -1186,7 +1216,6 @@ body.store-note {
   list-style: none;
   display: flex;
   gap: 10px;
-  justify-content: center;
   margin-top: 12px;
 }
 
@@ -1249,6 +1278,14 @@ body.store-note {
   hyphens: none;
 }
 
+/* one measure, centred: every block in the body caps at the same width and
+   sits on the plate's own axis, so the left and right gutters match at any
+   viewport instead of the text hugging the left edge on a wide plate */
+.prose > * {
+  max-width: 68ch;
+  margin-inline: auto;
+}
+
 .prose > * + * { margin-top: 18px; }
 
 .prose h2,
@@ -1265,8 +1302,7 @@ body.store-note {
 .prose h3 { font-size: 17px; }
 .prose h4 { font-size: 15px; }
 
-.prose p { max-width: 68ch; }
-.prose ul, .prose ol { padding-left: 1.3em; max-width: 68ch; }
+.prose ul, .prose ol { padding-left: 1.3em; }
 .prose li + li { margin-top: 6px; }
 
 .prose a { color: var(--mj-accent-bright); text-decoration: underline; text-underline-offset: 3px; }
@@ -1276,7 +1312,6 @@ body.store-note {
   border-left: 2px solid var(--mj-accent-border);
   padding-left: 16px;
   color: var(--text-muted);
-  max-width: 68ch;
 }
 
 .prose code {
@@ -1310,12 +1345,12 @@ body.store-note {
   border: 1px solid rgba(255, 255, 255, 0.035);
 }
 
-/* ── end strip ── */
-.article-end { display: grid; gap: 18px; justify-items: center; }
-
+/* ── share + back ── */
 .post-share { display: grid; gap: 10px; justify-items: center; }
 
-.post-share__label { font-size: 13px; letter-spacing: 0.05em; }
+/* a quiet plain-text label, not a // comment: the section label at the top of
+   the page is the only comment line a post gets */
+.post-share__label { font-size: 12px; letter-spacing: 0.06em; }
 
 .post-share__list { list-style: none; display: flex; gap: 10px; }
 
@@ -1347,7 +1382,7 @@ body.store-note {
   min-height: 1em;
 }
 
-.post-back { font-size: 13px; letter-spacing: 0.06em; }
+.post-back { font-size: 13px; letter-spacing: 0.06em; text-align: center; }
 .post-back a { color: var(--text-muted); }
 .post-back a:hover { color: var(--text); }
 
@@ -1365,7 +1400,9 @@ body.store-note {
   text-align: center;
 }
 
-.article-end .subscribe-card { margin-top: 0; }
+/* on a post the card is one block in the column, sized by the column, not by
+   its own 520px cap — that cap is what the #contact copy on / still uses */
+.article-wrap > .subscribe-card { max-width: var(--measure); margin: 0; }
 
 .subscribe-label {
   display: block;
@@ -1438,31 +1475,18 @@ body.store-note {
 .notes-more a { color: var(--text-muted); }
 .notes-more a:hover { color: var(--text); }
 
-/* two columns from the desktop break: the rail beside the body, the end strip
-   spanning both. The rail sticks while the article scrolls past it. */
-@media (min-width: 1024px) {
-  .article-wrap {
-    grid-template-columns: 240px minmax(0, 1fr);
-    grid-template-areas:
-      'label label'
-      'header header'
-      'rail article'
-      'end end';
-    column-gap: 28px;
-  }
-
-  .article-wrap > .section-label { grid-area: label; }
-  .post-header { grid-area: header; }
-  .article-rail { grid-area: rail; position: sticky; top: 20px; }
-  .article { grid-area: article; }
-  .article-end { grid-area: end; }
-}
-
-/* a sticky rail and a phone do not mix, and the cover thumb stacks above the
-   card copy rather than shrinking into a stamp */
+/* the cover thumb stacks above the card copy rather than shrinking into a
+   stamp, and the author strip turns into a centred stack */
 @media (max-width: 560px) {
   .section-list__link--thumbed { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .author-card { flex-direction: column; text-align: center; gap: 12px; }
+  .author-card__photo { width: 88px; height: 88px; }
+  .author-card__social { justify-content: center; }
+  /* the row stacks. flex-basis is a MAIN-axis size, so the 220px basis above
+     would become a 220px-tall input the moment the direction turns column —
+     reset it and let both controls take the full width instead. */
   .subscribe-row { flex-direction: column; }
+  .subscribe-input { flex: 0 0 auto; width: 100%; }
   .subscribe-btn { width: 100%; }
   .article.prose { padding: 20px 18px; }
 }
@@ -1845,12 +1869,13 @@ body.store-note {
 }
 
 @media (max-width: 480px) {
-  /* 10px type here, so the row box re-caps to a narrow measure and the nav
-     wraps to a few short lines instead of one long one. Re-measure this cap if
-     the nav labels change again: with the ten 2026 labels (albums … bio) the
-     safe window is 249–264px — 230px strands "Bio" alone on a fifth row, 256px
-     wraps 3/3/4. */
-  .nav { padding-inline: max(12px, calc((100% - 256px) / 2)); }
+  /* The row box re-caps to a narrow measure so the nav wraps to a few short
+     lines instead of one long one. Re-measure this cap whenever the nav labels
+     OR the type size change — the +2px bump (27146c6) widened every label and
+     pushed 256px from three rows to four, stranding "Press"/"Bio". Measured in
+     Chrome at 375px with the 12px labels: rows pack 3/3/4 for any cap in
+     258–309px, so 280px sits in the middle of that window. */
+  .nav { padding-inline: max(12px, calc((100% - 280px) / 2)); }
   .nav a { padding: 12px 10px; font-size: 12px; }
   .url-bar { padding: 8px 16px; }
   .hero h1 { font-size: 32px; }

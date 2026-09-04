@@ -345,7 +345,7 @@ test('post page: markdown subset renders, raw HTML never passes through', () => 
   assert.match(article, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
 });
 
-test('post page: end strip carries share cubes, subscribe form and the back link', () => {
+test('post page: share cubes, subscribe form and the back link all ship', () => {
   const html = readBlog('blog', 'short-note', 'index.html');
   assert.match(html, /facebook\.com\/sharer\/sharer\.php\?u=https%3A%2F%2Fmatthewjamison\.dev%2Fblog%2Fshort-note%2F/);
   assert.match(html, /linkedin\.com\/sharing\/share-offsite\/\?url=https%3A%2F%2Fmatthewjamison\.dev%2Fblog%2Fshort-note%2F/);
@@ -359,6 +359,89 @@ test('post page: end strip carries share cubes, subscribe form and the back link
   assert.match(html, /href="\/blog\/" class="link-plain">← all notes<\/a>/);
   assert.match(html, /<script src="\/blog\.js\?v=dev" defer><\/script>/);
   assert.match(html, /<script src="\/subscribe\.js\?v=dev" defer><\/script>/);
+});
+
+// Matthew rejected the two-column desktop layout in a real-browser preview:
+// every block on a post has to be a direct child of one centred column so the
+// left and right edges line up. This asserts the flat structure — a rail or an
+// end-strip wrapper coming back would fail here, not in a screenshot.
+const VOID = new Set(
+  'area base br col embed hr img input link meta param source track wbr'.split(' ')
+);
+
+function directChildren(fragment) {
+  const kids = [];
+  let depth = 0;
+  const tag = /<(\/?)([a-zA-Z][a-zA-Z0-9-]*)((?:"[^"]*"|[^>"])*)>/g;
+  let m;
+  while ((m = tag.exec(fragment))) {
+    const [, close, rawName, attrs] = m;
+    const name = rawName.toLowerCase();
+    if (close) {
+      depth--;
+      continue;
+    }
+    if (depth === 0) {
+      const cls = /\bclass="([^"]*)"/.exec(attrs);
+      kids.push(cls ? `${name}.${cls[1].trim().split(/\s+/).join('.')}` : name);
+    }
+    if (!VOID.has(name) && !attrs.trim().endsWith('/')) depth++;
+  }
+  return kids;
+}
+
+const articleWrap = html =>
+  html.match(/<section class="section article-wrap"[^>]*>([\s\S]*?)<\/section>/)[1];
+
+test('post page: one centred column — every block is a direct child', () => {
+  assert.deepEqual(directChildren(articleWrap(readBlog('blog', 'short-note', 'index.html'))), [
+    'h2.section-label.comment',
+    'header.post-header',
+    'aside.author-card',
+    'article.article.prose',
+    'div.post-share',
+    'div.subscribe-card',
+    'p.post-back'
+  ]);
+  assert.deepEqual(directChildren(articleWrap(readBlog('blog', 'long-post', 'index.html'))), [
+    'h2.section-label.comment',
+    'header.post-header',
+    'aside.author-card',
+    'div.article-toc',
+    'article.article.prose',
+    'div.post-share',
+    'div.subscribe-card',
+    'p.post-back'
+  ]);
+});
+
+test('post page: no rail, no end strip, no second column', () => {
+  for (const slug of ['short-note', 'long-post']) {
+    const html = readBlog('blog', slug, 'index.html');
+    assert.ok(!html.includes('article-rail'), `${slug}: a rail wrapper came back`);
+    assert.ok(!html.includes('article-end'), `${slug}: an end-strip wrapper came back`);
+  }
+  const css = readFileSync(join(root, 'style.css'), 'utf8');
+  assert.ok(!/grid-template-areas/.test(css.slice(css.indexOf('/* \u2500\u2500 post \u2500\u2500 */'))),
+    'the post page grew grid areas again');
+});
+
+// The // comment line is a SECTION heading device. One per page, at the top.
+test('blog: the // comment label is used once per page and nowhere else', () => {
+  for (const slug of ['short-note', 'long-post']) {
+    const wrap = articleWrap(readBlog('blog', slug, 'index.html'));
+    assert.equal((wrap.match(/class="[^"]*\bcomment\b/g) || []).length, 1, `${slug}: comment count`);
+    assert.match(wrap, /<h2 class="section-label comment">\/\/ notes<\/h2>/);
+    assert.match(wrap, /<span class="post-share__label muted" id="post-share-label">share<\/span>/);
+    assert.match(wrap, /<label class="subscribe-label" for="subscribe-email">/);
+    assert.ok(!/\/\/ share this/.test(wrap), `${slug}: share label still a comment`);
+  }
+  // the listing's <h1>notes</h1> already says it; no // notes label above it
+  const listing = readBlog('blog', 'index.html');
+  assert.ok(!/class="section-label/.test(listing), 'listing carries a duplicate // notes label');
+  // and the same form on / sits under // contact, so its label is plain too
+  const home = readFileSync(join(root, 'index.html'), 'utf8');
+  assert.match(home, /<label class="subscribe-label" for="subscribe-email">get new music \+ notes by email<\/label>/);
 });
 
 test('post page: author card holds both video sources and an img fallback', () => {
