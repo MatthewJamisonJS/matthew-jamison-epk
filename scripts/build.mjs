@@ -565,8 +565,13 @@ function renderMarkdown(src) {
       const n = (seen.get(base) || 0) + 1;
       seen.set(base, n);
       const id = n === 1 ? base : `${base}-${n}`;
-      out.push(`<h${level} id="${esc(id)}">${inlineMd(text)}</h${level}>`);
-      if (level >= 2 && level <= 4) headings.push({ level, id, text });
+      const html = inlineMd(text);
+      out.push(`<h${level} id="${esc(id)}">${html}</h${level}>`);
+      // The Contents list wants the heading as plain text: same escapes and
+      // emphasis resolved as the heading itself, tags stripped. `html` is already
+      // entity-escaped, so the TOC template must not escape it again.
+      const label = html.replace(/<[^>]*>/g, '');
+      if (level >= 2 && level <= 4) headings.push({ level, id, text, label });
       i++;
       continue;
     }
@@ -867,7 +872,7 @@ function postPage(p) {
           <summary class="article-toc__summary">contents</summary>
           <nav id="TableOfContents" aria-label="contents">
             <ul>
-${p.headings.map(h => `              <li><a href="#${esc(h.id)}">${esc(h.text)}</a></li>`).join('\n')}
+${p.headings.map(h => `              <li><a href="#${esc(h.id)}">${h.label}</a></li>`).join('\n')}
             </ul>
           </nav>
         </details>

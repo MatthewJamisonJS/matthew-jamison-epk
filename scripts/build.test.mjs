@@ -623,6 +623,7 @@ const EXEMPLARS = [
 ];
 
 let readReal = null;
+let readRealPage = null;
 const sources = new Map();
 
 if (haveCorpus) {
@@ -651,9 +652,8 @@ if (haveCorpus) {
     { stdio: 'pipe' }
   );
 
-  readReal = slug =>
-    readFileSync(join(realOut, 'blog', slug, 'index.html'), 'utf8')
-      .match(/<article class="article prose">([\s\S]*?)<\/article>/)[1];
+  readRealPage = slug => readFileSync(join(realOut, 'blog', slug, 'index.html'), 'utf8');
+  readReal = slug => readRealPage(slug).match(/<article class="article prose">([\s\S]*?)<\/article>/)[1];
 }
 
 test('corpus: every `---` divider survives as an <hr>', { skip: !haveCorpus }, () => {
@@ -702,7 +702,14 @@ test('corpus: brace definitions, hashtags and escapes reach the page untouched',
   assert.match(why, /<p>#FrogAndToad<\/p>/, 'a hashtag was eaten as a heading');
   assert.match(why, /🖖🏿💙/, 'emoji heading lost');
   // \_why is an escaped underscore, not the start of emphasis
-  assert.match(readReal('crumbs'), /_why \(😏iykyk\)</);
+  const crumbs = readReal('crumbs');
+  assert.match(crumbs, /_why \(😏iykyk\)</);
+  // and the Contents list resolves the same escape instead of showing the
+  // backslash (seen live: "\_why (😏iykyk)" in the TOC, 2026-09-04)
+  const toc = readRealPage('crumbs').match(/<nav id="TableOfContents"[\s\S]*?<\/nav>/);
+  assert.ok(toc, 'crumbs has 6 headings, so it must have a Contents panel');
+  assert.match(toc[0], />_why \(😏iykyk\)<\/a>/);
+  assert.doesNotMatch(toc[0], /\\_why/);
 });
 
 test('corpus: his emphasis renders — italic scripture, bold, code ticks', { skip: !haveCorpus }, () => {
