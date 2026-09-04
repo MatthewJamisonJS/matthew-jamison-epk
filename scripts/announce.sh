@@ -74,13 +74,19 @@ if [ -n "$html_file" ]; then
   payload=$(printf '%s' "$payload" | jq --rawfile html "$html_file" '. + {html: $html}')
 fi
 
-# The token is read into a subshell env and never echoed, never written to a
-# file, never passed as an argv element (argv is world-readable in `ps`).
+# The token stays inside this subshell: never echoed, never written to disk,
+# and never an argv element -- argv is world-readable in `ps`, so
+# `-H "Authorization: Bearer $TOKEN"` would leak the bearer to every user on
+# the box for the life of the request.
+#
+# Instead the header goes in through `-K`, which tells curl to read options
+# from a config file. Process substitution hands it a /dev/fd path, so the
+# config never exists on disk either -- the only argv element is the fd path.
+# It is also NOT exported: curl has no reason to inherit it in its environment.
 (
-  export ADMIN_TOKEN
   ADMIN_TOKEN="$(op read "op://${OP_VAULT}/${OP_ITEM}/${OP_FIELD}" --account "${OP_ACCOUNT}")"
   printf '%s' "$payload" | curl -sS -X POST "${API}/admin/broadcast" \
-    -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+    -K <(printf 'header = "Authorization: Bearer %s"\n' "$ADMIN_TOKEN") \
     -H 'Content-Type: application/json' \
     -H "User-Agent: ${UA}" \
     --data-binary @- \
