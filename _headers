@@ -49,6 +49,19 @@
 /release.js
   Cache-Control: public, max-age=604800, stale-while-revalidate=86400
 
+# the blog pages' avatar/reduce-motion + copy-link handling, and the subscribe
+# form shared by the home page and every post — same posture as script.js
+/blog.js
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+
+/subscribe.js
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+
+# regenerated on every deploy; a reader polling it wants the new one, not a
+# week-old copy
+/feed.xml
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+
 # ── games routes ─────────────────────────────────────────────────────────
 # Vendored third-party games are framed by index.html only. The site-wide
 # strict CSP + X-Frame-Options: DENY are detached per game route; each slug

@@ -6,4 +6,7 @@ node_modules/
 
 # generated at deploy time by scripts/build.mjs (sitemap.xml stays committed:
 # robots.txt points at it and reviewers diff it)
-music/
+/music/
+# anchored: content/blog/ is source and must stay tracked
+/blog/
+/feed.xml

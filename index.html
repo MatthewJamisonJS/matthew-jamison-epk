@@ -201,6 +201,7 @@
 }
   </script>
   <link rel="canonical" href="https://matthewjamison.dev/">
+  <link rel="alternate" type="application/rss+xml" title="matthew jamison · notes" href="/feed.xml">
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="preload" href="assets/fonts/jetbrains-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="style.css?v=dev">
@@ -1063,6 +1064,27 @@ live bassist: mtd 6&#8209;string maple bass + looper sfx pedal
           </span>
         </div>
       </div>
+
+      <!-- The same form the blog end strip carries; subscribe.js drives both.
+           form-action 'none' in the CSP means this cannot navigate — the
+           submit is intercepted and POSTed to the Worker. -->
+      <div class="subscribe-card">
+        <form class="subscribe" novalidate>
+          <label class="subscribe-label comment" for="subscribe-email">// get new music + notes by email</label>
+          <div class="subscribe-row">
+            <input class="subscribe-input" type="email" id="subscribe-email" name="email"
+                   autocomplete="email" required>
+            <button type="submit" class="btn subscribe-btn">→ subscribe</button>
+          </div>
+          <!-- honeypot: hidden by class, never by style= (the CSP has no
+               'unsafe-inline'), empty for every real submit. -->
+          <div class="visually-hidden" aria-hidden="true">
+            <label for="subscribe-email-website">website</label>
+            <input id="subscribe-email-website" type="text" name="website" tabindex="-1" autocomplete="off">
+          </div>
+          <p class="subscribe-status" role="status" aria-live="polite"></p>
+        </form>
+      </div>
     </section>
 
     <!-- rider -->
@@ -1237,6 +1259,12 @@ creation for creation's sake
 still healing</p>
     </section>
 
+    <!-- notes: the latest three posts, rendered in by scripts/build.mjs at
+         deploy time. Everything between these two markers is generated — edit
+         the generator, not this block. With no published posts the section is
+         omitted entirely. -->
+    <!-- notes:start --><!-- notes:end -->
+
   </main>
 
   <!-- store status: checkout and preview failures. Docked page-level for the
@@ -1321,5 +1349,6 @@ still healing</p>
   </dialog>
 
   <script src="script.js?v=dev" defer></script>
+  <script src="subscribe.js?v=dev" defer></script>
 </body>
 </html>
