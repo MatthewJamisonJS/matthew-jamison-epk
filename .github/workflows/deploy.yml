@@ -12,17 +12,26 @@ jobs:
       deployments: write
     steps:
       - uses: actions/checkout@v7
+      # The content layer is rendered at deploy time, not committed: this writes
+      # music/<slug>/index.html, music/index.html and sitemap.xml from
+      # data/releases.json. It runs BEFORE the sed below on purpose, so the
+      # generated pages get the same ?v=<sha> stamping as the hand-written ones.
+      - name: build content layer
+        run: node scripts/build.mjs
       # Pages uploads everything under the output dir ("."), and only
       # node_modules/.git/.DS_Store are auto-excluded — prune source that
       # must never ship as a static asset (the Worker deploys separately
-      # via wrangler deploy from worker/).
+      # via wrangler deploy from worker/). games/_test is Stage 0 test
+      # scaffolding: live, header-noindexed, and not worth an indexable URL.
       - name: prune non-site files
-        run: rm -rf worker docs
-      # style.css and script.js are cached 7 days unversioned (_headers); stamp
-      # their ?v= query with the commit SHA so every deploy is a new URL and
-      # returning phones never run stale JS against fresh HTML.
+        run: rm -rf worker docs scripts data content games/_test
+      # style.css, script.js and release.js are cached 7 days unversioned
+      # (_headers); stamp their ?v= query with the commit SHA so every deploy is
+      # a new URL and returning phones never run stale JS against fresh HTML.
       - name: version assets
-        run: sed -i "s/?v=dev/?v=${GITHUB_SHA::8}/g" index.html 404.html
+        run: |
+          sed -i "s/?v=dev/?v=${GITHUB_SHA::8}/g" index.html 404.html
+          find music -name index.html -print0 | xargs -0 sed -i "s/?v=dev/?v=${GITHUB_SHA::8}/g"
       # deploy-time minify only — the repo stays readable, no local build step.
       # starfield.js is left alone: it lives under the immutable /assets/* cache
       # rule, and changing its bytes under the same URL breaks that contract.
@@ -30,6 +39,7 @@ jobs:
         run: |
           npx --yes esbuild style.css --minify --allow-overwrite --outfile=style.css
           npx --yes esbuild script.js --minify --allow-overwrite --outfile=script.js
+          npx --yes esbuild release.js --minify --allow-overwrite --outfile=release.js
       - uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
