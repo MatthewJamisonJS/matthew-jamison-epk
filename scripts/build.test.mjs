@@ -28,6 +28,16 @@ execFileSync(process.execPath, [join(root, 'scripts', 'build.mjs'), '--out', out
 const read = (...p) => readFileSync(join(out, ...p), 'utf8');
 const journey = releases.find(r => r.slug === 'the-journey');
 
+// the generator's escaper, mirrored so an expected attribute value can be built
+// the same way the page built it
+const esc = v =>
+  String(v)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+
 // Scenario 1 — Given data/releases.json has the-journey, when the site builds,
 // then /music/the-journey/ exists with one <h1>, its full tracklist, a
 // self-canonical, and a MusicAlbum JSON-LD.
@@ -112,6 +122,163 @@ test('sitemap lists /, /music/ and every release with a lastmod', () => {
   for (const r of releases) {
     assert.ok(xml.includes(`/assets/covers/${r.cover || r.slug}-700.webp`), `no image entry for ${r.slug}`);
   }
+});
+
+test('release page: one preloadless <audio> for the whole tracklist', () => {
+  for (const r of releases) {
+    const html = read('music', r.slug, 'index.html');
+    const tags = html.match(/<audio\b[^>]*>/g) || [];
+    assert.equal(tags.length, 1, `${r.slug}: expected exactly one <audio>`);
+    assert.match(tags[0], /\bid="release-audio"/, `${r.slug}: audio not id'd`);
+    assert.match(tags[0], /\bpreload="none"/, `${r.slug}: audio would preload`);
+    // no src until a click — reading the page must cost no audio bytes
+    assert.ok(!/\ssrc=/.test(tags[0]), `${r.slug}: audio ships a src`);
+  }
+});
+
+test('release page: every track row carries a play button keyed to its NN', () => {
+  for (const r of releases) {
+    const html = read('music', r.slug, 'index.html');
+    const btns = html.match(/<button[^>]*class="store-play track-play"[^>]*>/g) || [];
+    assert.equal(btns.length, r.tracks.length, `${r.slug}: button count != track count`);
+
+    r.tracks.forEach((t, i) => {
+      const nn = String(t.n).padStart(2, '0');
+      const btn = btns[i];
+      // the row and its button agree on the NN the API takes literally
+      assert.ok(
+        html.includes(`<li data-track="${nn}">`),
+        `${r.slug}: no row for track ${nn}`
+      );
+      assert.match(btn, new RegExp(`\\bdata-track="${nn}"`), `${r.slug}: button ${i} not track ${nn}`);
+      assert.match(btn, /\bdata-slug="/, `${r.slug}: button ${i} has no slug`);
+      assert.match(btn, /\btype="button"/, `${r.slug}: button ${i} would submit`);
+      assert.match(btn, /\baria-pressed="false"/, `${r.slug}: button ${i} has no pressed state`);
+
+      const label = /aria-label="([^"]*)"/.exec(btn);
+      assert.ok(label, `${r.slug}: button ${i} has no aria-label`);
+      // the accessible name names the track, not just "play"
+      assert.equal(label[1], `play ${esc(t.title)}`, `${r.slug}: button ${i} label`);
+      // the visible title breaks at separators; the accessible name never does
+      assert.ok(!/<wbr>/.test(label[1]), `${r.slug}: button ${i} label carries markup`);
+    });
+
+    // both icons ship in every button; CSS picks one off .is-playing. Counted
+    // inside the <ol> only — the bar's toggle carries the same pair.
+    const ol = html.slice(html.indexOf('<ol class="release-tracks">'), html.indexOf('</ol>'));
+    assert.equal(
+      (ol.match(/class="icon icon-play"/g) || []).length, r.tracks.length,
+      `${r.slug}: play glyph count`
+    );
+    assert.equal(
+      (ol.match(/class="icon icon-pause"/g) || []).length, r.tracks.length,
+      `${r.slug}: pause glyph count`
+    );
+  }
+});
+
+test('release page: the now-playing bar ships once, hidden, with three controls', () => {
+  for (const r of releases) {
+    const html = read('music', r.slug, 'index.html');
+
+    const bars = html.match(/<div class="store-player release-player"[^>]*>/g) || [];
+    assert.equal(bars.length, 1, `${r.slug}: expected exactly one player bar`);
+    assert.match(bars[0], /\bid="release-player"/, `${r.slug}: bar not id'd`);
+    assert.match(bars[0], /\bhidden\b/, `${r.slug}: bar visible before a track loads`);
+    assert.match(bars[0], /role="region"/, `${r.slug}: bar is not a landmark`);
+    assert.match(bars[0], /aria-label="now playing"/, `${r.slug}: bar has no name`);
+
+    // it sits after </footer>, not inside .section — a backdrop-filtered
+    // ancestor would become the containing block for a position: fixed child
+    assert.ok(
+      html.indexOf('id="release-player"') > html.indexOf('</footer>'),
+      `${r.slug}: the bar is inside a filtered ancestor`
+    );
+
+    for (const [id, label] of [
+      ['release-prev', 'previous track'],
+      ['release-toggle', 'pause playback'],
+      ['release-next', 'next track']
+    ]) {
+      const btn = new RegExp(`<button type="button" class="store-ctl" id="${id}" aria-label="${label}"[^>]*>`);
+      assert.match(html, btn, `${r.slug}: no ${id} control`);
+    }
+
+    // the ends are marked, not removed: aria-disabled keeps them focusable
+    assert.match(html, /id="release-prev" aria-label="previous track" aria-disabled="true"/,
+      `${r.slug}: prev is live before anything plays`);
+    const nextInert = /id="release-next" aria-label="next track" aria-disabled="true"/.test(html);
+    assert.equal(nextInert, r.tracks.length === 1,
+      `${r.slug}: next's start state disagrees with the track count`);
+
+    // the readouts the bar has to fill, and the 210px cover thumb
+    assert.match(html, /<p class="store-player-track" id="release-now" aria-live="polite">/, `${r.slug}: no title readout`);
+    assert.match(html, /<span class="store-time" id="release-time">0:00 \/ 0:00<\/span>/, `${r.slug}: no clock`);
+    assert.match(html, new RegExp(`<img class="store-player-art" src="/assets/covers/${r.cover || r.slug}-210\\.webp"`),
+      `${r.slug}: bar art is not the 210px cover`);
+  }
+});
+
+test('release player: the bar reuses the home transport, with its own columns', () => {
+  const css = readFileSync(join(root, 'style.css'), 'utf8');
+  assert.match(css, /\.release-player \.store-player-row \{/, 'the bar has no column rule');
+  // the toggle carries both glyphs; without these it renders play AND pause
+  assert.match(css, /#release-toggle \.icon-pause,/, 'the bar toggle shows both glyphs at rest');
+  assert.match(css, /#release-toggle\.is-playing \.icon-pause \{ display: block; \}/,
+    'the bar toggle never shows its pause glyph');
+  assert.match(css, /\.store-ctl\[aria-disabled="true"\]/, 'aria-disabled end stops have no look');
+  // no new component: every class the bar uses already existed for the home bar
+  for (const cls of ['.store-player', '.store-player-row', '.store-player-art', '.store-transport', '.store-ctl', '.store-time']) {
+    assert.ok(css.includes(cls + ' '), `${cls} is not an existing style`);
+  }
+});
+
+test('release player: the transport and MediaSession are both wired', () => {
+  const js = readFileSync(join(root, 'release.js'), 'utf8');
+  for (const id of ['release-player', 'release-prev', 'release-toggle', 'release-next', 'release-now', 'release-time']) {
+    assert.ok(js.includes(`'${id}'`), `release.js never finds #${id}`);
+  }
+  for (const action of ['previoustrack', 'nexttrack']) {
+    assert.ok(js.includes(`'${action}'`), `no MediaSession ${action} handler`);
+  }
+  assert.match(js, /new window\.MediaMetadata/, 'no MediaSession metadata');
+  assert.match(js, /'matthew jamison'/, 'MediaSession names no artist');
+  // the runway under the footer, the same contract the home bar uses
+  assert.match(js, /store-open/, 'the bar opens no runway under the footer');
+  assert.match(js, /--store-dock-h/, 'the runway height is never measured');
+});
+
+test('release player: the track control has sizing and state rules to hang on', () => {
+  const css = readFileSync(join(root, 'style.css'), 'utf8');
+  assert.match(css, /\.track-play\s*\{/, '.track-play has no rule');
+  assert.match(css, /\.track-play\.is-playing\s*\{/, 'no .is-playing state');
+  assert.match(css, /\.track-play\.is-playing \.icon-pause \{ display: block; \}/,
+    'the pause glyph never shows');
+  // the row's grid gained the button column
+  assert.match(css, /grid-template-columns: 44px 2\.2em minmax\(0, 1fr\) auto;/,
+    'the tracklist grid has no column for the button');
+  // no mid-word breaking, ever — the <wbr>s the generator emits are the only
+  // break opportunities a title gets
+  assert.match(css, /\.track-name \{[^}]*overflow-wrap: normal/, '.track-name may break mid-word');
+  assert.ok(!/\.track-name \{[^}]*break-all/.test(css), '.track-name breaks mid-word');
+  assert.match(css, /\.track-play \{[^}]*width: 44px/, 'the row control is under the 44px target');
+  assert.match(css, /\.release-player \.store-ctl \{[^}]*min-width: 44px/, 'the transport is under the 44px target');
+});
+
+test('release.js drives the tracklist and exposes nothing global', () => {
+  const js = readFileSync(join(root, 'release.js'), 'utf8');
+  assert.match(js, /getElementById\('release-audio'\)/, 'release.js never finds the audio');
+  assert.match(js, /\.track-play/, 'release.js never finds the buttons');
+  // the /s/ -> /p/ fallback, and nothing more of the adaptive machine
+  assert.match(js, /retried/, 'no single-retry guard');
+  assert.ok(!/window\.[A-Za-z_$][\w$]*\s*=/.test(js), 'release.js writes to window');
+  // Trusted Types: no markup is ever assigned
+  // the assignment, not the word — the file's own comments name innerHTML to
+  // say it is never used
+  assert.ok(
+    !/\.(inner|outer)HTML\s*=|insertAdjacentHTML\s*\(/.test(js),
+    'release.js writes markup'
+  );
 });
 
 // Shell invariants — the CSP has no 'unsafe-inline' and requires Trusted Types.
