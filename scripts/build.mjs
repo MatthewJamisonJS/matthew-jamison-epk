@@ -722,6 +722,10 @@ function loadPosts() {
       title: String(meta.title || name.replace(/\.md$/, '')),
       date,
       description: String(meta.description || ''),
+      // A post migrated 1:1 from Substack keeps the Substack URL as its
+      // canonical, so the two copies do not compete. It still lists on
+      // /blog/, in the feed and in the sitemap -- only the canonical moves.
+      canonical: typeof meta.canonical === 'string' && /^https?:\/\//i.test(meta.canonical) ? meta.canonical : '',
       image: typeof meta.image === 'string' && meta.image ? meta.image : '',
       imageAlt: String(meta.image_alt || ''),
       tags: Array.isArray(meta.tags) ? meta.tags.map(String) : [],
@@ -845,7 +849,8 @@ function postJsonLd(p) {
     dateModified: p.date,
     author: { '@id': PERSON_ID, '@type': 'Person', name: 'Matthew Jamison' },
     image,
-    mainEntityOfPage: postUrl(p.slug)
+    url: p.canonical || postUrl(p.slug),
+    mainEntityOfPage: p.canonical || postUrl(p.slug)
   };
 }
 
@@ -902,7 +907,7 @@ ${subscribeCard('subscribe-email')}
   return shell({
     title: `${p.title} · matthew jamison`,
     desc: p.description,
-    canonical: url,
+    canonical: p.canonical || url,
     ogImage: p.image ? SITE + p.image : `${SITE}/assets/blog/avatar-240.webp`,
     ogImageAlt: p.imageAlt || AVATAR_ALT,
     ogType: 'article',

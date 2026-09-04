@@ -1399,7 +1399,13 @@ body.store-note {
   transition: border-color 0.15s;
 }
 
+/* the whole card is the link, so the border is the affordance -- .prose a
+   would otherwise underline both lines inside it */
+.prose .link-card__link,
+.link-card__link { text-decoration: none; color: inherit; }
+
 .link-card__link:hover { border-color: var(--mj-accent-bright); }
+.link-card__link:hover .link-card__label { color: var(--mj-accent-bright); }
 
 .link-card__kind {
   display: block;

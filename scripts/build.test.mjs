@@ -238,6 +238,19 @@ tone: flat
 done.`
 );
 
+// a post migrated 1:1 from Substack: the Substack URL stays canonical
+post(
+  'migrated',
+  `title = "the one that lives on substack"
+date = 2026-09-02
+draft = false
+description = "same words, two addresses."
+canonical = "https://matthewjamisonwwjd.substack.com/p/the-one"
+topic = "notes"
+publish_at = 2026-09-02`,
+  `it went up there first.`
+);
+
 // a scheduled draft: must never appear anywhere in the output
 post(
   'not-yet',
@@ -286,6 +299,29 @@ test('front matter: a quoted string keeps its escaped quotes', () => {
   assert.match(html, /<meta name="description" content="the signal chain, the mistakes, and what i would keep\.">/);
   // he quotes constantly; indexOf would truncate at the first backslash
   assert.match(html, /<h1 class="post-title">how i &quot;set&quot; the room up<\/h1>/);
+});
+
+test('post page: a front-matter canonical wins, and the post still lists', () => {
+  const html = readBlog('blog', 'migrated', 'index.html');
+  assert.match(html, /<link rel="canonical" href="https:\/\/matthewjamisonwwjd\.substack\.com\/p\/the-one">/);
+  assert.ok(
+    !html.includes('<link rel="canonical" href="https://matthewjamison.dev/blog/migrated/">'),
+    'the self-canonical is still there too'
+  );
+  const ld = JSON.parse(html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]);
+  assert.equal(ld.url, 'https://matthewjamisonwwjd.substack.com/p/the-one');
+  assert.equal(ld.mainEntityOfPage, 'https://matthewjamisonwwjd.substack.com/p/the-one');
+
+  // it is a normal post everywhere else
+  assert.match(readBlog('blog', 'index.html'), /href="\/blog\/migrated\/"/);
+  assert.match(readBlog('feed.xml'), /<link>https:\/\/matthewjamison\.dev\/blog\/migrated\/<\/link>/);
+  assert.match(readBlog('sitemap.xml'), /<loc>https:\/\/matthewjamison\.dev\/blog\/migrated\/<\/loc>/);
+
+  // and a post without the key is still self-canonical
+  const plain = readBlog('blog', 'short-note', 'index.html');
+  assert.match(plain, /<link rel="canonical" href="https:\/\/matthewjamison\.dev\/blog\/short-note\/">/);
+  const plainLd = JSON.parse(plain.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1]);
+  assert.equal(plainLd.mainEntityOfPage, 'https://matthewjamison.dev/blog/short-note/');
 });
 
 test('blog: only draft = false posts are rendered', () => {
@@ -478,7 +514,8 @@ test('blog index: newest first, cover thumb, meta line, pager at 10 per page', (
   const titles = [...p1.matchAll(/<h2 class="section-list__title">([^<]+)<\/h2>/g)].map(m => m[1]);
   assert.equal(titles.length, 10, 'page 1 holds 10 cards');
   assert.equal(titles[0], 'how i &quot;set&quot; the room up', 'newest first');
-  assert.equal(titles[1], 'the take that stuck');
+  assert.equal(titles[1], 'the one that lives on substack');
+  assert.equal(titles[2], 'the take that stuck');
   assert.match(p1, /<img class="section-list__thumb" src="\/assets\/blog\/long-post-cover\.webp"/);
   assert.match(p1, /alt="a bass leaning on an amp"/);
   assert.match(p1, /1 min read/);
@@ -486,7 +523,7 @@ test('blog index: newest first, cover thumb, meta line, pager at 10 per page', (
   assert.match(p1, /<a class="pager__link pager__link--next" href="\/blog\/page\/2\/" rel="next">/);
 
   const p2 = readBlog('blog', 'page', '2', 'index.html');
-  assert.equal((p2.match(/<h2 class="section-list__title">/g) || []).length, 1);
+  assert.equal((p2.match(/<h2 class="section-list__title">/g) || []).length, 2);
   assert.match(p2, /<a class="pager__link pager__link--prev" href="\/blog\/" rel="prev">/);
   assert.match(p2, /<link rel="canonical" href="https:\/\/matthewjamison\.dev\/blog\/page\/2\/">/);
 });
@@ -497,7 +534,7 @@ test('feed.xml: RSS 2.0, newest first, full HTML in CDATA, self link', () => {
   assert.match(xml, /<atom:link href="https:\/\/matthewjamison\.dev\/feed\.xml" rel="self" type="application\/rss\+xml"\s*\/>/);
   assert.match(xml, /<lastBuildDate>/);
   const items = [...xml.matchAll(/<item>[\s\S]*?<\/item>/g)].map(m => m[0]);
-  assert.equal(items.length, 11, 'every published post, capped at 20');
+  assert.equal(items.length, 12, 'every published post, capped at 20');
   assert.match(items[0], /<link>https:\/\/matthewjamison\.dev\/blog\/long-post\/<\/link>/);
   assert.match(items[0], /<!\[CDATA\[/);
   assert.match(items[0], /<h2 id="the-room">/);
@@ -521,7 +558,7 @@ test('home page: the // notes block lists the latest three and links to /blog/',
   assert.ok(block, 'notes markers missing from the rendered index.html');
   assert.match(block[1], /<section id="notes"/);
   const links = [...block[1].matchAll(/href="\/blog\/([a-z0-9-]+)\/"/g)].map(m => m[1]);
-  assert.deepEqual(links, ['long-post', 'short-note', 'filler-9']);
+  assert.deepEqual(links, ['long-post', 'migrated', 'short-note']);
   assert.match(block[1], /→ all notes/);
   // the two hash-pinned data blocks must survive the rewrite byte for byte
   const src = readFileSync(join(root, 'index.html'), 'utf8');
