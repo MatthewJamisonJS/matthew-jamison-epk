@@ -316,10 +316,21 @@ ${cards}
 // (`2026-09-04`, unquoted). No tables, no nested arrays, no multi-line strings
 // — the kit never writes them, and a parser that pretends to support them would
 // be a parser nobody has tested.
+// The closing quote is the first UNESCAPED one. indexOf would stop at the
+// backslash in `\"All About Love\"` and truncate the line — and he quotes
+// constantly, so that is a live failure mode, not a hypothetical one.
+function closingQuote(v) {
+  for (let n = 1; n < v.length; n++) {
+    if (v[n] === '\\') { n++; continue; }
+    if (v[n] === '"') return n;
+  }
+  return -1;
+}
+
 function tomlScalar(raw) {
   const v = raw.trim();
   if (v.startsWith('"')) {
-    const end = v.indexOf('"', 1);
+    const end = closingQuote(v);
     return v.slice(1, end === -1 ? v.length : end).replace(/\\(["\\])/g, '$1');
   }
   if (v.startsWith("'")) {

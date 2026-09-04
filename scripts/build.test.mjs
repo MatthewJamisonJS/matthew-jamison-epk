@@ -185,7 +185,7 @@ that is the whole note.`
 // must come out escaped.
 post(
   'long-post',
-  `title = "how i set the room up"
+  `title = "how i \\"set\\" the room up"
 date = 2026-09-03
 draft = false
 description = "the signal chain, the mistakes, and what i would keep."
@@ -281,6 +281,13 @@ execFileSync(
 const readBlog = (...p) => readFileSync(join(blogOut, ...p), 'utf8');
 const readEmpty = (...p) => readFileSync(join(emptyOut, ...p), 'utf8');
 
+test('front matter: a quoted string keeps its escaped quotes', () => {
+  const html = readBlog('blog', 'long-post', 'index.html');
+  assert.match(html, /<meta name="description" content="the signal chain, the mistakes, and what i would keep\.">/);
+  // he quotes constantly; indexOf would truncate at the first backslash
+  assert.match(html, /<h1 class="post-title">how i &quot;set&quot; the room up<\/h1>/);
+});
+
 test('blog: only draft = false posts are rendered', () => {
   assert.ok(existsSync(join(blogOut, 'blog', 'short-note', 'index.html')), 'short-note missing');
   assert.ok(existsSync(join(blogOut, 'blog', 'long-post', 'index.html')), 'long-post missing');
@@ -309,7 +316,7 @@ test('post page: Article JSON-LD names the Person @id', () => {
   assert.ok(m, 'no JSON-LD');
   const ld = JSON.parse(m[1]);
   assert.equal(ld['@type'], 'Article');
-  assert.equal(ld.headline, 'how i set the room up');
+  assert.equal(ld.headline, 'how i "set" the room up');
   assert.equal(ld.datePublished, '2026-09-03');
   assert.equal(ld.dateModified, '2026-09-03');
   assert.equal(ld.author['@id'], 'https://matthewjamison.dev/#matthew-jamison');
@@ -470,7 +477,7 @@ test('blog index: newest first, cover thumb, meta line, pager at 10 per page', (
   assert.match(p1, /<link rel="canonical" href="https:\/\/matthewjamison\.dev\/blog\/">/);
   const titles = [...p1.matchAll(/<h2 class="section-list__title">([^<]+)<\/h2>/g)].map(m => m[1]);
   assert.equal(titles.length, 10, 'page 1 holds 10 cards');
-  assert.equal(titles[0], 'how i set the room up', 'newest first');
+  assert.equal(titles[0], 'how i &quot;set&quot; the room up', 'newest first');
   assert.equal(titles[1], 'the take that stuck');
   assert.match(p1, /<img class="section-list__thumb" src="\/assets\/blog\/long-post-cover\.webp"/);
   assert.match(p1, /alt="a bass leaning on an amp"/);
