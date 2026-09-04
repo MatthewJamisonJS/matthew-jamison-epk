@@ -90,8 +90,39 @@ const description = r =>
 
 const cover = (slug, size) => `/assets/covers/${slug}-${size}.webp`;
 
+// ── nav ──────────────────────────────────────────────────────────────────
+// The same strip index.html carries, in the same order (nav order = scroll
+// order), with the hash links made absolute so they land on the home page's
+// section from anywhere under /music/ or /blog/. `current` marks the item the
+// visitor is standing in — a static attribute, no JS, because these pages ship
+// no scroll spy. index.html keeps its own copy: it is hand-written and the two
+// sha256-pinned JSON blocks in it must not move, so the generator never
+// rewrites its nav. Change one, change both.
+const NAV_ITEMS = [
+  ['/#catalog', 'Albums'],
+  ['/#games', 'Games'],
+  ['/#samples', 'Bass samples'],
+  ['/#watch', 'Videos'],
+  ['/#services', 'Session bass'],
+  ['/#contact', 'Contact'],
+  ['/#rider', 'Gear'],
+  ['/#collabs', 'Collabs'],
+  ['/#press', 'Press'],
+  ['/#bio', 'Bio'],
+  ['/blog/', 'Blog']
+];
+
+const nav = current =>
+  `  <!-- nav -->
+  <nav class="nav" aria-label="main navigation">
+${NAV_ITEMS.map(
+  ([href, label]) =>
+    `    <a href="${href}"${label === current ? ' aria-current="page"' : ''}>${label}</a>`
+).join('\n')}
+  </nav>`;
+
 // ── page shell ───────────────────────────────────────────────────────────
-// Mirrors thanks/index.html: url-bar, .page-orb, <main><section class="section">,
+// Mirrors thanks/index.html: url-bar, nav, .page-orb, <main><section class="section">,
 // footer. No <style>, no inline executable <script>, no style= — the CSP has no
 // 'unsafe-inline' and requires Trusted Types.
 const shell = ({
@@ -104,7 +135,8 @@ const shell = ({
   headLinks = '',
   head = '',
   body,
-  scripts = ''
+  scripts = '',
+  current = ''
 }) => `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -135,6 +167,8 @@ ${headLinks}${head}</head>
   <div class="url-bar">
     <span class="comment">// Matthew Jamison &nbsp;·&nbsp; EPK &nbsp;·&nbsp; 2026</span>
   </div>
+
+${nav(current)}
 
   <main>
 ${body}  </main>
@@ -256,6 +290,7 @@ ${tracks}
     title: `${r.title} · matthew jamison`,
     desc: description(r),
     canonical: `${SITE}/music/${r.slug}/`,
+    current: 'Albums',
     ogImage: SITE + cover(r.slug, 700),
     ogImageAlt: `${r.title} cover art`,
     head: `  <script type="application/ld+json">
@@ -303,6 +338,7 @@ ${cards}
     title: 'releases · matthew jamison',
     desc: `every matthew jamison release — ${releases.length} instrumental albums, eps and singles from a st. louis session bassist + producer. buy direct.`,
     canonical: `${SITE}/music/`,
+    current: 'Albums',
     ogImage: `${SITE}/assets/og-cover.jpg`,
     ogImageAlt: 'matthew jamison album cover art',
     body
@@ -795,7 +831,7 @@ these are the notes i keep while i figure things out.</p>
 // WORKSHOP: the label and the two status lines are Matthew's to rewrite.
 const subscribeCard = id => `      <div class="subscribe-card">
           <form class="subscribe" novalidate>
-            <label class="subscribe-label" for="${id}">get new music + notes by email</label>
+            <label class="subscribe-label" for="${id}">get new music + blog posts by email</label>
             <div class="subscribe-row">
               <input class="subscribe-input" type="email" id="${id}" name="email"
                      autocomplete="email" required>
@@ -886,7 +922,7 @@ ${p.headings.map(h => `              <li><a href="#${esc(h.id)}">${h.label}</a><
   // subscribe card all line up at every viewport. There is no side rail and no
   // second column: this page reads as one page, not a grid of cards.
   const body = `    <section class="section article-wrap" aria-label="${esc(p.title)}">
-      <h2 class="section-label comment">// notes</h2>
+      <h2 class="section-label comment">// blog</h2>
 
       <header class="post-header">
         <h1 class="post-title">${esc(p.title)}</h1>
@@ -905,7 +941,7 @@ ${p.html}
 
 ${postShare(url)}
 ${subscribeCard('subscribe-email')}
-      <p class="post-back"><a href="/blog/" class="link-plain">← all notes</a></p>
+      <p class="post-back"><a href="/blog/" class="link-plain">← all posts</a></p>
     </section>
 `;
 
@@ -916,6 +952,7 @@ ${subscribeCard('subscribe-email')}
     ogImage: p.image ? SITE + p.image : `${SITE}/assets/blog/avatar-240.webp`,
     ogImageAlt: p.imageAlt || AVATAR_ALT,
     ogType: 'article',
+    current: 'Blog',
     headLinks: RSS_LINK,
     head: `  <script type="application/ld+json">
 ${JSON.stringify(postJsonLd(p), null, 2)}
@@ -964,7 +1001,7 @@ function listingPage(n) {
   const pager =
     PAGES > 1
       ? `
-        <nav class="pager" aria-label="notes pages">
+        <nav class="pager" aria-label="blog pages">
 ${n > 1 ? `          <a class="pager__link pager__link--prev" href="${pageUrl(n - 1)}" rel="prev">← newer</a>\n` : ''}${n < PAGES ? `          <a class="pager__link pager__link--next" href="${pageUrl(n + 1)}" rel="next">older →</a>\n` : ''}        </nav>`
       : '';
 
@@ -972,11 +1009,11 @@ ${n > 1 ? `          <a class="pager__link pager__link--prev" href="${pageUrl(n 
     ? `        <ul class="section-list" role="list">
 ${cards}
         </ul>${pager}`
-    : `        <p class="blog-empty muted">nothing here yet. first note is coming.</p>`;
+    : `        <p class="blog-empty muted">nothing here yet. first post is coming.</p>`;
 
   const canonical = n === 1 ? `${SITE}/blog/` : `${SITE}/blog/page/${n}/`;
-  const body = `    <section class="section blog-wrap" aria-label="notes">
-      <h1 class="release-title release-title-hub">notes</h1>
+  const body = `    <section class="section blog-wrap" aria-label="blog">
+      <h1 class="release-title release-title-hub">blog</h1>
       <!-- WORKSHOP: Matthew replaces this dek in his own words. -->
       <p class="blog-dek muted">notes on bass, gear, faith &amp; whatever else is on my mind</p>
 
@@ -989,9 +1026,10 @@ ${list}
 `;
 
   return shell({
-    title: n === 1 ? 'notes · matthew jamison' : `notes · page ${n} · matthew jamison`,
-    desc: 'notes from matthew jamison — st. louis session bassist + producer — on bass, gear, faith and the work.',
+    title: n === 1 ? 'blog · matthew jamison' : `blog · page ${n} · matthew jamison`,
+    desc: 'blog posts from matthew jamison — st. louis session bassist + producer — on bass, gear, faith and the work.',
     canonical,
+    current: 'Blog',
     ogImage: `${SITE}/assets/og-cover.jpg`,
     ogImageAlt: 'matthew jamison album cover art',
     ogType: 'website',
@@ -1023,9 +1061,9 @@ function feed() {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
 <channel>
-  <title>matthew jamison · notes</title>
+  <title>matthew jamison · blog</title>
   <link>${SITE}/blog/</link>
-  <description>notes from matthew jamison — st. louis session bassist + producer.</description>
+  <description>blog posts from matthew jamison — st. louis session bassist + producer.</description>
   <language>en-us</language>
   <atom:link href="${SITE}/feed.xml" rel="self" type="application/rss+xml" />
   <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
@@ -1035,7 +1073,7 @@ ${items}
 `;
 }
 
-// ── blog: the // notes block on the home page ────────────────────────────
+// ── blog: the // blog block on the home page ─────────────────────────────
 // index.html is hand-written and stays that way: the generator rewrites the
 // bytes BETWEEN the two markers and nothing else, so the two sha256-pinned
 // JSON blocks in that file are never touched and neither _headers hash moves.
@@ -1048,12 +1086,12 @@ function notesBlock() {
     .map(p => `          <li><a href="/blog/${esc(p.slug)}/">${esc(p.title)}</a></li>`)
     .join('\n');
   return `
-    <section id="notes" class="section" aria-label="notes">
-      <h2 class="section-label comment">// notes</h2>
+    <section id="blog" class="section" aria-label="blog">
+      <h2 class="section-label comment">// blog</h2>
       <ul class="notes-list" role="list">
 ${items}
       </ul>
-      <p class="notes-more"><a href="/blog/">→ all notes</a></p>
+      <p class="notes-more"><a href="/blog/">→ all posts</a></p>
     </section>
 `;
 }

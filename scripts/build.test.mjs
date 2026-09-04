@@ -407,7 +407,7 @@ test('post page: share cubes, subscribe form and the back link all ship', () => 
   assert.match(html, /<div class="visually-hidden" aria-hidden="true">/);
   assert.match(html, /name="website"[^>]*tabindex="-1"/);
   assert.ok(!/name="website"[^>]*style="/.test(html), 'honeypot hidden with an inline style');
-  assert.match(html, /href="\/blog\/" class="link-plain">← all notes<\/a>/);
+  assert.match(html, /href="\/blog\/" class="link-plain">← all posts<\/a>/);
   assert.match(html, /<script src="\/blog\.js\?v=dev" defer><\/script>/);
   assert.match(html, /<script src="\/subscribe\.js\?v=dev" defer><\/script>/);
 });
@@ -482,17 +482,17 @@ test('blog: the // comment label is used once per page and nowhere else', () => 
   for (const slug of ['short-note', 'long-post']) {
     const wrap = articleWrap(readBlog('blog', slug, 'index.html'));
     assert.equal((wrap.match(/class="[^"]*\bcomment\b/g) || []).length, 1, `${slug}: comment count`);
-    assert.match(wrap, /<h2 class="section-label comment">\/\/ notes<\/h2>/);
+    assert.match(wrap, /<h2 class="section-label comment">\/\/ blog<\/h2>/);
     assert.match(wrap, /<span class="post-share__label muted" id="post-share-label">share<\/span>/);
     assert.match(wrap, /<label class="subscribe-label" for="subscribe-email">/);
     assert.ok(!/\/\/ share this/.test(wrap), `${slug}: share label still a comment`);
   }
-  // the listing's <h1>notes</h1> already says it; no // notes label above it
+  // the listing's <h1>blog</h1> already says it; no // blog label above it
   const listing = readBlog('blog', 'index.html');
-  assert.ok(!/class="section-label/.test(listing), 'listing carries a duplicate // notes label');
+  assert.ok(!/class="section-label/.test(listing), 'listing carries a duplicate // blog label');
   // and the same form on / sits under // contact, so its label is plain too
   const home = readFileSync(join(root, 'index.html'), 'utf8');
-  assert.match(home, /<label class="subscribe-label" for="subscribe-email">get new music \+ notes by email<\/label>/);
+  assert.match(home, /<label class="subscribe-label" for="subscribe-email">get new music \+ blog posts by email<\/label>/);
 });
 
 test('post page: author card holds both video sources and an img fallback', () => {
@@ -552,14 +552,15 @@ test('sitemap: /blog/, the pager pages and every published post', () => {
   assert.match(postUrl, /<lastmod>2026-09-03<\/lastmod>/);
 });
 
-test('home page: the // notes block lists the latest three and links to /blog/', () => {
+test('home page: the // blog block lists the latest three and links to /blog/', () => {
   const html = readBlog('index.html');
   const block = html.match(/<!-- notes:start -->([\s\S]*?)<!-- notes:end -->/);
-  assert.ok(block, 'notes markers missing from the rendered index.html');
-  assert.match(block[1], /<section id="notes"/);
+  assert.ok(block, 'notes: markers missing from the rendered index.html');
+  assert.match(block[1], /<section id="blog"/);
+  assert.match(block[1], /<h2 class="section-label comment">\/\/ blog<\/h2>/);
   const links = [...block[1].matchAll(/href="\/blog\/([a-z0-9-]+)\/"/g)].map(m => m[1]);
   assert.deepEqual(links, ['long-post', 'migrated', 'short-note']);
-  assert.match(block[1], /→ all notes/);
+  assert.match(block[1], /→ all posts/);
   // the two hash-pinned data blocks must survive the rewrite byte for byte
   const src = readFileSync(join(root, 'index.html'), 'utf8');
   for (const re of [
@@ -578,9 +579,9 @@ test('no posts: /blog/ still exists with an empty state, feed carries zero items
   const xml = readEmpty('feed.xml');
   assert.match(xml, /<rss version="2\.0"/);
   assert.equal((xml.match(/<item>/g) || []).length, 0);
-  // and the home page drops the notes section entirely
+  // and the home page drops the blog section entirely
   const home = readEmpty('index.html');
-  assert.ok(!home.includes('<section id="notes"'), 'notes section rendered with no posts');
+  assert.ok(!home.includes('<section id="blog"'), 'blog section rendered with no posts');
   assert.match(home, /<!-- notes:start -->\s*<!-- notes:end -->/);
 });
 
@@ -600,6 +601,74 @@ test('blog pages carry no inline style or executable inline script', () => {
       assert.match(tag, /type="application\/ld\+json"/, `${p}: executable inline script`);
     }
   }
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// The header nav. Every generated page carries the same strip index.html
+// does — same labels, same order — with the hash links absolute, plus the
+// static aria-current="page" marker for the surface the visitor is on. There
+// is no scroll spy on these pages, so the marker is markup, not JS.
+const NAV_LABELS = [
+  'Albums', 'Games', 'Bass samples', 'Videos', 'Session bass',
+  'Contact', 'Gear', 'Collabs', 'Press', 'Bio', 'Blog'
+];
+
+const navOf = html => {
+  const m = html.match(/<nav class="nav" aria-label="main navigation">([\s\S]*?)<\/nav>/);
+  assert.ok(m, 'no header nav on the page');
+  return m[1];
+};
+const navLinks = html =>
+  [...navOf(html).matchAll(/<a href="([^"]+)"([^>]*)>([^<]+)<\/a>/g)].map(m => ({
+    href: m[1],
+    attrs: m[2],
+    label: m[3]
+  }));
+
+const GENERATED = [
+  ['blog listing', () => readBlog('blog', 'index.html'), 'Blog'],
+  ['blog pager page 2', () => readBlog('blog', 'page', '2', 'index.html'), 'Blog'],
+  ['blog post', () => readBlog('blog', 'short-note', 'index.html'), 'Blog'],
+  ['/music/', () => read('music', 'index.html'), 'Albums'],
+  ['release page', () => read('music', 'the-journey', 'index.html'), 'Albums'],
+  ['empty blog listing', () => readEmpty('blog', 'index.html'), 'Blog']
+];
+
+test('nav: every generated page carries all eleven links, in order', () => {
+  for (const [name, get] of GENERATED) {
+    const links = navLinks(get());
+    assert.equal(links.length, 11, `${name}: link count`);
+    assert.deepEqual(links.map(l => l.label), NAV_LABELS, `${name}: labels`);
+    assert.equal(links.at(-1).href, '/blog/', `${name}: the Blog link points at /blog/`);
+    // the hash links have to be absolute or they resolve against /music/<slug>/
+    for (const l of links.slice(0, -1)) {
+      assert.match(l.href, /^\/#[a-z]+$/, `${name}: ${l.label} href is not an absolute hash`);
+    }
+  }
+});
+
+test('nav: exactly one link per page is marked aria-current="page"', () => {
+  for (const [name, get, current] of GENERATED) {
+    const links = navLinks(get());
+    const marked = links.filter(l => /\baria-current="page"/.test(l.attrs));
+    assert.equal(marked.length, 1, `${name}: marked link count`);
+    assert.equal(marked[0].label, current, `${name}: wrong link marked`);
+  }
+});
+
+test('nav: index.html carries the same eleven labels in the same order', () => {
+  const home = readFileSync(join(root, 'index.html'), 'utf8');
+  const links = navLinks(home);
+  assert.deepEqual(links.map(l => l.label), NAV_LABELS);
+  assert.equal(links.at(-1).href, '/blog/');
+  // on / the section links stay bare hashes — script.js smooth-scrolls
+  // a[href^="#"] and an absolute /#id would not match it
+  for (const l of links.slice(0, -1)) assert.match(l.href, /^#[a-z]+$/);
+});
+
+test('nav: the current marker has a style rule to hang on', () => {
+  const css = readFileSync(join(root, 'style.css'), 'utf8');
+  assert.match(css, /\.nav a\[aria-current="page"\]\s*\{/);
 });
 
 // ─────────────────────────────────────────────────────────────────────────

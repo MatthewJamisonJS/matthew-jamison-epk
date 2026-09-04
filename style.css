@@ -224,19 +224,21 @@ star-field {
    nobody discovers; every link has to be reachable at 320px.
 
    The padding is a wrap governor, not decoration. Left to the full width the
-   seven links break 6+1 and orphan "Contact" on a row of its own; capping the
-   row box lands the break after "gear" instead, so the rows read 4+3 and both
-   centre on the same axis. The caps are measured against the two type sizes
-   the nav uses — at 11px the first four links run 250px and the first five
-   run 314px, so 288px sits cleanly between them; the 480px block below
-   re-caps for the 10px size. The bar itself stays full-bleed: only the
-   padding grows, so the sticky glass still spans the viewport. */
+   links orphan the last one on a row of its own; capping the row box moves
+   the break earlier so the rows pack evenly and centre on the same axis. The
+   caps are measured per type size — this one against the 13px labels, the
+   480px block below against the 12px ones. Measured in Chrome at 481px and
+   600px with 11 links: rows pack 4/4/3 for any cap in 370–400px, so 384px
+   sits in the middle of that window (288px, the ten-label value, dropped the
+   strip to four uneven rows once "Blog" joined). The bar itself stays
+   full-bleed: only the padding grows, so the sticky glass still spans the
+   viewport. */
 @media (max-width: 640px) {
   .nav {
     flex-wrap: wrap;
     justify-content: center;
     overflow-x: visible;
-    padding-inline: max(22px, calc((100% - 288px) / 2));
+    padding-inline: max(22px, calc((100% - 384px) / 2));
   }
 
   /* the url-bar centres with the nav rows below it */
@@ -254,6 +256,20 @@ star-field {
 }
 
 .nav a:hover { color: var(--text); }
+
+/* The generated pages under /music/ and /blog/ mark their nav item with a
+   static aria-current="page" — there is no scroll spy on them and the home
+   page has none either, so nothing here is JS-driven. Comment green is the
+   section-label colour, so the marked item reads as "this section"; the
+   underline carries the same state for anyone who cannot use the hue. */
+.nav a[aria-current="page"] {
+  color: var(--mj-comment-green);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 5px;
+}
+
+.nav a[aria-current="page"]:hover { color: var(--text); }
 
 /* ── hero ────────────────────────────────────── */
 .hero {
@@ -1951,10 +1967,13 @@ body.store-note {
   /* The row box re-caps to a narrow measure so the nav wraps to a few short
      lines instead of one long one. Re-measure this cap whenever the nav labels
      OR the type size change — the +2px bump (27146c6) widened every label and
-     pushed 256px from three rows to four, stranding "Press"/"Bio". Measured in
-     Chrome at 375px with the 12px labels: rows pack 3/3/4 for any cap in
-     258–309px, so 280px sits in the middle of that window. */
-  .nav { padding-inline: max(12px, calc((100% - 280px) / 2)); }
+     pushed 256px from three rows to four, stranding "Press"/"Bio", and the
+     11th label ("Blog") then stranded itself on a fourth row at 280px.
+     Measured in Chrome at 375px with the 12px labels and 11 links: rows pack
+     3/3/5 for any cap in 283–309px, so 296px sits in the middle of that
+     window. It also holds at 320px, where the 12px floor takes over and the
+     row box lands on 296px anyway. */
+  .nav { padding-inline: max(12px, calc((100% - 296px) / 2)); }
   .nav a { padding: 12px 10px; font-size: 12px; }
   .url-bar { padding: 8px 16px; }
   .hero h1 { font-size: 32px; }
