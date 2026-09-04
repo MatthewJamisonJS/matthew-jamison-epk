@@ -508,6 +508,21 @@ function renderMarkdown(src) {
   const seen = new Map();
   let i = 0;
 
+  // Heading levels. The page <h1> is the post title, so a body heading shifts
+  // down one -- but a straight +1 skips levels on his real posts, which open
+  // with a `###` dek and then run `##` sections: <h1> -> <h4> -> <h3> is not a
+  // descending outline and axe says so. So: demote by one, never land more
+  // than one level below the heading before it, and remember the level a given
+  // source depth got so the same depth always renders the same tag.
+  const emittedFor = new Map();
+  let lastLevel = 1;
+  const headingLevel = depth => {
+    if (emittedFor.has(depth)) return emittedFor.get(depth);
+    const level = Math.min(Math.max(2, depth + 1), lastLevel + 1, 6);
+    emittedFor.set(depth, level);
+    return level;
+  };
+
   const listItems = (test, strip) => {
     const items = [];
     while (i < lines.length && test.test(lines[i])) {
@@ -543,11 +558,8 @@ function renderMarkdown(src) {
 
     const h = line.match(/^\s*(#{1,6})\s+(.*)$/);
     if (h) {
-      // The page <h1> is the post title, so every heading in the BODY shifts
-      // down one level: his `#` lines (`# March 12, 2026,`, `# ...`) become
-      // <h2>, his `##` sections <h3>, his `###` subtitle <h4>. The outline
-      // keeps exactly one <h1> per page.
-      const level = Math.min(6, h[1].length + 1);
+      const level = headingLevel(h[1].length);
+      lastLevel = level;
       const text = h[2].trim().replace(/\s+#+\s*$/, '');
       const base = slugify(text);
       const n = (seen.get(base) || 0) + 1;
@@ -750,8 +762,8 @@ const authorCard = () => `      <aside class="author-card">
         </video>
         <div class="author-card__text">
           <p class="author-card__name">matthew jamison</p>
+          <!-- WORKSHOP: the role line and the bio below are Matthew's to rewrite. -->
           <p class="author-card__role">session&nbsp;bassist&nbsp;· producer&nbsp;· dev</p>
-          <!-- WORKSHOP: Matthew replaces these two lines in his own words. -->
           <p class="author-card__bio">st. louis. i play bass, make beats, and write the code too.
 these are the notes i keep while i figure things out.</p>
           <ul class="author-card__social" role="list">

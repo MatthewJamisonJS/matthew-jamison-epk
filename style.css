@@ -1292,6 +1292,9 @@ body.store-note {
 }
 
 .prose > * + * { margin-top: 18px; }
+/* the plate's own padding opens the body; a heading's 34px on top of it left
+   a dead band above the first line */
+.prose > :first-child { margin-top: 0; }
 
 .prose h2,
 .prose h3,

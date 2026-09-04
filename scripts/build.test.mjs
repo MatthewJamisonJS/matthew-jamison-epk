@@ -341,7 +341,7 @@ test('post page: markdown subset renders, raw HTML never passes through', () => 
   const html = readBlog('blog', 'long-post', 'index.html');
   const article = html.match(/<article class="article prose">([\s\S]*?)<\/article>/)[1];
   // body headings shift down one level: the page <h1> is the title
-  assert.match(article, /<h3 id="the-room">the room<\/h3>/);
+  assert.match(article, /<h2 id="the-room">the room<\/h2>/);
   assert.match(article, /<strong>strong<\/strong>/);
   assert.match(article, /<em>em<\/em>/);
   assert.match(article, /<code>code span<\/code>/);
@@ -500,7 +500,7 @@ test('feed.xml: RSS 2.0, newest first, full HTML in CDATA, self link', () => {
   assert.equal(items.length, 11, 'every published post, capped at 20');
   assert.match(items[0], /<link>https:\/\/matthewjamison\.dev\/blog\/long-post\/<\/link>/);
   assert.match(items[0], /<!\[CDATA\[/);
-  assert.match(items[0], /<h3 id="the-room">/);
+  assert.match(items[0], /<h2 id="the-room">/);
   assert.match(items[0], /<pubDate>[A-Z][a-z]{2}, \d{2} [A-Z][a-z]{2} \d{4}/);
 });
 
@@ -626,15 +626,35 @@ test('corpus: every `---` divider survives as an <hr>', { skip: !haveCorpus }, (
   }
 });
 
-test('corpus: body headings demote one level and the page keeps one <h1>', { skip: !haveCorpus }, () => {
+test('corpus: body headings descend from the <h1> without skipping a level', { skip: !haveCorpus }, () => {
   for (const [slug] of EXEMPLARS) {
     const article = readReal(slug);
     assert.ok(!/<h1[\s>]/.test(article), `${slug}: a second <h1> in the body`);
-    for (const depth of [1, 2, 3]) {
-      const src = (sources.get(slug).match(new RegExp(`^#{${depth}} `, 'gm')) || []).length;
-      const got = (article.match(new RegExp(`<h${depth + 1} id=`, 'g')) || []).length;
-      assert.equal(got, src, `${slug}: ${'#'.repeat(depth)} -> h${depth + 1}`);
+
+    const srcDepths = [...sources.get(slug).matchAll(/^(#{1,6}) /gm)].map(m => m[1].length);
+    const outLevels = [...article.matchAll(/<h([2-6]) id=/g)].map(m => Number(m[1]));
+    assert.equal(outLevels.length, srcDepths.length, `${slug}: heading count`);
+
+    // never more than one level below the heading before it — axe's
+    // heading-order rule, and the reason a straight +1 demote was wrong
+    let prev = 1;
+    for (const [n, level] of outLevels.entries()) {
+      assert.ok(level <= prev + 1, `${slug}: heading ${n} jumps ${prev} -> ${level}`);
+      assert.ok(level >= 2, `${slug}: heading ${n} is above h2`);
+      prev = level;
     }
+
+    // the same source depth always renders the same tag
+    const byDepth = new Map();
+    srcDepths.forEach((d, n) => {
+      if (byDepth.has(d)) assert.equal(outLevels[n], byDepth.get(d), `${slug}: depth ${d} is inconsistent`);
+      else byDepth.set(d, outLevels[n]);
+    });
+
+    // Source depth order is deliberately NOT preserved. His posts open with a
+    // `###` dek and then run `##` sections; the dek lands at h2 and the
+    // sections nest under it at h3, which is how the document actually reads
+    // and the only shape that descends from the <h1>.
   }
 });
 
