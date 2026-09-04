@@ -311,12 +311,16 @@ function hubPage() {
     .map(
       r => `          <article class="store-card">
             <div class="store-art">
-              <img src="${cover(r, 350)}"
-                   srcset="${cover(r, 210)} 210w,
-                           ${cover(r, 350)} 350w,
-                           ${cover(r, 700)} 700w"
-                   sizes="(max-width: 768px) calc(50vw - 43px), 289px"
-                   alt="" width="350" height="350" loading="lazy" decoding="async">
+              <!-- the art is a second way in, not a second tab stop: the title link
+                   below is the card's one accessible name for /music/<slug>/ -->
+              <a class="store-art-link" href="/music/${esc(r.slug)}/" tabindex="-1" aria-hidden="true">
+                <img src="${cover(r, 350)}"
+                     srcset="${cover(r, 210)} 210w,
+                             ${cover(r, 350)} 350w,
+                             ${cover(r, 700)} 700w"
+                     sizes="(max-width: 768px) calc(50vw - 43px), 289px"
+                     alt="" width="350" height="350" loading="lazy" decoding="async">
+              </a>
             </div>
             <h2 class="store-title"><a href="/music/${esc(r.slug)}/">${esc(r.title)}</a></h2>
             <p class="store-meta">${esc(r.kind)}<span class="muted">&nbsp;·&nbsp;</span>${money(r.price)}</p>

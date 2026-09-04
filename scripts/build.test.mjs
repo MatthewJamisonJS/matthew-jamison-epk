@@ -138,6 +138,12 @@ test('hub page links every release', () => {
   assert.match(html, /<link rel="canonical" href="https:\/\/matthewjamison\.dev\/music\/">/);
   for (const r of releases) {
     assert.ok(html.includes(`href="/music/${r.slug}/"`), `hub missing ${r.slug}`);
+    // the cover is a link too (a card-sized target), hidden from AT so the
+    // title stays the one tab stop and accessible name
+    assert.ok(
+      html.includes(`<a class="store-art-link" href="/music/${r.slug}/" tabindex="-1" aria-hidden="true">`),
+      `hub art not linked for ${r.slug}`
+    );
   }
 });
 
