@@ -13,9 +13,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       # The content layer is rendered at deploy time, not committed: this writes
-      # music/<slug>/index.html, music/index.html and sitemap.xml from
-      # data/releases.json. It runs BEFORE the sed below on purpose, so the
-      # generated pages get the same ?v=<sha> stamping as the hand-written ones.
+      # music/<slug>/index.html, music/index.html, blog/<slug>/index.html, the
+      # /blog/ listing + pager, feed.xml and sitemap.xml from
+      # data/releases.json and content/blog/*.md, and rewrites index.html
+      # between its notes: markers. It runs BEFORE the sed below on purpose, so
+      # the generated pages get the same ?v=<sha> stamping as the hand-written
+      # ones. content/ may be absent or empty — then /blog/ ships its empty
+      # state and feed.xml ships zero items, so neither URL ever 404s.
       - name: build content layer
         run: node scripts/build.mjs
       # Pages uploads everything under the output dir ("."), and only
@@ -25,13 +29,13 @@ jobs:
       # scaffolding: live, header-noindexed, and not worth an indexable URL.
       - name: prune non-site files
         run: rm -rf worker docs scripts data content games/_test
-      # style.css, script.js and release.js are cached 7 days unversioned
+      # style.css, script.js, release.js, blog.js and subscribe.js are cached 7 days unversioned
       # (_headers); stamp their ?v= query with the commit SHA so every deploy is
       # a new URL and returning phones never run stale JS against fresh HTML.
       - name: version assets
         run: |
           sed -i "s/?v=dev/?v=${GITHUB_SHA::8}/g" index.html 404.html
-          find music -name index.html -print0 | xargs -0 sed -i "s/?v=dev/?v=${GITHUB_SHA::8}/g"
+          find music blog -name index.html -print0 | xargs -0 sed -i "s/?v=dev/?v=${GITHUB_SHA::8}/g"
       # deploy-time minify only — the repo stays readable, no local build step.
       # starfield.js is left alone: it lives under the immutable /assets/* cache
       # rule, and changing its bytes under the same URL breaks that contract.
@@ -40,6 +44,8 @@ jobs:
           npx --yes esbuild style.css --minify --allow-overwrite --outfile=style.css
           npx --yes esbuild script.js --minify --allow-overwrite --outfile=script.js
           npx --yes esbuild release.js --minify --allow-overwrite --outfile=release.js
+          npx --yes esbuild blog.js --minify --allow-overwrite --outfile=blog.js
+          npx --yes esbuild subscribe.js --minify --allow-overwrite --outfile=subscribe.js
       - uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}

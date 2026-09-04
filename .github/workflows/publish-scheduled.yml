@@ -1,0 +1,49 @@
+name: Publish scheduled posts
+
+on:
+  schedule:
+    - cron: "0 13 * * *"   # 13:00 UTC ~= 08:00 America/Chicago (CDT) / 07:00 (CST)
+    - cron: "45 15 * * *"  # 15:45 UTC ~= 10:45 America/Chicago (CDT) / 09:45 (CST)
+  # `publish_at` is date-only — release_scheduled.py truncates any time
+  # component — so a post is released by whichever run comes first on/after its
+  # date. These cron times are the only lever on *when within the day* a post
+  # goes live, and GitHub cron is UTC-only (it does not shift with DST), so each
+  # slot drifts an hour in local terms between CDT and CST.
+  workflow_dispatch: {}
+
+# There is deliberately no deploy job here. deploy.yml already fires on every
+# push to main and is the single place the build/sed/minify/prune/pages-deploy
+# sequence is written down; the push below triggers it. Duplicating those steps
+# would give this repo two deploy paths to keep in step, and the one that runs
+# twice a day is the one nobody would notice drifting.
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Release due posts
+        id: release
+        run: python scripts/release_scheduled.py
+
+      # Pushing to main is what publishes: deploy.yml picks it up from here.
+      - name: Commit and push releases
+        if: steps.release.outputs.released == 'true'
+        env:
+          SLUGS: ${{ steps.release.outputs.slugs }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "release: publish ${SLUGS}"
+          git push
