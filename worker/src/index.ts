@@ -7,6 +7,8 @@ import { handleFile, handleFileHead, handleLanding, handleReissue } from './rout
 import { handleVerify, handleVerifyResend } from './routes/verify';
 import { handleUnsubscribe } from './routes/unsubscribe';
 import { handleExport } from './routes/admin';
+import { handleBroadcast } from './routes/broadcast';
+import { handleSubscribe, handleSubscribePreflight } from './routes/subscribe';
 import { handleMpu } from './routes/upload';
 import { handlePreview, handleStream, handleStreamPreflight } from './routes/preview';
 import { scheduled } from './scheduled';
@@ -16,6 +18,10 @@ const router = new Router()
 
   .options('/checkout', (req, env) => handleCheckoutPreflight(req, env))
   .post('/checkout', handleCheckout)
+
+  // Site subscribe form. Always 202 on anything that is not malformed JSON.
+  .options('/subscribe', (req, env) => handleSubscribePreflight(req, env))
+  .post('/subscribe', handleSubscribe)
 
   .post('/webhook', handleWebhook)
 
@@ -41,6 +47,9 @@ const router = new Router()
   .get('/s/:slug/:track', handleStream)
 
   .get('/admin/export', handleExport)
+
+  // The list mail. Enqueues only; the cron drain does the sending.
+  .post('/admin/broadcast', handleBroadcast)
 
   // Admin-only R2 multipart upload for objects past wrangler's single-PUT cap.
   .post('/admin/mpu', handleMpu)

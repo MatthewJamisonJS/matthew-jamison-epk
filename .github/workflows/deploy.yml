@@ -17,7 +17,7 @@ jobs:
       # must never ship as a static asset (the Worker deploys separately
       # via wrangler deploy from worker/).
       - name: prune non-site files
-        run: rm -rf worker docs
+        run: rm -rf worker docs scripts
       # style.css and script.js are cached 7 days unversioned (_headers); stamp
       # their ?v= query with the commit SHA so every deploy is a new URL and
       # returning phones never run stale JS against fresh HTML.
