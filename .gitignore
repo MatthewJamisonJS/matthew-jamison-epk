@@ -3,3 +3,7 @@
 .claude/
 .wrangler/
 node_modules/
+
+# generated at deploy time by scripts/build.mjs (sitemap.xml stays committed:
+# robots.txt points at it and reviewers diff it)
+music/

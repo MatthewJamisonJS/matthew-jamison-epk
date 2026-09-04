@@ -45,6 +45,10 @@
 /script.js
   Cache-Control: public, max-age=604800, stale-while-revalidate=86400
 
+# the release pages' buy button — same posture as script.js
+/release.js
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+
 # ── games routes ─────────────────────────────────────────────────────────
 # Vendored third-party games are framed by index.html only. The site-wide
 # strict CSP + X-Frame-Options: DENY are detached per game route; each slug
