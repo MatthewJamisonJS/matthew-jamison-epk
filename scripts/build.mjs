@@ -88,7 +88,10 @@ const description = r =>
     ? `${r.title} — a single by matthew jamison, st. louis session bassist + producer. buy direct.`
     : `${r.title} — a ${r.tracks.length}-track ${r.kind} by matthew jamison, st. louis session bassist + producer. buy direct.`);
 
-const cover = (slug, size) => `/assets/covers/${slug}-${size}.webp`;
+// Optional `cover` on a release overrides the slug as the file stem. Used when a
+// cover has to be re-cut (assets are cached immutable for a year, so a fix
+// ships under a new name, never new bytes at the old URL).
+const cover = (r, size) => `/assets/covers/${r.cover || r.slug}-${size}.webp`;
 
 // ── nav ──────────────────────────────────────────────────────────────────
 // The same strip index.html carries, in the same order (nav order = scroll
@@ -199,7 +202,7 @@ function releaseJsonLd(r) {
     url: `${SITE}/music/${r.slug}/`,
     albumReleaseType: RELEASE_TYPE[r.kind],
     numTracks: r.tracks.length,
-    image: SITE + cover(r.slug, 700),
+    image: SITE + cover(r, 700),
     byArtist: ARTIST,
     genre: 'Instrumental',
     track: {
@@ -259,9 +262,9 @@ function releasePage(r) {
 
       <div class="release-head">
         <img class="release-art"
-             src="${cover(r.slug, 350)}"
-             srcset="${cover(r.slug, 350)} 350w,
-                     ${cover(r.slug, 700)} 700w"
+             src="${cover(r, 350)}"
+             srcset="${cover(r, 350)} 350w,
+                     ${cover(r, 700)} 700w"
              sizes="(max-width: 700px) 240px, 280px"
              alt="${esc(r.title)} cover art" width="350" height="350"
              fetchpriority="high" decoding="async">
@@ -291,7 +294,7 @@ ${tracks}
     desc: description(r),
     canonical: `${SITE}/music/${r.slug}/`,
     current: 'Albums',
-    ogImage: SITE + cover(r.slug, 700),
+    ogImage: SITE + cover(r, 700),
     ogImageAlt: `${r.title} cover art`,
     head: `  <script type="application/ld+json">
 ${JSON.stringify(releaseJsonLd(r), null, 2)}
@@ -308,10 +311,10 @@ function hubPage() {
     .map(
       r => `          <article class="store-card">
             <div class="store-art">
-              <img src="${cover(r.slug, 350)}"
-                   srcset="${cover(r.slug, 210)} 210w,
-                           ${cover(r.slug, 350)} 350w,
-                           ${cover(r.slug, 700)} 700w"
+              <img src="${cover(r, 350)}"
+                   srcset="${cover(r, 210)} 210w,
+                           ${cover(r, 350)} 350w,
+                           ${cover(r, 700)} 700w"
                    sizes="(max-width: 768px) calc(50vw - 43px), 289px"
                    alt="" width="350" height="350" loading="lazy" decoding="async">
             </div>
@@ -1150,7 +1153,7 @@ function sitemap() {
     <changefreq>yearly</changefreq>
     <priority>0.7</priority>
     <image:image>
-      <image:loc>${SITE}${cover(r.slug, 700)}</image:loc>
+      <image:loc>${SITE}${cover(r, 700)}</image:loc>
       <image:title>${esc(r.title)}</image:title>
       <image:caption>${esc(r.kind)} by matthew jamison</image:caption>
     </image:image>

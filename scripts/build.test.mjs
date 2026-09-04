@@ -110,7 +110,7 @@ test('sitemap lists /, /music/ and every release with a lastmod', () => {
   assert.ok(!locs.some(l => l.includes('/thanks/')), '/thanks/ must not be in the sitemap');
   // every release carries its 700px cover as an image entry
   for (const r of releases) {
-    assert.ok(xml.includes(`/assets/covers/${r.slug}-700.webp`), `no image entry for ${r.slug}`);
+    assert.ok(xml.includes(`/assets/covers/${r.cover || r.slug}-700.webp`), `no image entry for ${r.slug}`);
   }
 });
 
