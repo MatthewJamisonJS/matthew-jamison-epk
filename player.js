@@ -82,12 +82,37 @@
     return !!(rel && MP3_ONLY_KINDS[rel.k] === true);
   }
 
-  function streamPath(s) {
-    if (mp3Only(s)) return '/p/';
-    if (mode === 'saver') return '/p/';
-    if (mode === 'lossless') return canFlac ? '/s/' : '/p/';
-    if ((demoteCount > 0 && !promotable) || slowLink()) return '/p/';
-    return canFlac ? '/s/' : '/p/';
+  // three sources now, not two: '/s/' flac, '/p/' 128k mp3, and 'vault' — the
+  // same 128k mp3 already sitting in IndexedDB, played off a blob: URL. Reads
+  // only synchronous state (see "the synchronous boundary" below), because
+  // load() assigns the src inside an `ended` handler on iOS.
+  function streamPath(s, nn) {
+    const v = vaulted(s, nn);
+    if (mp3Only(s)) return v ? 'vault' : '/p/';
+    if (mode === 'saver') return v ? 'vault' : '/p/';
+    // lossless is the user's call and never *auto*-demotes: it asks for flac
+    // even with the link down. An outright load error still falls through, and
+    // the error path prefers the vault over the network — see fallbackPath().
+    if (mode === 'lossless') return canFlac ? '/s/' : (v ? 'vault' : '/p/');
+    if (isOffline() || slowLink() || (demoteCount > 0 && !promotable)) {
+      return v ? 'vault' : '/p/';
+    }
+    return canFlac ? '/s/' : (v ? 'vault' : '/p/');
+  }
+
+  // the src a path resolves to. A vault path is only ever returned by
+  // streamPath() when urls already holds the key, so the get cannot miss.
+  function srcFor(path, s, nn) {
+    return path === 'vault'
+      ? urls.get(vaultKey(s, nn))
+      : API + path + s + '/' + nn;
+  }
+
+  // where a failing lossless source, a stall, a drained runway or a load error
+  // sends the current track: the saved copy when there is one, the 128k stream
+  // otherwise.
+  function fallbackPath() {
+    return slug && urls.has(vaultKey(slug, trackNN)) ? 'vault' : '/p/';
   }
 
   const dataEl = document.getElementById('store-data');
@@ -164,6 +189,422 @@
   } catch (e) {
     return;
   }
+
+  // ── the vault ──────────────────────────────────────────────────────────────
+  //
+  // Chrome and WebKit deliberately cap how far ahead <audio> will buffer and
+  // never download a whole file, so driving into a dead zone drains the buffer
+  // and the music stops. The vault fetches whole 128k mp3 files into IndexedDB
+  // ahead of the playhead; the dual-element handoff below then swaps onto a
+  // blob: URL when the live stream falters or the network is gone. No Service
+  // Worker, no MSE — an IDB blob and URL.createObjectURL behave the same in
+  // every engine, iOS shells included.
+  //
+  // Every call is wrapped. A browser with IndexedDB blocked or missing (private
+  // mode quirks) simply has no vault, and the player behaves exactly as it did
+  // before this layer existed.
+  const VAULT_CAP = 200 * 1024 * 1024;   // bytes held before LRU eviction
+  const WINDOW_AHEAD = 2;                // tracks prefetched past the current one
+  const NO_SIGNAL = 'no signal, and this one isn’t saved yet.';
+
+  const idbOK = (function () {
+    try { return typeof indexedDB !== 'undefined' && !!indexedDB; } catch (e) { return false; }
+  })();
+
+  let dbPromise = null;
+
+  // one connection, opened lazily on first need and never rejected: a failure
+  // resolves null and every caller treats that as "no vault".
+  function openDb() {
+    if (dbPromise) return dbPromise;
+    dbPromise = new Promise(resolve => {
+      if (!idbOK) { resolve(null); return; }
+      // ask once for durable storage. The answer is advisory — Safari evicts a
+      // plain tab's data after seven idle days either way — so it is ignored.
+      try {
+        if (navigator.storage && navigator.storage.persist) {
+          const asked = navigator.storage.persist();
+          if (asked && asked.catch) asked.catch(() => { /* advisory */ });
+        }
+      } catch (e) { /* best effort */ }
+
+      let req;
+      try {
+        req = indexedDB.open('mj-audio', 1);
+      } catch (e) { resolve(null); return; }
+      req.onupgradeneeded = () => {
+        try {
+          const db = req.result;
+          if (!db.objectStoreNames.contains('tracks')) db.createObjectStore('tracks');
+        } catch (e) { /* the open handlers below report the failure */ }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+      req.onblocked = () => resolve(null);
+    });
+    return dbPromise;
+  }
+
+  // key shape: 'slug/NN'. One string, so the store needs no index and eviction
+  // is a single cursor walk.
+  function vaultKey(s, nn) {
+    return s + '/' + nn;
+  }
+
+  function vaulted(s, nn) {
+    return !!s && urls.has(vaultKey(s, nn));
+  }
+
+  // a read that also touches `at` — the LRU clock is "last played or prefetched"
+  function vaultGet(key) {
+    return openDb().then(db => {
+      if (!db) return null;
+      return new Promise(resolve => {
+        let t;
+        try { t = db.transaction('tracks', 'readwrite'); } catch (e) { resolve(null); return; }
+        t.onabort = () => resolve(null);
+        t.onerror = e2 => { if (e2 && e2.preventDefault) e2.preventDefault(); resolve(null); };
+        const store = t.objectStore('tracks');
+        const req = store.get(key);
+        req.onerror = () => resolve(null);
+        req.onsuccess = () => {
+          const rec = req.result;
+          if (!rec || !rec.blob) { resolve(null); return; }
+          rec.at = Date.now();
+          try { store.put(rec, key); } catch (e) { /* the read still stands */ }
+          resolve(rec.blob);
+        };
+      });
+    }).catch(() => null);
+  }
+
+  function vaultHas(key) {
+    return openDb().then(db => {
+      if (!db) return false;
+      return new Promise(resolve => {
+        let t;
+        try { t = db.transaction('tracks', 'readonly'); } catch (e) { resolve(false); return; }
+        t.onabort = () => resolve(false);
+        t.onerror = e2 => { if (e2 && e2.preventDefault) e2.preventDefault(); resolve(false); };
+        const req = t.objectStore('tracks').count(key);
+        req.onerror = () => resolve(false);
+        req.onsuccess = () => resolve(req.result > 0);
+      });
+    }).catch(() => false);
+  }
+
+  // every key with its size and clock, blobs left alone. At the cap this is
+  // ~50 rows, so a cursor walk on eviction is cheaper than a second meta store
+  // that could drift out of step with the real one.
+  function vaultRows(db) {
+    return new Promise(resolve => {
+      const rows = [];
+      let t;
+      try { t = db.transaction('tracks', 'readonly'); } catch (e) { resolve(rows); return; }
+      t.onabort = () => resolve(rows);
+      t.onerror = e2 => { if (e2 && e2.preventDefault) e2.preventDefault(); resolve(rows); };
+      t.oncomplete = () => resolve(rows);
+      const req = t.objectStore('tracks').openCursor();
+      req.onerror = () => resolve(rows);
+      req.onsuccess = () => {
+        const cur = req.result;
+        if (!cur) return;
+        const v = cur.value || {};
+        rows.push({ key: cur.key, bytes: v.bytes || 0, at: v.at || 0 });
+        cur.continue();
+      };
+    });
+  }
+
+  function vaultDelete(db, keys) {
+    if (!keys.length) return Promise.resolve();
+    return new Promise(resolve => {
+      let t;
+      try { t = db.transaction('tracks', 'readwrite'); } catch (e) { resolve(); return; }
+      t.onabort = () => resolve();
+      t.onerror = e2 => { if (e2 && e2.preventDefault) e2.preventDefault(); resolve(); };
+      t.oncomplete = () => resolve();
+      const store = t.objectStore('tracks');
+      keys.forEach(k => { try { store.delete(k); } catch (e) { /* skip it */ } });
+    });
+  }
+
+  // oldest `at` first until the total is back under the cap
+  function vaultEvict(db) {
+    return vaultRows(db).then(rows => {
+      let total = 0;
+      for (let i = 0; i < rows.length; i++) total += rows[i].bytes;
+      if (total <= VAULT_CAP) return null;
+      rows.sort((a, b) => a.at - b.at);
+      const doomed = [];
+      for (let i = 0; i < rows.length && total > VAULT_CAP; i++) {
+        doomed.push(rows[i].key);
+        total -= rows[i].bytes;
+      }
+      return vaultDelete(db, doomed);
+    });
+  }
+
+  function vaultEvictOldest(db) {
+    return vaultRows(db).then(rows => {
+      if (!rows.length) return null;
+      rows.sort((a, b) => a.at - b.at);
+      return vaultDelete(db, [rows[0].key]);
+    });
+  }
+
+  // resolves 'ok' | 'quota' | 'fail' — the caller only retries a quota refusal
+  function vaultPutOnce(db, key, blob) {
+    return new Promise(resolve => {
+      let t;
+      try { t = db.transaction('tracks', 'readwrite'); } catch (e) { resolve('fail'); return; }
+      let why = 'fail';
+      t.onabort = () => resolve(why);
+      t.onerror = e2 => {
+        if (e2 && e2.preventDefault) e2.preventDefault();
+        resolve(why);
+      };
+      t.oncomplete = () => resolve('ok');
+      try {
+        const req = t.objectStore('tracks').put(
+          { blob: blob, bytes: blob.size, at: Date.now() }, key
+        );
+        req.onerror = () => {
+          if (req.error && req.error.name === 'QuotaExceededError') why = 'quota';
+        };
+      } catch (e) {
+        why = e && e.name === 'QuotaExceededError' ? 'quota' : 'fail';
+        try { t.abort(); } catch (e2) { /* already dead */ }
+      }
+    });
+  }
+
+  function vaultPut(key, blob) {
+    return openDb().then(db => {
+      if (!db) return false;
+      return vaultPutOnce(db, key, blob).then(res => {
+        if (res === 'ok') return vaultEvict(db).then(() => true);
+        if (res !== 'quota') return false;
+        // a full origin: drop the coldest entry and try exactly once more,
+        // then give up without a word — a missing save is not a failure the
+        // listener can do anything about
+        return vaultEvictOldest(db)
+          .then(() => vaultPutOnce(db, key, blob))
+          .then(again => again === 'ok');
+      });
+    }).catch(() => false);
+  }
+
+  // ── the prefetch window ────────────────────────────────────────────────────
+  //
+  // urls only ever holds the current track and the next two of the loaded
+  // release. It exists so streamPath() and load() can answer synchronously:
+  // WebKit keeps the page alive while audio plays but only honours a play()
+  // issued inside the `ended` handler, so the src assignment at a track
+  // boundary must not await an IDB read. Do not "simplify" this into a lookup
+  // at load time.
+  const urls = new Map();     // 'slug/NN' → blob: URL
+  let fetchQueue = [];
+  let fetching = false;
+  let activeKey = '';       // the key runQueue is currently fetching
+  let vaultAbort = null;
+  let retryTimer = 0;
+
+  // Two kinds of offline, and conflating them breaks the drive this layer was
+  // built for. `linkDown` is the browser telling us the interface went away:
+  // authoritative, and it clears only when the interface comes back. A failed
+  // fetch is a guess — cellular signal drops and returns with no interface
+  // change at all, so `offline`/`online` never fire on a phone, and a hard flag
+  // set from a fetch would kill the queue for the rest of the session and pin
+  // auto to 128k with no way back. So a fetch failure is *soft*: it holds for a
+  // doubling backoff, then lets the next attempt through. A bad guess costs one
+  // load on the wrong source, which the demote machinery already handles.
+  let linkDown = false;
+  try { linkDown = navigator.onLine === false; } catch (e) { /* assume online */ }
+  let fetchFailedAt = 0;
+  let fetchBackoff = 0;
+  const BACKOFF_MIN = 15000;    // ms before the first retry after a failure
+  const BACKOFF_MAX = 120000;   // ms ceiling on the doubling
+
+  function isOffline() {
+    return linkDown || (fetchFailedAt !== 0 && Date.now() - fetchFailedAt < fetchBackoff);
+  }
+
+  function windowKeys() {
+    const out = [];
+    const rel = slug ? catalog[slug] : null;
+    if (!rel || !rel.tr) return out;
+    for (let i = index; i <= index + WINDOW_AHEAD && i < rel.tr.length; i++) {
+      out.push(vaultKey(slug, pad(rel.tr[i][0])));
+    }
+    return out;
+  }
+
+  function trimUrls(keep) {
+    urls.forEach((url, key) => {
+      if (keep.indexOf(key) !== -1) return;
+      try { URL.revokeObjectURL(url); } catch (e) { /* already gone */ }
+      urls.delete(key);
+    });
+  }
+
+  function revokeAll() {
+    urls.forEach(url => {
+      try { URL.revokeObjectURL(url); } catch (e) { /* already gone */ }
+    });
+    urls.clear();
+  }
+
+  function retryClear() {
+    if (retryTimer) clearTimeout(retryTimer);
+    retryTimer = 0;
+  }
+
+  // the backoff's own alarm clock. Nothing else re-opens the queue after a
+  // fetch failure — a phone that never fires an `online` event would otherwise
+  // wait forever.
+  function retryLater() {
+    retryClear();
+    retryTimer = setTimeout(() => {
+      retryTimer = 0;
+      runQueue();
+      paintQuality();   // the window closed: auto may reach for flac again
+    }, fetchBackoff);
+  }
+
+  // the body in flight only. The key it was fetching goes back to the head of
+  // the queue, so whatever reopens the queue picks up where this left off.
+  function abortInFlight() {
+    if (vaultAbort) {
+      try { vaultAbort.abort(); } catch (e) { /* nothing in flight */ }
+      vaultAbort = null;
+    }
+    if (activeKey && fetchQueue.indexOf(activeKey) === -1) fetchQueue.unshift(activeKey);
+    activeKey = '';
+  }
+
+  // the whole queue. Only for stop() and a release change, where the contents
+  // are downloads for music nobody is waiting on — never for a link failure,
+  // which has to leave the queue standing so a resume has something to resume.
+  function abortQueue() {
+    abortInFlight();
+    fetchQueue = [];
+    retryClear();
+  }
+
+  function noteFetchFailure(key) {
+    fetchFailedAt = Date.now();
+    fetchBackoff = Math.min(fetchBackoff ? fetchBackoff * 2 : BACKOFF_MIN, BACKOFF_MAX);
+    if (key && fetchQueue.indexOf(key) === -1) fetchQueue.unshift(key);
+    retryLater();
+    paintQuality();
+  }
+
+  function noteFetchSuccess() {
+    fetchFailedAt = 0;
+    fetchBackoff = 0;
+    retryClear();
+  }
+
+  // called after every load(): slide the window, revoke what fell out of it,
+  // adopt what the vault already holds and queue the rest.
+  function ensureWindow() {
+    const keys = windowKeys();
+    trimUrls(keys);
+    fetchQueue = fetchQueue.filter(k => keys.indexOf(k) !== -1);
+    keys.forEach(key => {
+      if (urls.has(key) || fetchQueue.indexOf(key) !== -1) return;
+      vaultGet(key).then(blob => {
+        // the window may have moved while the read was out
+        if (urls.has(key) || windowKeys().indexOf(key) === -1) return;
+        if (blob) {
+          adopt(key, blob);
+          return;
+        }
+        if (fetchQueue.indexOf(key) === -1) fetchQueue.push(key);
+        runQueue();
+      });
+    });
+    runQueue();
+  }
+
+  function adopt(key, blob) {
+    if (urls.has(key) || windowKeys().indexOf(key) === -1) return;
+    try {
+      urls.set(key, URL.createObjectURL(blob));
+    } catch (e) { return; }
+    // the chip predicts the next load's source, and this key may have changed it
+    paintQuality();
+  }
+
+  // one fetch at a time: a parallel burst competes with the live stream for the
+  // same link, which is the thing the vault exists to protect.
+  function runQueue() {
+    if (fetching || isOffline() || !fetchQueue.length) return;
+    const key = fetchQueue.shift();
+    if (urls.has(key) || windowKeys().indexOf(key) === -1) { runQueue(); return; }
+    fetching = true;
+    activeKey = key;
+    if (!vaultAbort) {
+      try { vaultAbort = new AbortController(); } catch (e) { vaultAbort = null; }
+    }
+    const ctl = vaultAbort;
+    // it may have been stored since it was queued — a count beats a download
+    vaultHas(key)
+      .then(has => (has ? vaultGet(key) : fetchTrack(key, ctl)))
+      .then(blob => { if (blob) adopt(key, blob); })
+      .catch(() => { /* a miss is a miss */ })
+      .then(() => {
+        fetching = false;
+        if (activeKey === key) activeKey = '';
+        runQueue();
+      });
+  }
+
+  function fetchTrack(key, ctl) {
+    const cut = key.lastIndexOf('/');
+    const s = key.slice(0, cut);
+    const nn = key.slice(cut + 1);
+    const opts = { mode: 'cors', cache: 'no-store' };
+    if (ctl) opts.signal = ctl.signal;
+    return fetch(API + '/p/' + s + '/' + nn, opts)
+      .then(r => {
+        if (!r.ok) throw new Error(String(r.status));
+        return r.blob();
+      })
+      .then(blob => {
+        // a body arrived, so the link is up whatever a previous failure said
+        noteFetchSuccess();
+        return vaultPut(key, blob).then(() => blob);
+      })
+      .catch(err => {
+        // an abort is the queue being torn down on purpose. A TypeError is the
+        // network — or, from localhost, a CORS refusal, which looks identical
+        // and is treated the same: back off, retry later, leave playback alone.
+        if (err && err.name === 'AbortError') return null;
+        if (err instanceof TypeError) noteFetchFailure(key);
+        return null;
+      });
+  }
+
+  window.addEventListener('offline', () => {
+    linkDown = true;
+    // the in-flight body is dead, but the queue is not: `online` resumes it,
+    // and there is nothing for the backoff clock to try until then
+    abortInFlight();
+    retryClear();
+    paintQuality();
+  });
+
+  window.addEventListener('online', () => {
+    linkDown = false;
+    fetchFailedAt = 0;
+    fetchBackoff = 0;
+    retryClear();
+    if (status && status.textContent === NO_SIGNAL) setStatus('');
+    ensureWindow();
+    paintQuality();
+  });
 
   const artEl = document.getElementById('store-player-art');
   const releaseEl = document.getElementById('store-player-release');
@@ -331,13 +772,23 @@
   // the next track, so it names the quality the next load will use
   function paintQuality() {
     if (!qualityBtn) return;
-    const lossless = streamPath(slug) === '/s/';
+    // the chip says "now", so with a track loaded it names the source that is
+    // actually loaded — a mode change lands on the next track and the mode word
+    // beside it already says so. Idle, there is nothing loaded to describe, so
+    // it predicts what the next load would pick. Before the vault the two could
+    // only disagree for one track; now the prefetch window moves under the
+    // prediction (step forward and back and a key leaves urls, then returns),
+    // and a chip reading "saved" over a 128k stream is simply wrong.
+    const path = slug ? currentPath : streamPath(slug, trackNN);
+    const chip = path === 'vault' ? 'saved' : (path === '/s/' ? 'flac' : '128k');
+    const words = path === 'vault'
+      ? 'saved offline'
+      : (path === '/s/' ? 'lossless' : '128 kbps');
     qModeEl.textContent = mode;
-    qNowEl.textContent = ' · ' + (lossless ? 'flac' : '128k');
+    qNowEl.textContent = ' · ' + chip;
     qualityBtn.setAttribute(
       'aria-label',
-      'streaming quality: ' + mode + ', ' +
-      (lossless ? 'lossless' : '128 kbps') + ' now. ' + NEXT_ACTION[mode]
+      'streaming quality: ' + mode + ', ' + words + ' now. ' + NEXT_ACTION[mode]
     );
   }
 
@@ -370,8 +821,36 @@
     stallStart = Date.now();
     stallTimer = setTimeout(() => {
       recordDemote();
-      handoff('/p/');
+      handoff(fallbackPath());
     }, Math.max(0, STALL_BUDGET - stalledMs));
+  }
+
+  // the offline dead end. Nothing arms the stall clock on a '/p/' source, and a
+  // blob cannot stall for network reasons, so an offline listener whose track
+  // was never saved would otherwise sit in silence with no explanation. Three
+  // guards keep it off the healthy path: the link has to be down, the buffer
+  // has to be dry, and the playhead has to have stopped moving — a prefetch
+  // that failed while the live stream plays fine trips none of them.
+  const OFFLINE_STALL = 4000;
+  let offlineTimer = 0;
+
+  function offlineStallClear() {
+    if (offlineTimer) clearTimeout(offlineTimer);
+    offlineTimer = 0;
+  }
+
+  function offlineStallBegin() {
+    if (!isOffline() || !slug || currentPath === 'vault' || offlineTimer) return;
+    if (audio.paused) return;
+    const was = audio.currentTime;
+    offlineTimer = setTimeout(() => {
+      offlineTimer = 0;
+      if (!isOffline() || !slug || currentPath === 'vault') return;
+      if (audio.currentTime !== was) return;                  // still moving
+      if (bufferedEnd(audio.currentTime) - audio.currentTime > 1) return;  // still has runway
+      audio.pause();
+      reportLoadFailure(NO_SIGNAL);
+    }, OFFLINE_STALL);
   }
 
   function stallEnd() {
@@ -383,9 +862,10 @@
 
   // the end of the line for a source: nothing is playing and nothing is left
   // to try
-  function reportLoadFailure() {
+  function reportLoadFailure(msg) {
     stallReset();
-    setStatus('that preview didn’t load. try again in a moment.');
+    offlineStallClear();
+    setStatus(msg || 'that preview didn’t load. try again in a moment.');
     syncToggle();
   }
 
@@ -398,7 +878,11 @@
   let handoffGen = 0;
 
   function handoff(toPath, forcePlay, fromError) {
-    if (!slug || currentPath === toPath) return;
+    if (!slug) return;
+    // the window can move between the decision and the call — a vault target
+    // with no URL behind it is the 128k stream instead
+    if (toPath === 'vault' && !urls.has(vaultKey(slug, trackNN))) toPath = '/p/';
+    if (currentPath === toPath) return;
     const gen = ++handoffGen;
     lastRunway = Infinity;   // the new source buffers on its own terms
 
@@ -413,6 +897,7 @@
       swapPointers();
       currentPath = toPath;
       stallReset();
+      offlineStallClear();
       paintQuality();
       if (wasPlaying) {
         const p = audio.play();
@@ -430,7 +915,7 @@
       // a demote can just give up and leave the current source playing, but an
       // error-path handoff has no live source behind it — the listener's
       // message is all that is left
-      if (fromError) reportLoadFailure();
+      if (fromError) reportLoadFailure(isOffline() && toPath !== 'vault' ? NO_SIGNAL : '');
     }
 
     standby.addEventListener('canplay', done, { once: true });
@@ -438,7 +923,7 @@
     // the element was cloned from a preload="none" tag, so a bare src assignment
     // would download nothing
     standby.preload = 'auto';
-    standby.src = API + toPath + slug + '/' + trackNN;
+    standby.src = srcFor(toPath, slug, trackNN);
   }
 
   // ⏮ is a restart before it is a skip — the same convention every transport
@@ -480,6 +965,9 @@
     const total = rel.tr.length;
     if (nextIndex < 0 || nextIndex >= total) return;
 
+    // a different record: the queue is fetching for one nobody is listening to
+    if (nextSlug !== slug) abortQueue();
+
     slug = nextSlug;
     index = nextIndex;
     const track = rel.tr[index];      // [trackNumber, title, seconds]
@@ -488,24 +976,31 @@
     trackNN = nn;
     retried = false;
     stallReset();
+    offlineStallClear();
     startClear();        // a rapid skip re-arms the deadline below
     lastRunway = Infinity;
     lastBufEnd = -1;     // buffer readings don't carry across tracks
     handoffGen++;        // a handoff in flight is for the track being replaced
     clearEl(standby);    // and so is whatever it half-loaded
-    currentPath = streamPath(slug);
+    // synchronous, all of it: on iOS this runs inside the `ended` handler and
+    // the play() below only counts while that handler is still on the stack.
+    // streamPath reads the in-memory url map, never IndexedDB.
+    currentPath = streamPath(slug, nn);
     // a promotion is spent the moment it lands: any later one needs fresh
     // evidence, and demoteCount survives so a re-stall backs off harder
     if (currentPath === '/s/' && promotable) {
       promotable = false;
       healthySince = 0;
     }
-    audio.src = API + currentPath + slug + '/' + nn;
-    if (autoplay && mode === 'auto' && currentPath === '/s/') {
+    audio.src = srcFor(currentPath, slug, nn);
+    // nothing to arm on a blob (there is no download to stall), and nothing to
+    // arm offline either — the deadline's whole point is to reach a better
+    // source, and offline there isn't one.
+    if (autoplay && mode === 'auto' && currentPath === '/s/' && !isOffline()) {
       startTimer = setTimeout(() => {
         startTimer = 0;
         recordDemote();
-        handoff('/p/', true);
+        handoff(fallbackPath(), true);
       }, START_DEADLINE);
     }
     paintQuality();
@@ -536,6 +1031,10 @@
       if (p && p.catch) p.catch(() => syncToggle());
     }
     syncToggle();
+    // slide the prefetch window: this track, then the next two. Whatever the
+    // vault already holds becomes a blob: URL now, so the next `ended` can
+    // reach it without touching IndexedDB.
+    ensureWindow();
     // measured last: the title above is what decides how tall the bar wraps
     sizeDock();
   }
@@ -551,13 +1050,19 @@
   function stop() {
     stallReset();
     startClear();
+    offlineStallClear();
     lastRunway = Infinity;
     handoffGen++;
     clearEl(audio);
     clearEl(standby);
+    // the elements are released above, so every blob: URL is now unreferenced
+    abortQueue();
+    revokeAll();
     slug = null;
+    currentPath = '/p/';   // nothing is loaded; the chip goes back to predicting
     showBar(false);
     paintEnds();
+    paintQuality();
     markCards();
     if ('mediaSession' in navigator) {
       navigator.mediaSession.playbackState = 'none';
@@ -693,10 +1198,10 @@
   bindBoth('play', syncToggle);
   // pausing during startup withdraws the deadline: a forced demote would resume
   // playback the listener just stopped
-  bindBoth('pause', () => { stallEnd(); startClear(); syncToggle(); });
-  bindBoth('waiting', stallBegin);
-  bindBoth('stalled', stallBegin);
-  bindBoth('playing', () => { stallEnd(); startClear(); });
+  bindBoth('pause', () => { stallEnd(); startClear(); offlineStallClear(); syncToggle(); });
+  bindBoth('waiting', () => { stallBegin(); offlineStallBegin(); });
+  bindBoth('stalled', () => { stallBegin(); offlineStallBegin(); });
+  bindBoth('playing', () => { stallEnd(); startClear(); offlineStallClear(); });
   bindBoth('ended', () => {
     if (!slug) return;
     if (index < catalog[slug].tr.length - 1) step(1);
@@ -736,7 +1241,7 @@
     }
     if (runway < RUNWAY_MIN && runway < lastRunway) {
       recordDemote();
-      handoff('/p/');
+      handoff(fallbackPath());
       // currentPath only flips when the handoff lands, so the monitor has to
       // disarm itself in the meantime — every tick until then would otherwise
       // cancel and restart the swap
@@ -764,7 +1269,11 @@
 
   function healthCheck() {
     if (mode !== 'auto' || demoteCount === 0 || promotable) return;
-    if (currentPath !== '/p/' || !slug || audio.paused) return;
+    // the probe at the end of this is a network fetch — offline it can only fail
+    if (isOffline()) return;
+    // a vault source counts: the listener is hearing the demoted quality, and
+    // the streak is what buys the probe that measures the link for real
+    if ((currentPath !== '/p/' && currentPath !== 'vault') || !slug || audio.paused) return;
     // a pack has no flac source to be promoted to, and probing one would fire a
     // guaranteed 404 — the session's demote state is left untouched
     if (mp3Only(slug)) return;
@@ -776,7 +1285,9 @@
     const t = audio.currentTime;
     const end = bufferedEnd(t);
     const dur = audio.duration;
-    const whole = end >= 0 && dur && isFinite(dur) && end >= dur - 0.5;
+    // a blob is whole the instant it plays — there is nothing left to download
+    const whole = currentPath === 'vault' ||
+      (end >= 0 && dur && isFinite(dur) && end >= dur - 0.5);
     // growing at least as fast as the clock is the test — a buffer that only
     // holds its lead is keeping pace, one that slips is not
     const growing = end >= 0 && lastBufEnd >= 0 && elapsedSec > 0 &&
@@ -799,7 +1310,7 @@
   // one ranged GET of the flac source, wall-clocked. The API answers GET only —
   // a HEAD comes back 404 — so the first half-megabyte is the measurement.
   function probeLossless() {
-    if (probing) return;
+    if (probing || isOffline()) return;
     probing = true;
     const t0 = Date.now();
     fetch(API + '/s/' + slug + '/' + trackNN, {
@@ -845,7 +1356,13 @@
     // failure reaches the listener
     if (currentPath === '/s/' && !retried) {
       retried = true;
-      handoff('/p/', true, true);
+      handoff(fallbackPath(), true, true);
+      return;
+    }
+    // the link is down and this one was never saved. Say so plainly and stop:
+    // there is nothing left to try, and auto-advancing would only fail again.
+    if (isOffline() && currentPath !== 'vault') {
+      reportLoadFailure(NO_SIGNAL);
       return;
     }
     reportLoadFailure();

@@ -409,6 +409,42 @@ test('player.js drives both pages and keeps the CSP posture', () => {
   }
 });
 
+// The offline vault. Its behaviour needs a real browser and a real dead zone,
+// so what is asserted here is that the layer is present and still keeps the
+// posture: the IndexedDB store, the cap, the blob: URL lifecycle, the CORS
+// fetch, the third source path and both link-state events.
+test('player.js carries the offline vault', () => {
+  const js = readFileSync(join(root, 'player.js'), 'utf8');
+  // comments name several of these to explain them, so scan code only
+  const code = js.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/.*$/gm, ' ');
+
+  for (const needle of [
+    "indexedDB.open('mj-audio'",   // the database, opened lazily
+    'VAULT_CAP',                   // 200 MB before LRU eviction
+    'URL.createObjectURL',         // the in-memory window of blob: URLs
+    'URL.revokeObjectURL',         // and the other half of its lifecycle
+    'navigator.storage',           // persist() asked once, answer ignored
+    "mode: 'cors'",                // /p/ answers the site origin only
+    "'vault'",                     // the third currentPath
+    "addEventListener('offline'",
+    "addEventListener('online'",
+    // a phone's signal drops and returns with no interface change, so the
+    // events never fire — a fetch failure has to expire on its own clock
+    'fetchBackoff'
+  ]) {
+    assert.ok(code.includes(needle), `player.js never mentions ${needle}`);
+  }
+
+  // the vault must not smuggle a markup sink or a global in behind the layer
+  assert.ok(!/\bwindow\.[A-Za-z_$][\w$]*\s*=[^=]/.test(code), 'player.js writes a window global');
+  for (const sink of ['innerHTML', 'insertAdjacentHTML', 'outerHTML', 'document.write']) {
+    assert.ok(!code.includes(sink), `player.js uses ${sink}`);
+  }
+
+  // and it has to parse
+  execFileSync(process.execPath, ['--check', join(root, 'player.js')], { stdio: 'pipe' });
+});
+
 test('the one player is wired into the home page, _headers and the deploy', () => {
   const html = readFileSync(join(root, 'index.html'), 'utf8');
   const hits = html.match(/player\.js\?v=dev/g) || [];
