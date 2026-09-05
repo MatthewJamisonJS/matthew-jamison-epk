@@ -125,30 +125,19 @@ async function serveAudio(
   return new Response(object.body, { status: 200, headers });
 }
 
-export async function handlePreview(
-  req: Request,
-  env: Env,
-  ctx: Ctx,
-  params: Record<string, string>,
-): Promise<Response> {
-  return serveAudio(req, env, ctx, params, 'previews', 'mp3', 'audio/mpeg');
-}
-
-export async function handleStreamPreflight(req: Request, env: Env): Promise<Response> {
-  const cors = streamCorsHeaders(env, req);
-  if (Object.keys(cors).length === 0) {
-    return new Response(null, { status: 403 });
-  }
-  return new Response(null, { status: 204, headers: cors });
-}
-
-export async function handleStream(
-  req: Request,
-  env: Env,
-  ctx: Ctx,
-  params: Record<string, string>,
-): Promise<Response> {
-  const res = await serveAudio(req, env, ctx, params, 'stream', 'flac', 'audio/flac');
+/**
+ * Adds the stream CORS set to an already-built audio response.
+ *
+ * Applied AFTER the cache lookup, on the response object only -- what
+ * `cache.put` stores stays origin-neutral, so one cached body serves every
+ * origin and a CORS grant is never baked into the edge cache.
+ *
+ * `Vary` is appended rather than set: the audio responses do not carry one
+ * today, but a `set` here would silently drop it if they ever do.
+ *
+ * Both /p/ and /s/ go through this, so the two routes cannot drift.
+ */
+function withStreamCors(res: Response, env: Env, req: Request): Response {
   const cors = streamCorsHeaders(env, req);
   if (Object.keys(cors).length === 0) return res;
   const headers = new Headers(res.headers);
@@ -157,4 +146,42 @@ export async function handleStream(
     else headers.set(k, v);
   }
   return new Response(res.body, { status: res.status, headers });
+}
+
+export async function handlePreview(
+  req: Request,
+  env: Env,
+  ctx: Ctx,
+  params: Record<string, string>,
+): Promise<Response> {
+  const res = await serveAudio(req, env, ctx, params, 'previews', 'mp3', 'audio/mpeg');
+  return withStreamCors(res, env, req);
+}
+
+/**
+ * Shared preflight for /p/ and /s/ -- same single-origin allowlist, same
+ * `Range` allowance, so one function answers both.
+ */
+export async function handleAudioPreflight(req: Request, env: Env): Promise<Response> {
+  const cors = streamCorsHeaders(env, req);
+  if (Object.keys(cors).length === 0) {
+    return new Response(null, { status: 403 });
+  }
+  return new Response(null, { status: 204, headers: cors });
+}
+
+/** Kept so index.ts still reads /s/ -> handleStreamPreflight at a glance. */
+export const handleStreamPreflight = handleAudioPreflight;
+
+/** Ditto for /p/. */
+export const handlePreviewPreflight = handleAudioPreflight;
+
+export async function handleStream(
+  req: Request,
+  env: Env,
+  ctx: Ctx,
+  params: Record<string, string>,
+): Promise<Response> {
+  const res = await serveAudio(req, env, ctx, params, 'stream', 'flac', 'audio/flac');
+  return withStreamCors(res, env, req);
 }
