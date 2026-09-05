@@ -150,11 +150,17 @@ export function corsHeaders(env: Env, req: Request): Record<string, string> {
  * a real CORS fetch. Applied per-request after the cache lookup, so cached
  * entries stay origin-neutral.
  */
+// Cloudflare Pages preview deployments of the site: <branch>.<project>.pages.dev.
+// Allowed on the PUBLIC stream routes only, so a preview build can exercise the
+// player's vault fetch against the live audio. Checkout stays site-origin only.
+const PAGES_PREVIEW_RE = /^https:\/\/[a-z0-9-]+\.matthew-jamison-epk\.pages\.dev$/;
+
 export function streamCorsHeaders(env: Env, req: Request): Record<string, string> {
   const origin = req.headers.get('Origin');
-  if (origin !== env.SITE_ORIGIN) return {};
+  if (!origin) return {};
+  if (origin !== env.SITE_ORIGIN && !PAGES_PREVIEW_RE.test(origin)) return {};
   return {
-    'Access-Control-Allow-Origin': env.SITE_ORIGIN,
+    'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Access-Control-Allow-Headers': 'Range',
     'Access-Control-Max-Age': '86400',

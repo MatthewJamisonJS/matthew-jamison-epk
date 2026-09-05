@@ -53,6 +53,19 @@ describe('GET /p/:slug/:track CORS', () => {
     expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull();
   });
 
+  // A Pages preview build of the site gets its own origin back, so the player's
+  // vault fetch can be exercised against live audio before a merge to main.
+  it('echoes a Pages preview origin of this project', async () => {
+    const preview = 'https://unified-player.matthew-jamison-epk.pages.dev';
+    const res = await get(preview);
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe(preview);
+  });
+
+  it('rejects a pages.dev origin from another project', async () => {
+    const res = await get('https://unified-player.someone-else.pages.dev');
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull();
+  });
+
   it('sends no ACAO when there is no Origin at all', async () => {
     const res = await get(null);
     expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull();
