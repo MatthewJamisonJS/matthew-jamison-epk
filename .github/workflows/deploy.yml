@@ -29,7 +29,7 @@ jobs:
       # scaffolding: live, header-noindexed, and not worth an indexable URL.
       - name: prune non-site files
         run: rm -rf worker docs scripts data content games/_test
-      # style.css, script.js, release.js, blog.js and subscribe.js are cached 7 days unversioned
+      # style.css, script.js, player.js, blog.js and subscribe.js are cached 7 days unversioned
       # (_headers); stamp their ?v= query with the commit SHA so every deploy is
       # a new URL and returning phones never run stale JS against fresh HTML.
       - name: version assets
@@ -43,7 +43,7 @@ jobs:
         run: |
           npx --yes esbuild style.css --minify --allow-overwrite --outfile=style.css
           npx --yes esbuild script.js --minify --allow-overwrite --outfile=script.js
-          npx --yes esbuild release.js --minify --allow-overwrite --outfile=release.js
+          npx --yes esbuild player.js --minify --allow-overwrite --outfile=player.js
           npx --yes esbuild blog.js --minify --allow-overwrite --outfile=blog.js
           npx --yes esbuild subscribe.js --minify --allow-overwrite --outfile=subscribe.js
       - uses: cloudflare/wrangler-action@v4

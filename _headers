@@ -32,7 +32,8 @@
   # api.matthewjamison.dev is the store worker: connect-src for the checkout
   # POST, media-src for the /p/{slug}/{NN} preview streams. Album art is
   # self-hosted under /assets/covers/, so img-src is back to 'self'.
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-zGdcM3cD/rgIg2O6ovTJcFQ/KFe+zcFDhgEYH75jLDA=' 'sha256-M1GoZRETYTKm52cLLG8yWfOgQO/UVkAXw3mxnKTky5I=' https://static.cloudflareinsights.com; style-src 'self'; img-src 'self'; font-src 'self'; media-src 'self' https://api.matthewjamison.dev; connect-src 'self' https://cloudflareinsights.com https://api.matthewjamison.dev; form-action 'none'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; require-trusted-types-for 'script'
+  # blob: for the offline vault's IndexedDB-backed tracks (player.js).
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-zGdcM3cD/rgIg2O6ovTJcFQ/KFe+zcFDhgEYH75jLDA=' 'sha256-M1GoZRETYTKm52cLLG8yWfOgQO/UVkAXw3mxnKTky5I=' https://static.cloudflareinsights.com; style-src 'self'; img-src 'self'; font-src 'self'; media-src 'self' blob: https://api.matthewjamison.dev; connect-src 'self' https://cloudflareinsights.com https://api.matthewjamison.dev; form-action 'none'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; require-trusted-types-for 'script'
 
 # content-stable: fonts, video, and the retired orb files never change in place
 /assets/*
@@ -45,8 +46,8 @@
 /script.js
   Cache-Control: public, max-age=604800, stale-while-revalidate=86400
 
-# the release pages' buy button — same posture as script.js
-/release.js
+# the one player, home + release pages — same posture as script.js
+/player.js
   Cache-Control: public, max-age=604800, stale-while-revalidate=86400
 
 # the blog pages' avatar/reduce-motion + copy-link handling, and the subscribe

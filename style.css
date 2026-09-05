@@ -528,6 +528,10 @@ star-field {
   /* no hover-scale: these cards hold controls, and a scaling target under the
      pointer makes the play and buy buttons harder to hit */
   transition: border-color 0.18s;
+  /* the containing block for the stretched link below: the title's ::after
+     covers the whole card, so a tap anywhere that isn't a control navigates
+     to /music/<slug>/. */
+  position: relative;
 }
 
 .store-card:hover,
@@ -560,6 +564,8 @@ star-field {
   position: absolute;
   left: 8px;
   bottom: 8px;
+  /* above the title's stretched ::after, which covers the card */
+  z-index: 1;
   /* 44x44 — the minimum touch target, and the reason the icon is an svg
      rather than a glyph sized off the font */
   width: 44px;
@@ -627,10 +633,20 @@ star-field {
 .store-title a:hover,
 .store-title a:focus-visible { text-decoration: underline; text-underline-offset: 3px; }
 
+/* stretched link: the whole card is the title's hit area. The pseudo-element
+   is invisible and carries no focus of its own, so the ring still draws around
+   the title text — the link is one tab stop, at its own size, not the card's.
+   The three real controls sit above it on z-index 1. */
+.store-title a::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
 /* hub cards (/music/): the cover is a link too, so the whole square is a target
    and not just the title text. It is tabindex=-1 + aria-hidden, so the title
    stays the one tab stop; hovering the art underlines the title to say so. */
-.store-art-link { display: block; width: 100%; height: 100%; }
+.store-art-link { display: block; width: 100%; height: 100%; position: relative; z-index: 1; }
 .store-card:has(.store-art-link:hover) .store-title a { text-decoration: underline; text-underline-offset: 3px; }
 
 .store-meta {
@@ -641,6 +657,9 @@ star-field {
 
 .store-buy {
   margin-top: auto;
+  /* above the title's stretched ::after, which covers the card */
+  position: relative;
+  z-index: 1;
   padding: 9px 12px;
   background: none;
   border: 1px solid var(--mj-accent-border);
@@ -988,7 +1007,7 @@ body.store-note {
 .release-date { font-size: 13px; letter-spacing: 0.04em; }
 .release-actions { margin-top: 4px; }
 
-/* the checkout failure line from release.js. Reserves no height while empty —
+/* the checkout failure line from player.js. Reserves no height while empty —
    it is announced by aria-live, not by taking up space. */
 .release-status { font-size: 13px; color: var(--text-muted); letter-spacing: 0.04em; }
 
@@ -1063,13 +1082,15 @@ body.store-note {
 }
 
 /* ── the release page's now-playing bar ─────── */
-/* Everything visual is .store-player's, inherited. The only thing that differs
-   is the column count: the home bar carries seven cells (art, meta, transport,
-   scrubber, time, quality, stop) and this one carries four. The home rules name
-   the missing three by id/class, so they simply don't apply — but the column
-   template is on .store-player-row and does, which is what these two rules fix. */
+/* One bar, two pages: the generator emits the same seven cells here (art, meta,
+   transport, scrubber, time, quality, stop) with the same ids, and player.js
+   drives both. So the column template, the row stacking under 768px and every
+   visual rule are .store-player's, inherited untouched — .release-player only
+   adjusts what its bigger transport costs the row. */
 .release-player .store-player-row {
-  grid-template-columns: 52px minmax(0, 1fr) auto auto;
+  /* the 44px controls below are wider than the home bar's 38px ones, so the
+     row gives back 2px of gutter rather than squeezing the scrubber */
+  gap: 10px;
 }
 
 /* the home bar's 38x34 controls sit in a row that also carries a scrubber, a
@@ -1094,27 +1115,10 @@ body.store-note {
   overflow: hidden;
 }
 
-@media (max-width: 768px) {
-  /* three rows, not the home bar's four — there is no scrubber to give one to.
-     What's playing, then the transport centred on the bar's axis, then the
-     clock under it. */
-  .release-player .store-player-row {
-    grid-template-columns: 52px minmax(0, 1fr);
-    row-gap: 12px;
-  }
-
-  .release-player .store-transport {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    justify-content: center;
-  }
-
-  .release-player .store-time {
-    grid-column: 1 / -1;
-    grid-row: 3;
-    text-align: center;
-  }
-}
+/* no phone override: this bar now carries the scrubber, the quality chip and
+   the stop button too, so the home bar's four-row stack under 768px (and its
+   five-row split under 360px) is exactly the layout this one wants. The old
+   three-row rules here put the clock on row 3, where the scrubber lives. */
 
 /* one column under the tablet break: the cover caps at its rendered size and
    the buy column centres with the rest of the phone layout */

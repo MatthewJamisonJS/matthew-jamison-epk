@@ -367,6 +367,68 @@ test('player.js exists and every release page loads it', () => {
   }
 });
 
+// release.js is gone. These stand in for the behaviour tests it used to carry:
+// the one module has to reach both pages' controls, and it has to keep the
+// posture the CSP depends on. Behaviour proper belongs in player.test.mjs.
+test('player.js drives both pages and keeps the CSP posture', () => {
+  const js = readFileSync(join(root, 'player.js'), 'utf8');
+
+  // the shared audio element, the two play surfaces, the two buy surfaces
+  for (const needle of [
+    "getElementById('store-audio')",
+    '.track-play',
+    '.store-play',
+    '.store-buy',
+    '.release-buy',
+    'mediaSession',
+    'RESTART_AFTER'
+  ]) {
+    assert.ok(js.includes(needle), `player.js never mentions ${needle}`);
+  }
+
+  // the file's own comments name these APIs to say it does not use them, so
+  // the scan runs over code only. Blunt on purpose: everything from a // to the
+  // end of the line goes, which costs nothing but the tail of a URL literal.
+  const code = js.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/.*$/gm, ' ');
+
+  // an IIFE, not a namespace: nothing is published for another script to reach
+  assert.ok(!/\bwindow\.[A-Za-z_$][\w$]*\s*=[^=]/.test(code), 'player.js writes a window global');
+
+  // Trusted Types is enforced sitewide — no markup sink may appear at all
+  for (const sink of ['innerHTML', 'insertAdjacentHTML', 'outerHTML', 'document.write']) {
+    assert.ok(!code.includes(sink), `player.js uses ${sink}`);
+  }
+
+  // the only inline-style writes allowed are the two dock custom properties
+  const styleWrites = code.match(/\.style\.[A-Za-z]+/g) || [];
+  for (const w of styleWrites) {
+    assert.ok(
+      w === '.style.setProperty' || w === '.style.removeProperty',
+      `player.js writes ${w} — the CSP allows no style attribute`
+    );
+  }
+});
+
+test('the one player is wired into the home page, _headers and the deploy', () => {
+  const html = readFileSync(join(root, 'index.html'), 'utf8');
+  const hits = html.match(/player\.js\?v=dev/g) || [];
+  assert.equal(hits.length, 1, 'index.html does not load player.js exactly once');
+  assert.ok(!html.includes('release.js'), 'index.html still references release.js');
+  assert.ok(!existsSync(join(root, 'release.js')), 'release.js is still on disk');
+
+  const headers = readFileSync(join(root, '_headers'), 'utf8');
+  assert.match(headers, /^\/player\.js$/m, '_headers has no /player.js block');
+  assert.ok(!headers.includes('/release.js'), '_headers still caches /release.js');
+  // the vault plays IndexedDB-backed tracks off blob: URLs
+  const csp = headers.split('\n').find(l => l.includes('Content-Security-Policy: default-src \'self\''));
+  assert.ok(csp, 'no home-page CSP line in _headers');
+  assert.match(csp, /media-src [^;]*\bblob:/, "media-src does not allow blob:");
+
+  const deploy = readFileSync(join(root, '.github', 'workflows', 'deploy.yml'), 'utf8');
+  assert.match(deploy, /esbuild player\.js --minify/, 'the deploy does not minify player.js');
+  assert.ok(!deploy.includes('release.js'), 'the deploy still minifies release.js');
+});
+
 test('release player: the track control has sizing and state rules to hang on', () => {
   const css = readFileSync(join(root, 'style.css'), 'utf8');
   assert.match(css, /\.track-play\s*\{/, '.track-play has no rule');
