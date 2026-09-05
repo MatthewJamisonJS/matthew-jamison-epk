@@ -1281,6 +1281,7 @@ still healing</p>
        transport that only stuck to the catalog was off-screen for every
        #samples preview. role=region makes it a landmark, since it sits far
        from the card that started it in DOM order. -->
+  <!-- player:start -->
   <div class="store-player" id="store-player" role="region" aria-label="now playing" hidden>
     <p class="store-player-label comment">// now playing</p>
     <div class="store-player-row">
@@ -1296,13 +1297,14 @@ still healing</p>
       </div>
       <input type="range" class="store-scrub" id="store-scrub" min="0" max="100" step="1" value="0" aria-label="seek within track">
       <span class="store-time" id="store-time">0:00 / 0:00</span>
-      <!-- one button cycles auto → lossless → saver; script.js writes both
+      <!-- one button cycles auto → lossless → saver; player.js writes both
            spans and the aria-label with textContent -->
       <button type="button" class="store-quality" id="store-quality" aria-label="streaming quality: auto, lossless now. press to force lossless"><span class="store-quality-mode" id="store-quality-mode">auto</span><span class="store-quality-now" id="store-quality-now"> · flac</span></button>
       <button type="button" class="store-ctl store-ctl-stop" id="store-stop" aria-label="stop playback"><svg class="icon icon-stop" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg></button>
     </div>
     <audio id="store-audio" preload="none"></audio>
   </div>
+  <!-- player:end -->
 
   <!-- footer -->
   <footer class="footer">
