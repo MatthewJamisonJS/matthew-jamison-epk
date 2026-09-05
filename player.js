@@ -247,7 +247,20 @@
           if (!db.objectStoreNames.contains('tracks')) db.createObjectStore('tracks');
         } catch (e) { /* the open handlers below report the failure */ }
       };
-      req.onsuccess = () => resolve(req.result);
+      req.onsuccess = () => {
+        const db = req.result;
+        // a same-version database without the store (something else opened the
+        // name first, or the upgrade half-failed) would throw on every
+        // transaction — that is "no vault", not an error to raise later
+        let ok = false;
+        try { ok = db.objectStoreNames.contains('tracks'); } catch (e) { ok = false; }
+        if (!ok) {
+          try { db.close(); } catch (e) { /* already closed */ }
+          resolve(null);
+          return;
+        }
+        resolve(db);
+      };
       req.onerror = () => resolve(null);
       req.onblocked = () => resolve(null);
     });
