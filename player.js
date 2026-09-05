@@ -855,11 +855,17 @@
     const words = path === 'vault'
       ? 'saved offline'
       : (path === '/s/' ? 'lossless' : '128 kbps');
+    // the browser's own verdict only, not the fetch backoff: "flac · offline"
+    // says the saved copy is standing by behind a stream that is still playing
+    // off its buffer — the flip to "saved" happens when the vault actually
+    // takes over, and this is the honest word in the meantime.
+    const hint = linkDown ? ' · offline' : '';
     qModeEl.textContent = mode;
-    qNowEl.textContent = ' · ' + chip;
+    qNowEl.textContent = ' · ' + chip + hint;
     qualityBtn.setAttribute(
       'aria-label',
-      'streaming quality: ' + mode + ', ' + words + ' now. ' + NEXT_ACTION[mode]
+      'streaming quality: ' + mode + ', ' + words + (linkDown ? ', offline' : '') +
+      ' now. ' + NEXT_ACTION[mode]
     );
   }
 

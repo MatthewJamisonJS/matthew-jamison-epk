@@ -685,10 +685,15 @@ test('an offline event stops attempts until online comes back', async () => {
   w.window.dispatchEvent({ type: 'offline' });
   await tick(w, 600000);
   assert.equal(w.fetches.length, 1, 'the backoff clock is disarmed while the link is down');
+  // the browser's verdict shows on the chip while whatever is loaded keeps
+  // playing off its buffer — the flip to "saved" waits for the vault to take over
+  assert.equal(w.els.get('store-quality-now').textContent, ' · flac · offline');
+  assert.match(w.els.get('store-quality').getAttribute('aria-label'), /lossless, offline now/);
 
   w.window.dispatchEvent({ type: 'online' });
   await flush();
   assert.equal(w.fetches.length, 2, 'online resumes the queue at once');
+  assert.equal(w.els.get('store-quality-now').textContent, ' · flac');
 });
 
 // ── 7. LRU eviction ─────────────────────────────────────────────────────────
