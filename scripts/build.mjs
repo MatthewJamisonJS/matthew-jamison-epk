@@ -246,15 +246,11 @@ const ICON_PREV =
   '<svg class="icon icon-prev" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false"><path d="M5 4.75a.75.75 0 0 1 1.5 0v3.9l7.35-4.45A.75.75 0 0 1 15 4.84v10.32a.75.75 0 0 1-1.15.64L6.5 11.35v3.9a.75.75 0 0 1-1.5 0V4.75Z"/></svg>';
 const ICON_NEXT =
   '<svg class="icon icon-next" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false"><path d="M15 4.75a.75.75 0 0 0-1.5 0v3.9L6.15 4.2A.75.75 0 0 0 5 4.84v10.32a.75.75 0 0 0 1.15.64l7.35-4.45v3.9a.75.75 0 0 0 1.5 0V4.75Z"/></svg>';
+// The stop glyph — an ✕, not a square: the button ends the session and
+// closes the bar, it does not pause.
+const ICON_STOP =
+  '<svg class="icon icon-stop" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" focusable="false"><path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z"/></svg>';
 
-// The now-playing bar. Same component as the home store's, reduced to what a
-// release page needs: no scrubber (the tracklist is the index), no quality chip
-// (the player bar on / owns that setting) and no stop button (the toggle and a
-// navigation both end it). Every class and every glyph is the home bar's.
-//
-// It lives after the footer, not inside the section: .section carries a
-// backdrop-filter, and a filtered ancestor becomes the containing block for a
-// position: fixed descendant — the bar would scroll with the page.
 // Track titles are full of code — `b_strolln.html.erb`, `structure.sql`,
 // `values.value.map(&:to_s).join("; `. At 375px the title column is ~125px, so
 // CSS had two options and both were wrong: overflow-wrap: break-word split them
@@ -266,31 +262,67 @@ const ICON_NEXT =
 // are not in the class.
 const wrappable = title => esc(title).replace(/([._/:=?])(?=[^\s<])/g, '$1<wbr>');
 
-function releaseBar(r) {
-  const ctl = (id, label, icons, extra = '') =>
-    `        <button type="button" class="store-ctl" id="${id}" aria-label="${label}"${extra}>${icons}</button>`;
-
-  return `  <div class="store-player release-player" id="release-player" role="region" aria-label="now playing" hidden>
+// The now-playing bar — one component, two pages. index.html no longer owns
+// these bytes: this function does, and the build rewrites the block between the
+// <!-- player:start --> / <!-- player:end --> markers in that file, exactly the
+// way it rewrites the notes: block. A single player.js drives both copies, so
+// every id is shared and nothing is trimmed per page — same transport, same
+// scrubber, same quality chip, same stop.
+//
+// `art` and `release` pre-fill the thumb and the release line on a release page,
+// where there is one record and the bar should read correctly before any JS
+// runs. The home copy ships them empty and fills them on the first play. No
+// aria-disabled ships either: the end stops are player state, not markup.
+//
+// It lives after the footer, not inside the section: .section carries a
+// backdrop-filter, and a filtered ancestor becomes the containing block for a
+// position: fixed descendant — the bar would scroll with the page.
+function playerBar({ art = '', release = '', extraClass = '' } = {}) {
+  const cls = extraClass ? ` ${extraClass}` : '';
+  return `  <div class="store-player${cls}" id="store-player" role="region" aria-label="now playing" hidden>
     <p class="store-player-label comment">// now playing</p>
     <div class="store-player-row">
-      <!-- one release, one cover: the art never changes, so it is static markup
-           and the 210px file is the smallest of the three. -->
-      <img class="store-player-art" src="${cover(r, 210)}" alt="" width="52" height="52" decoding="async">
+      <img class="store-player-art" id="store-player-art" src="${art}" alt="" width="52" height="52" decoding="async">
       <div class="store-player-meta">
-        <p class="store-player-release">${esc(r.title)}</p>
-        <p class="store-player-track" id="release-now" aria-live="polite"></p>
+        <p class="store-player-release" id="store-player-release">${release}</p>
+        <p class="store-player-track" id="store-player-track" aria-live="polite"></p>
       </div>
       <div class="store-transport">
-${ctl('release-prev', 'previous track', ICON_PREV, ' aria-disabled="true"')}
-${ctl('release-toggle', 'pause playback', ICON_PLAY + ICON_PAUSE)}
-${ctl('release-next', 'next track', ICON_NEXT, r.tracks.length > 1 ? '' : ' aria-disabled="true"')}
+        <button type="button" class="store-ctl" id="store-prev" aria-label="previous track">${ICON_PREV}</button>
+        <button type="button" class="store-ctl is-playing" id="store-toggle" aria-label="pause playback">${ICON_PLAY}${ICON_PAUSE}</button>
+        <button type="button" class="store-ctl" id="store-next" aria-label="next track">${ICON_NEXT}</button>
       </div>
-      <span class="store-time" id="release-time">0:00 / 0:00</span>
+      <input type="range" class="store-scrub" id="store-scrub" min="0" max="100" step="1" value="0" aria-label="seek within track">
+      <span class="store-time" id="store-time">0:00 / 0:00</span>
+      <!-- one button cycles auto → lossless → saver; player.js writes both
+           spans and the aria-label with textContent -->
+      <button type="button" class="store-quality" id="store-quality" aria-label="streaming quality: auto, lossless now. press to force lossless"><span class="store-quality-mode" id="store-quality-mode">auto</span><span class="store-quality-now" id="store-quality-now"> · flac</span></button>
+      <button type="button" class="store-ctl store-ctl-stop" id="store-stop" aria-label="stop playback">${ICON_STOP}</button>
     </div>
-    <audio id="release-audio" preload="none"></audio>
+    <audio id="store-audio" preload="none"></audio>
   </div>
 `;
 }
+
+const releaseBar = r =>
+  playerBar({ art: cover(r, 210), release: esc(r.title), extraClass: 'release-player' });
+
+// The player reads its catalog out of a JSON data block. A release page carries
+// the one entry, in the home page's exact shape, so player.js needs no second
+// code path. The block is deliberately unhashed: a <script> whose type is not a
+// JavaScript MIME type is never prepared as a script, so script-src's inline
+// check is never reached (see .claude/rules/architecture.md). `<` is escaped in
+// the payload so the string "</script" cannot occur inside it.
+const storeData = r =>
+  `  <script type="application/json" id="store-data">${JSON.stringify({
+    [r.slug]: {
+      t: r.title,
+      k: r.kind,
+      p: money(r.price),
+      tr: r.tracks.map(t => [t.n, t.title, t.seconds])
+    }
+  }).replace(/</g, '\\u003c')}</script>
+`;
 
 function releasePage(r) {
   const tracks = r.tracks
@@ -370,7 +402,7 @@ ${JSON.stringify(releaseJsonLd(r), null, 2)}
 `,
     body,
     tail: releaseBar(r),
-    scripts: `  <script src="/release.js?v=dev" defer></script>`
+    scripts: `${storeData(r)}  <script src="/player.js?v=dev" defer></script>`
   });
 }
 
@@ -1169,8 +1201,7 @@ ${items}
 `;
 }
 
-function homePage() {
-  const src = readFileSync(join(ROOT, 'index.html'), 'utf8');
+function rewriteNotes(src) {
   const start = src.indexOf(NOTES_START);
   const end = src.indexOf(NOTES_END);
   if (start === -1 || end === -1) {
@@ -1178,6 +1209,28 @@ function homePage() {
     return src;
   }
   return src.slice(0, start + NOTES_START.length) + notesBlock() + src.slice(end);
+}
+
+// ── the player bar on the home page ──────────────────────────────────────
+// Same mechanism, same reason: the generator owns the bar's bytes so the home
+// copy and the release copy cannot drift apart. The start marker carries its
+// own newline so the block between the markers is playerBar()'s output exactly,
+// byte for byte — which is what scripts/build.test.mjs asserts.
+const PLAYER_START = '  <!-- player:start -->\n';
+const PLAYER_END = '  <!-- player:end -->';
+
+function rewritePlayer(src) {
+  const start = src.indexOf(PLAYER_START);
+  const end = src.indexOf(PLAYER_END);
+  if (start === -1 || end === -1) {
+    console.warn('build: index.html has no player: markers — the bar is left alone');
+    return src;
+  }
+  return src.slice(0, start + PLAYER_START.length) + playerBar() + src.slice(end);
+}
+
+function homePage() {
+  return rewritePlayer(rewriteNotes(readFileSync(join(ROOT, 'index.html'), 'utf8')));
 }
 
 // ── sitemap ──────────────────────────────────────────────────────────────

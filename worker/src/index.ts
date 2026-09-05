@@ -10,7 +10,12 @@ import { handleExport } from './routes/admin';
 import { handleBroadcast } from './routes/broadcast';
 import { handleSubscribe, handleSubscribePreflight } from './routes/subscribe';
 import { handleMpu } from './routes/upload';
-import { handlePreview, handleStream, handleStreamPreflight } from './routes/preview';
+import {
+  handlePreview,
+  handlePreviewPreflight,
+  handleStream,
+  handleStreamPreflight,
+} from './routes/preview';
 import { scheduled } from './scheduled';
 
 const router = new Router()
@@ -40,6 +45,9 @@ const router = new Router()
 
   // Public streams for the on-site player: /p/ = 128k MP3 previews (legacy +
   // fallback), /s/ = lossless FLAC full tracks.
+  // preflight for the player's cors fetch (full-file prefetch into IndexedDB)
+  // -- media element loads are no-cors and never send OPTIONS
+  .options('/p/:slug/:track', (req, env) => handlePreviewPreflight(req, env))
   .get('/p/:slug/:track', handlePreview)
   // preflight for the player's ranged throughput probe -- media loads are
   // no-cors and never send OPTIONS

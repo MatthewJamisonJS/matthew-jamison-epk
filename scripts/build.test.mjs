@@ -11,12 +11,32 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, readFileSync, existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const releases = JSON.parse(readFileSync(join(root, 'data', 'releases.json'), 'utf8'));
+
+// Every id one player.js reaches for. The home bar and every release bar carry
+// the same set — that is the whole point of the generator owning the markup.
+const PLAYER_IDS = [
+  'store-player',
+  'store-player-art',
+  'store-player-release',
+  'store-player-track',
+  'store-prev',
+  'store-toggle',
+  'store-next',
+  'store-scrub',
+  'store-time',
+  'store-quality',
+  'store-quality-mode',
+  'store-quality-now',
+  'store-stop',
+  'store-audio'
+];
 
 const out = mkdtempSync(join(tmpdir(), 'mj-build-'));
 process.on('exit', () => rmSync(out, { recursive: true, force: true }));
@@ -92,10 +112,12 @@ test('release page: JSON-LD parses and is a MusicAlbum', () => {
 // Scenario 2 (partial) — the buy control carries the slug the Worker expects
 // and the page loads the module that POSTs it. The redirect itself is a
 // browser check, not a unit one.
-test('release page: buy button carries its slug and loads release.js', () => {
+test('release page: buy button carries its slug and loads player.js', () => {
   const html = read('music', 'the-journey', 'index.html');
   assert.match(html, /class="btn release-buy" data-slug="the-journey"/);
-  assert.match(html, /<script src="\/release\.js\?v=dev" defer><\/script>/);
+  assert.match(html, /<script src="\/player\.js\?v=dev" defer><\/script>/);
+  // release.js is gone from these pages: one player drives / and /music/<slug>/
+  assert.ok(!html.includes('release.js'), 'a release page still loads release.js');
 });
 
 // Scenario 3 — the sitemap lists /, /music/, and every release with a lastmod.
@@ -129,7 +151,7 @@ test('release page: one preloadless <audio> for the whole tracklist', () => {
     const html = read('music', r.slug, 'index.html');
     const tags = html.match(/<audio\b[^>]*>/g) || [];
     assert.equal(tags.length, 1, `${r.slug}: expected exactly one <audio>`);
-    assert.match(tags[0], /\bid="release-audio"/, `${r.slug}: audio not id'd`);
+    assert.match(tags[0], /\bid="store-audio"/, `${r.slug}: audio not id'd`);
     assert.match(tags[0], /\bpreload="none"/, `${r.slug}: audio would preload`);
     // no src until a click — reading the page must cost no audio bytes
     assert.ok(!/\ssrc=/.test(tags[0]), `${r.slug}: audio ships a src`);
@@ -177,13 +199,13 @@ test('release page: every track row carries a play button keyed to its NN', () =
   }
 });
 
-test('release page: the now-playing bar ships once, hidden, with three controls', () => {
+test('release page: the now-playing bar is the home bar, ids and all', () => {
   for (const r of releases) {
     const html = read('music', r.slug, 'index.html');
 
     const bars = html.match(/<div class="store-player release-player"[^>]*>/g) || [];
     assert.equal(bars.length, 1, `${r.slug}: expected exactly one player bar`);
-    assert.match(bars[0], /\bid="release-player"/, `${r.slug}: bar not id'd`);
+    assert.match(bars[0], /\bid="store-player"/, `${r.slug}: bar not id'd`);
     assert.match(bars[0], /\bhidden\b/, `${r.slug}: bar visible before a track loads`);
     assert.match(bars[0], /role="region"/, `${r.slug}: bar is not a landmark`);
     assert.match(bars[0], /aria-label="now playing"/, `${r.slug}: bar has no name`);
@@ -191,61 +213,295 @@ test('release page: the now-playing bar ships once, hidden, with three controls'
     // it sits after </footer>, not inside .section — a backdrop-filtered
     // ancestor would become the containing block for a position: fixed child
     assert.ok(
-      html.indexOf('id="release-player"') > html.indexOf('</footer>'),
+      html.indexOf('id="store-player"') > html.indexOf('</footer>'),
       `${r.slug}: the bar is inside a filtered ancestor`
     );
 
-    for (const [id, label] of [
-      ['release-prev', 'previous track'],
-      ['release-toggle', 'pause playback'],
-      ['release-next', 'next track']
-    ]) {
-      const btn = new RegExp(`<button type="button" class="store-ctl" id="${id}" aria-label="${label}"[^>]*>`);
-      assert.match(html, btn, `${r.slug}: no ${id} control`);
+    // every id one player.js will reach for, on this page as on /
+    for (const id of PLAYER_IDS) {
+      assert.equal(
+        (html.match(new RegExp(`id="${id}"`, 'g')) || []).length, 1,
+        `${r.slug}: #${id} is not on the page exactly once`
+      );
     }
 
-    // the ends are marked, not removed: aria-disabled keeps them focusable
-    assert.match(html, /id="release-prev" aria-label="previous track" aria-disabled="true"/,
-      `${r.slug}: prev is live before anything plays`);
-    const nextInert = /id="release-next" aria-label="next track" aria-disabled="true"/.test(html);
-    assert.equal(nextInert, r.tracks.length === 1,
-      `${r.slug}: next's start state disagrees with the track count`);
+    for (const [id, label] of [
+      ['store-prev', 'previous track'],
+      ['store-next', 'next track']
+    ]) {
+      assert.match(
+        html,
+        new RegExp(`<button type="button" class="store-ctl" id="${id}" aria-label="${label}">`),
+        `${r.slug}: no ${id} control`
+      );
+    }
+    // the end stops are player state now, not markup: nothing ships disabled
+    assert.ok(!/aria-disabled/.test(html), `${r.slug}: the bar ships an aria-disabled end stop`);
 
-    // the readouts the bar has to fill, and the 210px cover thumb
-    assert.match(html, /<p class="store-player-track" id="release-now" aria-live="polite">/, `${r.slug}: no title readout`);
-    assert.match(html, /<span class="store-time" id="release-time">0:00 \/ 0:00<\/span>/, `${r.slug}: no clock`);
-    assert.match(html, new RegExp(`<img class="store-player-art" src="/assets/covers/${r.cover || r.slug}-210\\.webp"`),
+    // the readouts the bar has to fill, and the 210px cover thumb — pre-filled,
+    // so the bar reads correctly before player.js runs
+    assert.match(html, /<p class="store-player-track" id="store-player-track" aria-live="polite">/, `${r.slug}: no title readout`);
+    assert.match(html, /<span class="store-time" id="store-time">0:00 \/ 0:00<\/span>/, `${r.slug}: no clock`);
+    assert.match(html, new RegExp(`<img class="store-player-art" id="store-player-art" src="/assets/covers/${r.cover || r.slug}-210\\.webp"`),
       `${r.slug}: bar art is not the 210px cover`);
+    assert.ok(html.includes(`<p class="store-player-release" id="store-player-release">${esc(r.title)}</p>`),
+      `${r.slug}: the bar does not name the release`);
+    // the scrubber and the quality chip ship here too — same machine, one page
+    assert.match(html, /<input type="range" class="store-scrub" id="store-scrub"/, `${r.slug}: no scrubber`);
+    assert.match(html, /<button type="button" class="store-quality" id="store-quality"/, `${r.slug}: no quality chip`);
+  }
+});
+
+// The bar is one component. index.html carries it between the player: markers
+// and the generator rewrites those bytes, so a drift between the two copies is
+// a failing test, not a bug someone notices in a browser six months later.
+const PLAYER_START = '  <!-- player:start -->\n';
+const PLAYER_END = '  <!-- player:end -->';
+const playerBlock = html => {
+  const start = html.indexOf(PLAYER_START);
+  const end = html.indexOf(PLAYER_END);
+  assert.ok(start !== -1 && end !== -1, 'player: markers missing');
+  return html.slice(start + PLAYER_START.length, end);
+};
+
+test('the committed index.html bar is exactly what the generator emits', () => {
+  const committed = playerBlock(readFileSync(join(root, 'index.html'), 'utf8'));
+  const generated = playerBlock(read('index.html'));
+  assert.equal(committed, generated, 'index.html is out of date — run node scripts/build.mjs');
+  // and it is the home shape: no release class, no pre-filled art or title
+  assert.match(committed, /<div class="store-player" id="store-player"/);
+  assert.match(committed, /id="store-player-art" src=""/);
+  assert.match(committed, /id="store-player-release"><\/p>/);
+  for (const id of PLAYER_IDS) {
+    assert.equal((committed.match(new RegExp(`id="${id}"`, 'g')) || []).length, 1, `#${id}`);
+  }
+});
+
+test('a release bar is the home bar, plus a class, a cover and a title', () => {
+  const home = playerBlock(read('index.html'));
+  for (const r of releases) {
+    const html = read('music', r.slug, 'index.html');
+    const expected = home
+      .replace('class="store-player"', 'class="store-player release-player"')
+      .replace('id="store-player-art" src=""', `id="store-player-art" src="/assets/covers/${r.cover || r.slug}-210.webp"`)
+      .replace('id="store-player-release"></p>', `id="store-player-release">${esc(r.title)}</p>`);
+    assert.ok(html.includes(expected), `${r.slug}: the bar is not the home bar`);
+  }
+});
+
+// The player's catalog: one entry, the home page's exact shape.
+test('every release page carries a #store-data entry that matches the data', () => {
+  for (const r of releases) {
+    const html = read('music', r.slug, 'index.html');
+    const blocks = html.match(/<script type="application\/json" id="store-data">([\s\S]*?)<\/script>/g) || [];
+    assert.equal(blocks.length, 1, `${r.slug}: expected exactly one #store-data block`);
+    const raw = /<script type="application\/json" id="store-data">([\s\S]*?)<\/script>/.exec(html)[1];
+    // "</script" can never appear inside the payload
+    assert.ok(!raw.includes('<'), `${r.slug}: an unescaped < in the data block`);
+    assert.deepEqual(JSON.parse(raw), {
+      [r.slug]: {
+        t: r.title,
+        k: r.kind,
+        p: `$${r.price.toFixed(2)}`,
+        tr: r.tracks.map(t => [t.n, t.title, t.seconds])
+      }
+    }, `${r.slug}: #store-data disagrees with data/releases.json`);
+    // it sits before the scripts that read it
+    assert.ok(html.indexOf('id="store-data"') < html.indexOf('/player.js'), `${r.slug}: data after the script`);
+  }
+});
+
+// The two sha256 pins in _headers are computed over these exact bytes. If a
+// rewrite moves either block by one byte, the home page's CSP starts refusing
+// its own JSON-LD — so the pins are asserted against the file, not trusted.
+const HASHED = [
+  /<script type="application\/ld\+json">([\s\S]*?)<\/script>/,
+  /<script type="application\/json" id="store-data">([\s\S]*?)<\/script>/
+];
+
+test('_headers still pins the two JSON blocks in the committed index.html', () => {
+  const html = readFileSync(join(root, 'index.html'), 'utf8');
+  const csp = readFileSync(join(root, '_headers'), 'utf8')
+    .split('\n')
+    .find(l => l.includes('script-src') && l.includes('cloudflareinsights'));
+  assert.ok(csp, 'no home-page script-src line in _headers');
+  const pins = [...csp.matchAll(/'(sha256-[^']+)'/g)].map(m => m[1]);
+  for (const re of HASHED) {
+    const m = re.exec(html);
+    assert.ok(m, 'a hash-pinned block is missing from index.html');
+    const hash = 'sha256-' + createHash('sha256').update(m[1], 'utf8').digest('base64');
+    assert.ok(pins.includes(hash), `_headers does not pin ${hash} — recompute the CSP hashes`);
+  }
+});
+
+test('rewriting the player block leaves both hashed blocks byte-identical', () => {
+  const committed = readFileSync(join(root, 'index.html'), 'utf8');
+  const rebuilt = read('index.html');
+  for (const re of HASHED) {
+    assert.equal(re.exec(rebuilt)[1], re.exec(committed)[1], 'a hash-pinned block moved');
   }
 });
 
 test('release player: the bar reuses the home transport, with its own columns', () => {
   const css = readFileSync(join(root, 'style.css'), 'utf8');
   assert.match(css, /\.release-player \.store-player-row \{/, 'the bar has no column rule');
-  // the toggle carries both glyphs; without these it renders play AND pause
-  assert.match(css, /#release-toggle \.icon-pause,/, 'the bar toggle shows both glyphs at rest');
-  assert.match(css, /#release-toggle\.is-playing \.icon-pause \{ display: block; \}/,
+  // the toggle carries both glyphs; without these it renders play AND pause.
+  // It is #store-toggle on both pages now — one bar, one id set.
+  assert.match(css, /#store-toggle \.icon-pause,/, 'the bar toggle shows both glyphs at rest');
+  assert.match(css, /#store-toggle\.is-playing \.icon-pause,/,
     'the bar toggle never shows its pause glyph');
-  assert.match(css, /\.store-ctl\[aria-disabled="true"\]/, 'aria-disabled end stops have no look');
   // no new component: every class the bar uses already existed for the home bar
   for (const cls of ['.store-player', '.store-player-row', '.store-player-art', '.store-transport', '.store-ctl', '.store-time']) {
     assert.ok(css.includes(cls + ' '), `${cls} is not an existing style`);
   }
 });
 
-test('release player: the transport and MediaSession are both wired', () => {
-  const js = readFileSync(join(root, 'release.js'), 'utf8');
-  for (const id of ['release-player', 'release-prev', 'release-toggle', 'release-next', 'release-now', 'release-time']) {
-    assert.ok(js.includes(`'${id}'`), `release.js never finds #${id}`);
+// The player itself is one module for both pages now; its behaviour is tested
+// in scripts/player.test.mjs. What the generator owes it is a file to load.
+test('player.js exists and every release page loads it', () => {
+  assert.ok(existsSync(join(root, 'player.js')), 'player.js missing');
+  for (const r of releases) {
+    const html = read('music', r.slug, 'index.html');
+    assert.match(html, /<script src="\/player\.js\?v=dev" defer><\/script>/, `${r.slug}: no player.js`);
+    assert.ok(!html.includes('release.js'), `${r.slug}: still loads release.js`);
   }
-  for (const action of ['previoustrack', 'nexttrack']) {
-    assert.ok(js.includes(`'${action}'`), `no MediaSession ${action} handler`);
+});
+
+// release.js is gone. These stand in for the behaviour tests it used to carry:
+// the one module has to reach both pages' controls, and it has to keep the
+// posture the CSP depends on. Behaviour proper belongs in player.test.mjs.
+test('player.js drives both pages and keeps the CSP posture', () => {
+  const js = readFileSync(join(root, 'player.js'), 'utf8');
+
+  // the shared audio element, the two play surfaces, the two buy surfaces
+  for (const needle of [
+    "getElementById('store-audio')",
+    '.track-play',
+    '.store-play',
+    '.store-buy',
+    '.release-buy',
+    'mediaSession',
+    'RESTART_AFTER'
+  ]) {
+    assert.ok(js.includes(needle), `player.js never mentions ${needle}`);
   }
-  assert.match(js, /new window\.MediaMetadata/, 'no MediaSession metadata');
-  assert.match(js, /'matthew jamison'/, 'MediaSession names no artist');
-  // the runway under the footer, the same contract the home bar uses
-  assert.match(js, /store-open/, 'the bar opens no runway under the footer');
-  assert.match(js, /--store-dock-h/, 'the runway height is never measured');
+
+  // the file's own comments name these APIs to say it does not use them, so
+  // the scan runs over code only. Blunt on purpose: everything from a // to the
+  // end of the line goes, which costs nothing but the tail of a URL literal.
+  const code = js.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/.*$/gm, ' ');
+
+  // an IIFE, not a namespace: nothing is published for another script to reach
+  assert.ok(!/\bwindow\.[A-Za-z_$][\w$]*\s*=[^=]/.test(code), 'player.js writes a window global');
+
+  // Trusted Types is enforced sitewide — no markup sink may appear at all
+  for (const sink of ['innerHTML', 'insertAdjacentHTML', 'outerHTML', 'document.write']) {
+    assert.ok(!code.includes(sink), `player.js uses ${sink}`);
+  }
+
+  // the only inline-style writes allowed are the two dock custom properties
+  const styleWrites = code.match(/\.style\.[A-Za-z]+/g) || [];
+  for (const w of styleWrites) {
+    assert.ok(
+      w === '.style.setProperty' || w === '.style.removeProperty',
+      `player.js writes ${w} — the CSP allows no style attribute`
+    );
+  }
+});
+
+// The offline vault. Its behaviour needs a real browser and a real dead zone,
+// so what is asserted here is that the layer is present and still keeps the
+// posture: the IndexedDB store, the cap, the blob: URL lifecycle, the CORS
+// fetch, the third source path and both link-state events.
+test('player.js carries the offline vault', () => {
+  const js = readFileSync(join(root, 'player.js'), 'utf8');
+  // comments name several of these to explain them, so scan code only
+  const code = js.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/.*$/gm, ' ');
+
+  for (const needle of [
+    "indexedDB.open('mj-audio'",   // the database, opened lazily
+    'VAULT_CAP',                   // 200 MB before LRU eviction
+    'URL.createObjectURL',         // the in-memory window of blob: URLs
+    'URL.revokeObjectURL',         // and the other half of its lifecycle
+    'navigator.storage',           // persist() asked once, answer ignored
+    "mode: 'cors'",                // /p/ answers the site origin only
+    "'vault'",                     // the third currentPath
+    "addEventListener('offline'",
+    "addEventListener('online'",
+    // a phone's signal drops and returns with no interface change, so the
+    // events never fire — a fetch failure has to expire on its own clock
+    'fetchBackoff'
+  ]) {
+    assert.ok(code.includes(needle), `player.js never mentions ${needle}`);
+  }
+
+  // the vault must not smuggle a markup sink or a global in behind the layer
+  assert.ok(!/\bwindow\.[A-Za-z_$][\w$]*\s*=[^=]/.test(code), 'player.js writes a window global');
+  for (const sink of ['innerHTML', 'insertAdjacentHTML', 'outerHTML', 'document.write']) {
+    assert.ok(!code.includes(sink), `player.js uses ${sink}`);
+  }
+
+  // and it has to parse
+  execFileSync(process.execPath, ['--check', join(root, 'player.js')], { stdio: 'pipe' });
+});
+
+// Resume across pages. The behaviour needs two documents and a real navigation,
+// so what is asserted here is that the layer is present and still keeps the
+// posture: the one key, the v:1 shape, both writes, the clear, and pagehide —
+// which is the only unload signal iOS fires reliably.
+test('player.js parks its position for the next page', () => {
+  const js = readFileSync(join(root, 'player.js'), 'utf8');
+  const code = js.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/.*$/gm, ' ');
+
+  for (const needle of [
+    "'mj-player-state'",       // the key, and only this one
+    'localStorage.getItem',    // read at boot
+    'localStorage.setItem',    // timeupdate, pause, load(), pagehide
+    'localStorage.removeItem', // stop(), and the end of the record
+    "addEventListener('pagehide'",
+    'v: 1'                     // the shape every reader checks first
+  ]) {
+    assert.ok(code.includes(needle), `player.js never mentions ${needle}`);
+  }
+
+  // the quality mode keeps its own key — a setting is not a bookmark
+  assert.ok(
+    !/mj-player-state[\s\S]{0,400}mode:/.test(code),
+    'player.js parks the quality mode in the resume state'
+  );
+
+  // resume is paused by design: iOS refuses unmuted autoplay in a fresh
+  // document, so the boot load() must not ask for one
+  assert.match(code, /load\(\s*st\.slug,\s*st\.index,\s*false\s*\)/,
+    'the resume load() is not the paused, autoplay-false form');
+
+  // and it still smuggles in neither a markup sink nor a global
+  assert.ok(!/\bwindow\.[A-Za-z_$][\w$]*\s*=[^=]/.test(code), 'player.js writes a window global');
+  for (const sink of ['innerHTML', 'insertAdjacentHTML', 'outerHTML', 'document.write']) {
+    assert.ok(!code.includes(sink), `player.js uses ${sink}`);
+  }
+
+  execFileSync(process.execPath, ['--check', join(root, 'player.js')], { stdio: 'pipe' });
+});
+
+test('the one player is wired into the home page, _headers and the deploy', () => {
+  const html = readFileSync(join(root, 'index.html'), 'utf8');
+  const hits = html.match(/player\.js\?v=dev/g) || [];
+  assert.equal(hits.length, 1, 'index.html does not load player.js exactly once');
+  assert.ok(!html.includes('release.js'), 'index.html still references release.js');
+  assert.ok(!existsSync(join(root, 'release.js')), 'release.js is still on disk');
+
+  const headers = readFileSync(join(root, '_headers'), 'utf8');
+  assert.match(headers, /^\/player\.js$/m, '_headers has no /player.js block');
+  assert.ok(!headers.includes('/release.js'), '_headers still caches /release.js');
+  // the vault plays IndexedDB-backed tracks off blob: URLs
+  const csp = headers.split('\n').find(l => l.includes('Content-Security-Policy: default-src \'self\''));
+  assert.ok(csp, 'no home-page CSP line in _headers');
+  assert.match(csp, /media-src [^;]*\bblob:/, "media-src does not allow blob:");
+
+  const deploy = readFileSync(join(root, '.github', 'workflows', 'deploy.yml'), 'utf8');
+  assert.match(deploy, /esbuild player\.js --minify/, 'the deploy does not minify player.js');
+  assert.ok(!deploy.includes('release.js'), 'the deploy still minifies release.js');
 });
 
 test('release player: the track control has sizing and state rules to hang on', () => {
@@ -265,22 +521,6 @@ test('release player: the track control has sizing and state rules to hang on', 
   assert.match(css, /\.release-player \.store-ctl \{[^}]*min-width: 44px/, 'the transport is under the 44px target');
 });
 
-test('release.js drives the tracklist and exposes nothing global', () => {
-  const js = readFileSync(join(root, 'release.js'), 'utf8');
-  assert.match(js, /getElementById\('release-audio'\)/, 'release.js never finds the audio');
-  assert.match(js, /\.track-play/, 'release.js never finds the buttons');
-  // the /s/ -> /p/ fallback, and nothing more of the adaptive machine
-  assert.match(js, /retried/, 'no single-retry guard');
-  assert.ok(!/window\.[A-Za-z_$][\w$]*\s*=/.test(js), 'release.js writes to window');
-  // Trusted Types: no markup is ever assigned
-  // the assignment, not the word — the file's own comments name innerHTML to
-  // say it is never used
-  assert.ok(
-    !/\.(inner|outer)HTML\s*=|insertAdjacentHTML\s*\(/.test(js),
-    'release.js writes markup'
-  );
-});
-
 // Shell invariants — the CSP has no 'unsafe-inline' and requires Trusted Types.
 test('generated pages carry no inline style or executable inline script', () => {
   const pages = [join('music', 'index.html'), ...releases.map(r => join('music', r.slug, 'index.html'))];
@@ -291,7 +531,7 @@ test('generated pages carry no inline style or executable inline script', () => 
     // the only inline <script> allowed is the non-executable ld+json data block
     const inline = [...html.matchAll(/<script(?![^>]*\ssrc=)[^>]*>/g)].map(m => m[0]);
     for (const tag of inline) {
-      assert.match(tag, /type="application\/ld\+json"/, `${p}: executable inline script`);
+      assert.match(tag, /type="application\/(ld\+json|json)"/, `${p}: executable inline script`);
     }
   }
 });
@@ -317,9 +557,7 @@ test('hub page links every release', () => {
   }
 });
 
-test('release.js exists and is referenced with a cache-busting query', () => {
-  assert.ok(existsSync(join(root, 'release.js')), 'release.js missing');
-});
+
 
 // ─────────────────────────────────────────────────────────────────────────
 // Phase 2 — blog.
