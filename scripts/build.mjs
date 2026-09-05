@@ -27,6 +27,7 @@
 // Phase 2 (blog) extends this file: same shell(), same sitemap writer.
 
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 
@@ -1236,12 +1237,24 @@ function homePage() {
 // ── sitemap ──────────────────────────────────────────────────────────────
 // Hand-maintained facts that survive regeneration: /thanks/ stays out (it is a
 // post-purchase receipt), and / keeps its three bass-sample cover entries.
+// Hub dates come from the commit being built, not the wall clock, so the
+// committed sitemap and the deploy-time one say the same thing: /, /music/ and
+// an empty /blog/ are rendered from code and change when the code does; a
+// release page or a post carries its own date. Only a checkout with no git
+// history falls back to today. Regenerate and commit sitemap.xml with any
+// commit that should move those dates — the build in CI reads the same commit.
 const TODAY = new Date().toISOString().slice(0, 10);
+const BUILD_DATE = (() => {
+  try {
+    return execFileSync('git', ['log', '-1', '--format=%cs'], { cwd: ROOT, stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString().trim() || TODAY;
+  } catch (e) { return TODAY; }
+})();
 
 function sitemap() {
   const home = `  <url>
     <loc>${SITE}/</loc>
-    <lastmod>${TODAY}</lastmod>
+    <lastmod>${BUILD_DATE}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>1.0</priority>
     <!-- the three bass sample pack covers. 700px is the largest variant that
@@ -1265,7 +1278,7 @@ function sitemap() {
 
   const hub = `  <url>
     <loc>${SITE}/music/</loc>
-    <lastmod>${TODAY}</lastmod>
+    <lastmod>${BUILD_DATE}</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>`;
@@ -1274,7 +1287,7 @@ function sitemap() {
     .map(
       r => `  <url>
     <loc>${SITE}/music/${r.slug}/</loc>
-    <lastmod>${r.released || TODAY}</lastmod>
+    <lastmod>${r.released || BUILD_DATE}</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.7</priority>
     <image:image>
@@ -1289,7 +1302,7 @@ function sitemap() {
   // /blog/ and its pager are hubs; a post's lastmod is its own date.
   const blogHub = `  <url>
     <loc>${SITE}/blog/</loc>
-    <lastmod>${POSTS.length ? POSTS[0].date : TODAY}</lastmod>
+    <lastmod>${POSTS.length ? POSTS[0].date : BUILD_DATE}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>`;
@@ -1298,7 +1311,7 @@ function sitemap() {
     .map(
       n => `  <url>
     <loc>${SITE}/blog/page/${n}/</loc>
-    <lastmod>${POSTS.length ? POSTS[0].date : TODAY}</lastmod>
+    <lastmod>${POSTS.length ? POSTS[0].date : BUILD_DATE}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.4</priority>
   </url>`
