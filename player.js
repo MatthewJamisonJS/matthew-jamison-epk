@@ -167,6 +167,15 @@
   // gets its own silent unlock the first time the user presses play.
   let unlocked = false;
 
+  // a resumed track boots with preload='metadata' (see the resume block at the
+  // foot of the file). The first time the listener asks for audio, both elements
+  // go back to buffering ahead the way a fresh load always did.
+  function playIntent() {
+    unlockStandby();
+    audio.preload = 'auto';
+    standby.preload = 'auto';
+  }
+
   function unlockStandby() {
     if (unlocked) return;
     unlocked = true;
@@ -626,6 +635,55 @@
   let currentPath = '/p/';  // path the loaded source was built from
   let retried = false; // one mp3 retry per load, so errors can't loop
 
+  // ── resume across pages ────────────────────────────────────────────────────
+  //
+  // Tapping a card on / navigates to /music/<slug>/, so the document unloads
+  // and the audio dies with it. The position is parked in localStorage and the
+  // next page whose catalog holds the slug boots the bar paused there, one tap
+  // from continuing. Paused by design: iOS refuses unmuted autoplay in a fresh
+  // document, and a bar that silently failed to start reads as broken.
+  //
+  // The quality mode is NOT in here — it has its own key, and a mode is a
+  // setting while this is a bookmark.
+  const STATE_KEY = 'mj-player-state';
+  const SAVE_EVERY = 2000;   // ms between timeupdate writes
+  let lastSaved = 0;
+  let restoring = false;   // the boot load() must not overwrite the spot it is restoring
+  let finished = false;    // the last track ended: nothing left to come back to
+
+  function saveState() {
+    if (!slug || restoring || finished) return;
+    // a restored bar that was never played has no metadata yet and reads 0:00 —
+    // writing that would overwrite the bookmark it was restored from
+    if (audio.readyState < 1) return;
+    lastSaved = Date.now();
+    const at = audio.currentTime;
+    try {
+      localStorage.setItem(STATE_KEY, JSON.stringify({
+        v: 1,
+        slug: slug,
+        index: index,
+        t: isFinite(at) && at > 0 ? Math.round(at * 10) / 10 : 0
+      }));
+    } catch (e) { /* storage blocked — no resume, and no error either */ }
+  }
+
+  function clearState() {
+    try { localStorage.removeItem(STATE_KEY); } catch (e) { /* storage blocked */ }
+  }
+
+  function readState() {
+    try {
+      const raw = localStorage.getItem(STATE_KEY);
+      if (!raw) return null;
+      const st = JSON.parse(raw);
+      if (!st || st.v !== 1 || typeof st.slug !== 'string') return null;
+      if (typeof st.index !== 'number' || typeof st.t !== 'number') return null;
+      if (!isFinite(st.t) || st.t < 0) return null;
+      return st;
+    } catch (e) { return null; }
+  }
+
   function clock(s) {
     if (!isFinite(s) || s < 0) s = 0;
     const m = Math.floor(s / 60);
@@ -975,6 +1033,7 @@
 
     trackNN = nn;
     retried = false;
+    finished = false;
     stallReset();
     offlineStallClear();
     startClear();        // a rapid skip re-arms the deadline below
@@ -1037,6 +1096,10 @@
     ensureWindow();
     // measured last: the title above is what decides how tall the bar wraps
     sizeDock();
+    // the `ended` handler reaches the next track through step() → load(), all
+    // synchronous, so this one write covers the track boundary too: by the time
+    // it runs, slug/index/currentTime already describe the track now loaded.
+    saveState();
   }
 
   function step(delta) {
@@ -1059,6 +1122,7 @@
     abortQueue();
     revokeAll();
     slug = null;
+    clearState();          // stop is the listener saying they are done
     currentPath = '/p/';   // nothing is loaded; the chip goes back to predicting
     showBar(false);
     paintEnds();
@@ -1107,7 +1171,7 @@
       const s = row.dataset.slug;
       const i = indexOfTrack(s, row.dataset.track);
       if (i === -1) return;
-      unlockStandby();
+      playIntent();
       if (s === slug && i === index) playPause();
       else load(s, i, true);
       return;
@@ -1116,7 +1180,7 @@
     const play = t.closest('.store-play');
     if (play && play.dataset.slug) {
       const s = play.dataset.slug;
-      unlockStandby();
+      playIntent();
       if (s === slug) playPause();
       else load(s, 0, true);
       return;
@@ -1161,7 +1225,7 @@
   stopBtn.addEventListener('click', stop);
   toggleBtn.addEventListener('click', () => {
     if (!slug) return;
-    unlockStandby();
+    playIntent();
     playPause();
   });
 
@@ -1198,14 +1262,26 @@
   bindBoth('play', syncToggle);
   // pausing during startup withdraws the deadline: a forced demote would resume
   // playback the listener just stopped
-  bindBoth('pause', () => { stallEnd(); startClear(); offlineStallClear(); syncToggle(); });
+  bindBoth('pause', () => {
+    stallEnd(); startClear(); offlineStallClear();
+    // stop() nulls slug synchronously and the pause event lands after it, so a
+    // stopped player writes nothing here — saveState() reads the same flag.
+    saveState();
+    syncToggle();
+  });
   bindBoth('waiting', () => { stallBegin(); offlineStallBegin(); });
   bindBoth('stalled', () => { stallBegin(); offlineStallBegin(); });
   bindBoth('playing', () => { stallEnd(); startClear(); offlineStallClear(); });
   bindBoth('ended', () => {
     if (!slug) return;
     if (index < catalog[slug].tr.length - 1) step(1);
-    else syncToggle();
+    else {
+      // the record is over: there is no position worth coming back to, and the
+      // flag keeps pagehide from writing the tail of the last track back in
+      finished = true;
+      clearState();
+      syncToggle();
+    }
   });
 
   bindBoth('timeupdate', () => {
@@ -1218,6 +1294,18 @@
     // track runs — this is the only end stop that time changes
     paintEnds();
   });
+
+  // ≥2s apart. timeupdate fires ~4/s and every write is a JSON.stringify plus a
+  // synchronous storage hit; a resume is worth a couple of seconds of drift.
+  bindBoth('timeupdate', () => {
+    if (!slug || Date.now() - lastSaved < SAVE_EVERY) return;
+    saveState();
+  });
+
+  // pagehide, not beforeunload: WebKit fires pagehide on a real navigation and
+  // on the way into the back/forward cache, and iOS does not fire beforeunload
+  // reliably at all. This is the write that makes a card tap resume.
+  window.addEventListener('pagehide', saveState);
 
   // demote before the buffer runs dry rather than after: an audible stall is the
   // thing being avoided, so the swap has to start while there is still audio to
@@ -1389,4 +1477,44 @@
   // bar is hidden either way, but the accessible name is not.
   paintEnds();
   syncToggle();
+
+  // and last: if this page's catalog holds the release the listener left on,
+  // bring the bar up paused at that spot. A release page for some other record
+  // leaves the state untouched — / can still resume it.
+  (function resume() {
+    const st = readState();
+    if (!st) return;
+    const rel = catalog[st.slug];
+    if (!rel || !rel.tr || !rel.tr.length) return;
+    if (!(st.index >= 0 && st.index < rel.tr.length)) return;
+
+    // preload='none' is on the tag, so a paused element downloads nothing and
+    // never fires loadedmetadata — the seek below would never run. 'metadata'
+    // is the middle ground: a duration to seek against, without pulling a whole
+    // track down a phone's connection before anyone asked for it. playIntent()
+    // puts it back to 'auto' the moment they do.
+    audio.preload = 'metadata';
+
+    restoring = true;
+    load(st.slug, st.index, false);
+    restoring = false;
+    if (slug !== st.slug || index !== st.index) return;   // load() refused it
+
+    const el = audio;
+    el.addEventListener('loadedmetadata', () => {
+      // anything the listener did in the meantime outranks the restore
+      if (el !== audio || slug !== st.slug || index !== st.index) return;
+      const d = el.duration;
+      // inside the last second there is nothing left to resume: start it over
+      if (!isFinite(d) || d <= 0 || st.t >= d - 1) return;
+      try { el.currentTime = st.t; } catch (e) { /* not seekable yet */ }
+    }, { once: true });
+
+    // metadata is a network round trip away, so paint the saved position now —
+    // the bar comes up at it rather than sitting at 0:00 until the file answers.
+    const dur = rel.tr[st.index][2] || 0;
+    scrub.value = String(Math.round(st.t));
+    timeEl.textContent = clock(st.t) + ' / ' + clock(dur);
+    scrub.setAttribute('aria-valuetext', clock(st.t) + ' of ' + clock(dur));
+  })();
 })();

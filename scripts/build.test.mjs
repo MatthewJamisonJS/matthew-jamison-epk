@@ -445,6 +445,45 @@ test('player.js carries the offline vault', () => {
   execFileSync(process.execPath, ['--check', join(root, 'player.js')], { stdio: 'pipe' });
 });
 
+// Resume across pages. The behaviour needs two documents and a real navigation,
+// so what is asserted here is that the layer is present and still keeps the
+// posture: the one key, the v:1 shape, both writes, the clear, and pagehide —
+// which is the only unload signal iOS fires reliably.
+test('player.js parks its position for the next page', () => {
+  const js = readFileSync(join(root, 'player.js'), 'utf8');
+  const code = js.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/.*$/gm, ' ');
+
+  for (const needle of [
+    "'mj-player-state'",       // the key, and only this one
+    'localStorage.getItem',    // read at boot
+    'localStorage.setItem',    // timeupdate, pause, load(), pagehide
+    'localStorage.removeItem', // stop(), and the end of the record
+    "addEventListener('pagehide'",
+    'v: 1'                     // the shape every reader checks first
+  ]) {
+    assert.ok(code.includes(needle), `player.js never mentions ${needle}`);
+  }
+
+  // the quality mode keeps its own key — a setting is not a bookmark
+  assert.ok(
+    !/mj-player-state[\s\S]{0,400}mode:/.test(code),
+    'player.js parks the quality mode in the resume state'
+  );
+
+  // resume is paused by design: iOS refuses unmuted autoplay in a fresh
+  // document, so the boot load() must not ask for one
+  assert.match(code, /load\(\s*st\.slug,\s*st\.index,\s*false\s*\)/,
+    'the resume load() is not the paused, autoplay-false form');
+
+  // and it still smuggles in neither a markup sink nor a global
+  assert.ok(!/\bwindow\.[A-Za-z_$][\w$]*\s*=[^=]/.test(code), 'player.js writes a window global');
+  for (const sink of ['innerHTML', 'insertAdjacentHTML', 'outerHTML', 'document.write']) {
+    assert.ok(!code.includes(sink), `player.js uses ${sink}`);
+  }
+
+  execFileSync(process.execPath, ['--check', join(root, 'player.js')], { stdio: 'pipe' });
+});
+
 test('the one player is wired into the home page, _headers and the deploy', () => {
   const html = readFileSync(join(root, 'index.html'), 'utf8');
   const hits = html.match(/player\.js\?v=dev/g) || [];
