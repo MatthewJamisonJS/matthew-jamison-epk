@@ -32,7 +32,15 @@ command -v npx >/dev/null 2>&1 || {
 # env -u CLOUDFLARE_API_TOKEN: the stale env token would shadow the cached
 #   OAuth session wrangler actually has.
 # --config wrangler.jsonc: the Worker config; the repo-root one is Pages.
-op read --account my.1password.com --no-newline "$OP_REF" \
-  | env -u CLOUDFLARE_API_TOKEN npx wrangler secret put STRIPE_SECRET_KEY --config wrangler.jsonc
+# Read first, then pipe. A bare `op read | wrangler` uploads an EMPTY secret
+# when op fails (wrangler happily reads an empty stdin and prints Success);
+# that happened once with the webhook secret. The value lives only in this
+# subshell's memory and is never printed.
+(
+  SECRET="$(op read --account my.1password.com --no-newline "$OP_REF")" || exit 1
+  [ -n "$SECRET" ] || { echo "error: op returned an empty value for $OP_REF" >&2; exit 1; }
+  printf '%s' "$SECRET" \
+    | env -u CLOUDFLARE_API_TOKEN npx wrangler secret put STRIPE_SECRET_KEY --config wrangler.jsonc
+)
 
 echo "verify (expect 200 and a \"url\"):  curl -sS -o /dev/null -w '%{http_code}\n' -X POST https://api.matthewjamison.dev/checkout -H 'Origin: https://matthewjamison.dev' -H 'Content-Type: application/json' -d '{\"slug\":\"perspective\"}'"
