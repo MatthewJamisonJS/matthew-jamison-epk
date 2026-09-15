@@ -7,7 +7,7 @@
         xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
     <loc>https://matthewjamison.dev/</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-15</lastmod>
     <changefreq>monthly</changefreq>
     <priority>1.0</priority>
     <!-- the three bass sample pack covers. 700px is the largest variant that
@@ -30,7 +30,7 @@
   </url>
   <url>
     <loc>https://matthewjamison.dev/music/</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-15</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
@@ -355,8 +355,20 @@
   </url>
   <url>
     <loc>https://matthewjamison.dev/blog/</loc>
-    <lastmod>2026-09-04</lastmod>
+    <lastmod>2026-09-15</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://matthewjamison.dev/privacy/</loc>
+    <lastmod>2026-09-15</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://matthewjamison.dev/terms/</loc>
+    <lastmod>2026-09-15</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
   </url>
 </urlset>

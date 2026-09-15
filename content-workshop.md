@@ -634,7 +634,7 @@ what matthew doesn't need
 > music → matthewjjamison.bandcamp.com
 > github → MatthewJamisonJS
 > substack → still processing
-> youtube → @mjamison2802
+> youtube → @matthewjamison_wwjd
 > streaming → spotify · apple music · soundcloud
 
 <!-- WRITE BELOW -->
