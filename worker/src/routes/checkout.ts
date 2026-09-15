@@ -1,10 +1,28 @@
 import type { Ctx, Env } from '../types';
 import { getActiveAlbum } from '../lib/db';
 import { clientIp, corsHeaders, json } from '../lib/http';
+import { alert } from '../lib/outbox';
 import { stripeClient } from '../lib/stripe';
 
 const MAX_BODY_BYTES = 2048;
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{0,79}$/;
+
+/**
+ * A dead key or a Stripe incident fails EVERY checkout, so an unthrottled
+ * alert would write one outbox row per shopper -- the outage would flood the
+ * very channel that is supposed to report it. One email an hour is plenty to
+ * say "checkout is down"; the console line still carries every occurrence.
+ *
+ * Per-isolate on purpose: no D1 read on the failure path, and the worst case
+ * is one email per isolate per hour, which is still a handful, not a flood.
+ */
+let lastCheckoutAlertAt = 0;
+const CHECKOUT_ALERT_EVERY_MS = 3_600_000;
+
+/** Test hook: the throttle is module state, so a suite has to be able to clear it. */
+export function _resetCheckoutAlertThrottle(): void {
+  lastCheckoutAlertAt = 0;
+}
 
 export async function handleCheckoutPreflight(
   req: Request,
@@ -94,6 +112,17 @@ export async function handleCheckout(req: Request, env: Env, _ctx: Ctx): Promise
     console.error(
       JSON.stringify({ level: 'error', at: 'checkout', slug, err: String(err) }),
     );
+    // Stripe masks the key in its own error messages, so String(err) is safe
+    // to put in an email.
+    const now = Date.now();
+    if (now - lastCheckoutAlertAt >= CHECKOUT_ALERT_EVERY_MS) {
+      lastCheckoutAlertAt = now;
+      await alert(
+        env,
+        'checkout_failed',
+        `checkout could not create a Stripe session for "${slug}".\n\n${String(err)}`,
+      );
+    }
     return json({ error: 'checkout_failed' }, { status: 502, headers: cors });
   }
 }

@@ -30,8 +30,10 @@ export async function nightly(env: Env): Promise<void> {
   const started = Date.now();
   const report: Record<string, unknown> = { at: 'nightly' };
 
-  report.reconciled = await reconcile(env).catch((err) => {
+  report.reconciled = await reconcile(env).catch(async (err) => {
     console.error(JSON.stringify({ level: 'error', at: 'reconcile', err: String(err) }));
+    // A cron that dies quietly is a cron nobody knows stopped running.
+    await alert(env, 'reconcile_failed', String(err));
     return { error: String(err) };
   });
 
