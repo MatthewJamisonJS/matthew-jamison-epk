@@ -23,6 +23,10 @@ const releases = JSON.parse(readFileSync(join(root, 'data', 'releases.json'), 'u
 // the same set — that is the whole point of the generator owning the markup.
 const PLAYER_IDS = [
   'store-player',
+  'store-size-toggle',
+  'store-player-row',
+  'store-player-meta',
+  'store-title-rail',
   'store-player-art',
   'store-player-release',
   'store-player-track',
@@ -1097,7 +1101,12 @@ test('nav: the current marker has a style rule to hang on', () => {
 // rest is byte-for-byte his) and assert the constructs he actually uses.
 // The corpus lives in a sibling repo; when it is absent — CI, a fresh clone —
 // the block skips instead of failing.
-const CORPUS = '/Users/wwjd_._/Code/mj-writing-room/voice/exemplars/substack';
+// Set MJ_SUBSTACK_CORPUS to the existing exemplar directory on other hosts.
+const CORPUS = process.env.MJ_SUBSTACK_CORPUS ||
+  '/Users/wwjd_._/Code/mj-writing-room/voice/exemplars/substack';
+if (process.env.MJ_SUBSTACK_CORPUS) {
+  assert.ok(existsSync(CORPUS), 'MJ_SUBSTACK_CORPUS must name an existing exemplar directory');
+}
 const haveCorpus = existsSync(CORPUS);
 
 const EXEMPLARS = [

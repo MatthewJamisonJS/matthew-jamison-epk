@@ -283,13 +283,12 @@ const wrappable = title => esc(title).replace(/([._/:=?])(?=[^\s<])/g, '$1<wbr>'
 function playerBar({ art = '', release = '', extraClass = '' } = {}) {
   const cls = extraClass ? ` ${extraClass}` : '';
   return `  <div class="store-player${cls}" id="store-player" role="region" aria-label="now playing" hidden>
-    <p class="store-player-label comment">// now playing</p>
-    <div class="store-player-row">
+    <div class="store-player-row" id="store-player-row">
       <img class="store-player-art" id="store-player-art" src="${art}" alt="" width="52" height="52" decoding="async">
-      <div class="store-player-meta">
+      <div class="store-player-meta" id="store-player-meta" tabindex="0" aria-label="album and song title"><div class="store-title-rail" id="store-title-rail">
         <p class="store-player-release" id="store-player-release">${release}</p>
         <p class="store-player-track" id="store-player-track" aria-live="polite"></p>
-      </div>
+      </div></div>
       <div class="store-transport">
         <button type="button" class="store-ctl" id="store-prev" aria-label="previous track">${ICON_PREV}</button>
         <button type="button" class="store-ctl is-playing" id="store-toggle" aria-label="pause playback">${ICON_PLAY}${ICON_PAUSE}</button>
@@ -301,6 +300,10 @@ function playerBar({ art = '', release = '', extraClass = '' } = {}) {
            spans and the aria-label with textContent -->
       <button type="button" class="store-quality" id="store-quality" aria-label="streaming quality: auto, lossless now. press to force lossless"><span class="store-quality-mode" id="store-quality-mode">auto</span><span class="store-quality-now" id="store-quality-now"> · flac</span></button>
       <button type="button" class="store-ctl store-ctl-stop" id="store-stop" aria-label="stop playback">${ICON_STOP}</button>
+    </div>
+    <div class="store-player-heading">
+      <p class="store-player-label comment">// now playing</p>
+      <button type="button" class="store-ctl store-size-toggle" id="store-size-toggle" aria-label="minimize player" title="minimize player" aria-expanded="true" aria-controls="store-player-row"><svg class="icon icon-size-minimize" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 6 8 8M6 14h8V6"/></svg><svg class="icon icon-size-restore" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 14 8-8M6 6h8v8"/></svg></button>
     </div>
     <audio id="store-audio" preload="none"></audio>
   </div>
