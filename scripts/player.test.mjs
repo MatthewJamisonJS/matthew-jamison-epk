@@ -372,6 +372,7 @@ function makeWorld(opts = {}) {
     removeItem: k => { store.delete(k); }
   };
 
+  w.mediaHandlers = new Map();
   w.navigator = {
     onLine: opts.onLine === undefined ? true : opts.onLine,
     connection: opts.connection,
@@ -379,7 +380,7 @@ function makeWorld(opts = {}) {
     mediaSession: {
       playbackState: 'none',
       metadata: null,
-      setActionHandler() {}
+      setActionHandler(action, handler) { w.mediaHandlers.set(action, handler); }
     }
   };
 
@@ -636,6 +637,175 @@ test('a stall hands off to /p/ when the track is not saved', async () => {
   await tick(w, 2100);
   assert.equal(w.standby.src, API + '/p/alb/01');
 });
+
+// A src-less unlock can settle after its element has become the active player.
+// Exercise both outcomes: neither may mute or pause the new track.
+for (const outcome of ['resolve', 'reject']) {
+  test('late standby unlock ' + outcome + ' leaves handoff and next track unmuted and playing', async () => {
+    const w = boot({ onFetch: () => new Promise(() => {}) });
+    const el = w.standby;
+    let settle;
+    const pending = new Promise((resolve, reject) => {
+      settle = outcome === 'resolve' ? resolve : () => reject(new Error('unlock aborted'));
+    });
+    const play = el.play.bind(el);
+    let first = true;
+    el.play = () => {
+      const result = play();
+      if (!first) return result;
+      first = false;
+      return pending;
+    };
+    clickRelease(w, 'alb');
+    w.audio.dispatchEvent({ type: 'waiting' });
+    await tick(w, 2100);
+    el.dispatchEvent({ type: 'canplay' });
+    assert.equal(el.muted, false, 'handoff must clear the silent-unlock mute before play');
+    settle();
+    await flush();
+    assert.equal(el.paused, false, 'late unlock must not pause an element now playing a source');
+    assert.equal(el.muted, false, 'late unlock must unmute its own element after a pointer swap');
+    const playsBeforeEnd = el.plays.length;
+    el.paused = true;  // real media is paused at the end of its resource
+    el.dispatchEvent({ type: 'ended' });
+    assert.equal(el.plays.length, playsBeforeEnd + 1, 'ended must issue exactly one new play call');
+    assert.equal(el.src, API + '/p/alb/02');
+    assert.equal(el.paused, false);
+    assert.equal(el.muted, false, 'next-track playback must remain unmuted');
+  });
+}
+
+test('a synchronous standby unlock exception does not leave its element muted', () => {
+  const w = boot();
+  w.standby.play = () => { throw new Error('unlock unavailable'); };
+  clickRelease(w, 'alb');
+  assert.equal(w.standby.muted, false);
+});
+
+for (const pauseVia of ['toggle', 'media-session', 'media-session-already-paused']) {
+  test('pause via ' + pauseVia + ' withdraws pending forced fallback playback', async () => {
+    const w = boot({ onFetch: () => new Promise(() => {}) });
+    clickRelease(w, 'alb');
+    await flush();
+    await tick(w, 2500);  // startup deadline starts a forced /p/ fallback
+    const fallback = w.standby;
+    assert.equal(fallback.src, API + '/p/alb/01');
+    const plays = fallback.plays.length;
+    if (pauseVia === 'toggle') {
+      w.els.get('store-toggle').dispatchEvent({ type: 'click' });
+    } else {
+      if (pauseVia === 'media-session-already-paused') w.audio.paused = true;
+      w.mediaHandlers.get('pause')();
+    }
+    fallback.dispatchEvent({ type: 'canplay' });
+    assert.equal(fallback.src, API + '/p/alb/01', 'fallback remains loaded');
+    assert.equal(fallback.plays.length, plays, 'fallback must not issue a play after explicit pause');
+    assert.equal(fallback.paused, true);
+    assert.equal(w.els.get('store-toggle').getAttribute('aria-label'), 'resume playback');
+    w.els.get('store-toggle').dispatchEvent({ type: 'click' });
+    assert.equal(fallback.plays.length, plays + 1, 'resume plays the prepared fallback');
+    assert.equal(fallback.paused, false);
+  });
+}
+
+test('startup fallback still plays when no pause request intervenes', async () => {
+  const w = boot({ onFetch: () => new Promise(() => {}) });
+  clickRelease(w, 'alb');
+  await flush();
+  await tick(w, 2500);
+  const plays = w.standby.plays.length;
+  w.standby.dispatchEvent({ type: 'canplay' });
+  assert.equal(w.standby.plays.length, plays + 1);
+  assert.equal(w.standby.paused, false);
+});
+
+for (const action of ['stop', 'next', 'quality']) {
+  test(action + ' still invalidates a pending startup fallback', async () => {
+    const w = boot({ onFetch: () => new Promise(() => {}) });
+    clickRelease(w, 'alb');
+    await flush();
+    await tick(w, 2500);
+    const fallback = w.standby;
+    const plays = fallback.plays.length;
+    const control = { stop: 'store-stop', next: 'store-next', quality: 'store-quality' }[action];
+    w.els.get(control).dispatchEvent({ type: 'click' });
+    fallback.dispatchEvent({ type: 'canplay' });
+    assert.equal(fallback.plays.length, plays, 'stale fallback must not play');
+    if (action === 'stop') assert.equal(w.bar.hidden, true);
+    if (action === 'next') assert.equal(w.audio.src, API + '/p/alb/02');
+    if (action === 'quality') assert.equal(w.audio.src, API + '/s/alb/01');
+  });
+}
+
+for (const resumeVia of ['toggle', 'media-session']) {
+  test('resume via ' + resumeVia + ' restores fallback intent even if failed source rejects play', async () => {
+    const w = boot({ onFetch: () => new Promise(() => {}) });
+    clickRelease(w, 'alb');
+    await flush();
+    w.audio.paused = true;
+    w.audio.dispatchEvent({ type: 'error' });
+    const fallback = w.standby;
+    w.mediaHandlers.get('pause')();
+    w.audio.play = () => {
+      w.audio.paused = true;
+      return Promise.reject(new Error('failed FLAC source'));
+    };
+    if (resumeVia === 'toggle') w.els.get('store-toggle').dispatchEvent({ type: 'click' });
+    else w.mediaHandlers.get('play')();
+    await flush();
+    assert.equal(w.audio.paused, true, 'failed source stays paused despite explicit resume intent');
+    const plays = fallback.plays.length;
+    fallback.dispatchEvent({ type: 'canplay' });
+    assert.equal(fallback.plays.length, plays + 1, 'prepared fallback honours latest explicit resume');
+    assert.equal(fallback.paused, false);
+  });
+}
+
+test('game-audio button withdraws pending fallback through the shared player pause path', async () => {
+  const w = boot({ onFetch: () => new Promise(() => {}) });
+  const site = readFileSync(path.join(HERE, '..', 'script.js'), 'utf8');
+  for (const match of site.matchAll(/getElementById\('([^']+)'\)/g)) {
+    if (!w.els.has(match[1])) w.els.set(match[1], new El(match[1], w));
+  }
+  w.window.matchMedia = () => ({ matches: true });
+  w.Event = class Event { constructor(type) { this.type = type; } };
+  w.els.get('game-music-dialog').close = () => {};
+  vm.runInContext(site, vm.createContext(w), { filename: 'script.js' });
+  clickRelease(w, 'alb');
+  await flush();
+  await tick(w, 2500);
+  const fallback = w.standby;
+  const plays = fallback.plays.length;
+  // Exercise the actual handler registered by script.js, not a simulated API caller.
+  w.els.get('game-music-game').dispatchEvent({ type: 'click' });
+  fallback.dispatchEvent({ type: 'canplay' });
+  assert.equal(fallback.plays.length, plays, 'game audio selection must prevent pending music autoplay');
+  assert.equal(fallback.paused, true);
+});
+
+for (const action of ['pause-again', 'stop', 'next', 'quality']) {
+  test(action + ' outranks resume of a failed source before fallback readiness', async () => {
+    const w = boot({ onFetch: () => new Promise(() => {}) });
+    clickRelease(w, 'alb');
+    await flush();
+    w.audio.paused = true;
+    w.audio.dispatchEvent({ type: 'error' });
+    const fallback = w.standby;
+    w.mediaHandlers.get('pause')();
+    w.audio.play = () => { w.audio.paused = true; return Promise.reject(new Error('failed source')); };
+    w.mediaHandlers.get('play')();
+    await flush();
+    const plays = fallback.plays.length;
+    if (action === 'pause-again') w.mediaHandlers.get('pause')();
+    else {
+      const control = { stop: 'store-stop', next: 'store-next', quality: 'store-quality' }[action];
+      w.els.get(control).dispatchEvent({ type: 'click' });
+    }
+    fallback.dispatchEvent({ type: 'canplay' });
+    assert.equal(fallback.plays.length, plays, 'late readiness must not revive superseded playback');
+    assert.equal(fallback.paused, true);
+  });
+}
 
 // ── 6. the soft offline backoff ─────────────────────────────────────────────
 
