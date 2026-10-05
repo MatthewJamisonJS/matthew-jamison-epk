@@ -182,23 +182,27 @@
     // Keep the element identity: a quality handoff can swap standby before
     // this src-less play promise settles.
     const el = standby;
+    let request = null;
     try {
       el.muted = true;
       // load() inside the gesture is what actually lifts webkit's playback
       // restriction on a src-less element; the muted play is belt-and-braces
       el.load();
+      request = playRequest(el, 'unlock');
       const up = el.play();
       if (up && up.then) {
         up.then(() => {
           // A source assigned in the meantime belongs to real playback.
           if (!el.hasAttribute('src')) el.pause();
           el.muted = false;
-        }).catch(() => { el.muted = false; });
+          trace('unlock-settled', 'unlock', undefined, undefined, undefined, request);
+        }).catch(e => { el.muted = false; trace('play-rejected', 'unlock', e && e.name, undefined, undefined, request); });
       } else {
         el.muted = false;
       }
     } catch (e) {
       el.muted = false;  // unlock is best-effort; never retain its silent mute
+      trace('play-rejected', 'unlock', e && e.name, undefined, undefined, request);
     }
   }
 
@@ -938,7 +942,7 @@
     stallStart = Date.now();
     stallTimer = setTimeout(() => {
       recordDemote();
-      handoff(fallbackPath());
+      handoff(fallbackPath(), false, false, 'stall');
     }, Math.max(0, STALL_BUDGET - stalledMs));
   }
 
@@ -997,13 +1001,212 @@
   // Media paused state can reflect a failed source rather than user intent.
   let playbackIntent = null;
 
-  function handoff(toPath, forcePlay, fromError) {
+  // Opt-in, tab-local in-memory diagnostics. Fixed fields only: never titles, slugs,
+  // URLs, error messages, user agent, wall-clock time or arbitrary event data.
+  // Diagnostic failures must never escape into the transport.
+  const LEGACY_DIAG_KEYS = ['mj-audio-diagnostics', 'mj-audio-diag-consent'];
+  const DIAG_LIMIT = 128;
+  const DIAG_PAINT_DELAY = 250; // coalesce UI updates outside transport
+  const diagSlots = [audio, standby];
+  const diagStarted = Date.now();
+  const diagEvents = ['enable', 'disable', 'silence-marker', 'load', 'stop',
+    'play-request', 'play-rejected', 'unlock-settled', 'intent-pause', 'intent-resume',
+    'handoff-request', 'handoff-complete', 'handoff-failed', 'quality-change',
+    'loadstart', 'loadedmetadata', 'canplay', 'play', 'playing', 'pause', 'waiting',
+    'stalled', 'ended', 'error', 'emptied', 'abort', 'seeking', 'seeked',
+    'volumechange', 'sample', 'visibilitychange', 'pagehide', 'pageshow',
+    'freeze', 'resume', 'offline', 'online', 'media-action'];
+  const diagCauses = ['none', 'load', 'resume', 'handoff', 'unlock', 'startup', 'stall',
+    'runway', 'error', 'fallback', 'play', 'pause', 'nexttrack', 'previoustrack'];
+  const diagErrors = ['none', 'NotAllowedError', 'AbortError', 'NotSupportedError',
+    'NetworkError', 'SecurityError', 'unknown'];
+  let diagEnabled = false, diagDropped = 0, diagCaptureGeneration = 0;
+  let diagHistory = [], diagLastSample = -5000, diagRequestId = 0;
+  let diagTimer = null;
+  const diagToggle = document.getElementById('audio-diag-toggle');
+  const diagMark = document.getElementById('audio-diag-mark');
+  const diagStatus = document.getElementById('audio-diag-status');
+  const diagOutput = document.getElementById('audio-diag-output');
+  const diagNotice = document.getElementById('audio-diag-notice');
+  const bounded = (value, max) => typeof value === 'number' && isFinite(value)
+    ? Math.round(Math.max(0, Math.min(max, value)) * 10) / 10 : 0;
+  const choice = (value, values, fallback) => values.indexOf(value) !== -1 ? value : fallback;
+
+  // Fixed allowlist for snapshots and explicit export; no arbitrary strings.
+  function sanitizeDiag(record) {
+    if (!record || diagEvents.indexOf(record.event) === -1) return null;
+    const clean = {
+      page: bounded(record.page, 1000000), ms: bounded(record.ms, 86400000),
+      event: record.event, cause: choice(record.cause, diagCauses, 'none'),
+      rejection: choice(record.rejection, diagErrors, record.rejection ? 'unknown' : 'none'),
+      target: choice(record.target, ['none', 'flac', 'mp3', 'saved'], 'none'),
+      mediaSession: choice(record.mediaSession, ['none', 'paused', 'playing'], 'none'),
+      emitter: record.emitter === 0 || record.emitter === 1 ? record.emitter : null,
+      active: record.active === 1 ? 1 : 0,
+      track: bounded(record.track, 10000), generation: bounded(record.generation, 1000000),
+      intent: choice(record.intent, ['default', 'play', 'pause'], 'default'),
+      quality: choice(record.quality, MODES, 'auto'),
+      visibility: choice(record.visibility, ['visible', 'hidden'], 'hidden'),
+      online: record.online === true,
+      origin: record.origin ? {
+        id: bounded(record.origin.id, 1000000), page: bounded(record.origin.page, 1000000),
+        slot: record.origin.slot === 1 ? 1 : 0,
+        track: bounded(record.origin.track, 10000), generation: bounded(record.origin.generation, 1000000)
+      } : null,
+      slots: []
+    };
+    for (let i = 0; i < 2; i++) {
+      const slot = record.slots && record.slots[i] || {};
+      clean.slots.push({
+        source: choice(slot.source, ['none', 'flac', 'mp3', 'saved', 'other'], 'other'),
+        paused: slot.paused === true, muted: slot.muted === true,
+        volume: bounded(slot.volume, 1), ready: bounded(slot.ready, 4),
+        network: bounded(slot.network, 3), time: bounded(slot.time, 86400),
+        duration: bounded(slot.duration, 86400), ahead: bounded(slot.ahead, 86400),
+        error: bounded(slot.error, 4)
+      });
+    }
+    return clean;
+  }
+
+  function announceDiag(message) {
+    if (diagNotice && diagNotice.textContent !== message) diagNotice.textContent = message;
+  }
+
+  function paintDiag() {
+    if (diagToggle) {
+      diagToggle.textContent = diagEnabled ? 'disable recording' : 'enable recording';
+      diagToggle.setAttribute('aria-pressed', String(diagEnabled));
+    }
+    if (diagMark) diagMark.disabled = !diagEnabled;
+    if (diagStatus) diagStatus.textContent =
+      (diagEnabled ? 'recording' : 'off') + ' · ' + diagHistory.length + ' events · this tab only';
+  }
+
+  // Remove only earlier prototype keys. Never read consent/history or write
+  // new diagnostic storage. Denied cleanup cannot affect the in-memory log.
+  function removeLegacyDiagnostics() {
+    let removed = true;
+    LEGACY_DIAG_KEYS.forEach(key => {
+      try { localStorage.removeItem(key); } catch (e) { removed = false; }
+    });
+    if (!removed) announceDiag('Older saved diagnostic data could not be removed. This log stays in this tab only.');
+    return removed;
+  }
+
+  function cancelDiagPaint() {
+    if (diagTimer !== null) clearTimeout(diagTimer);
+    diagTimer = null;
+  }
+
+  function updateDiag() {
+    cancelDiagPaint();
+    while (diagHistory.length > DIAG_LIMIT || JSON.stringify(diagHistory).length > 60000) {
+      diagHistory.shift(); diagDropped++;
+    }
+    paintDiag();
+  }
+
+  function queueDiagPaint() {
+    if (diagTimer === null) diagTimer = setTimeout(updateDiag, DIAG_PAINT_DELAY);
+  }
+
+  removeLegacyDiagnostics();
+
+  function playRequest(el, cause) {
+    if (!diagEnabled) return null;
+    const origin = { id: diagRequestId = (diagRequestId % 1000000) + 1, page: 1, capture: diagCaptureGeneration,
+      slot: el === diagSlots[1] ? 1 : 0, track: slug ? index + 1 : 0, generation: handoffGen };
+    trace('play-request', cause, undefined, origin.slot, undefined, origin);
+    return origin;
+  }
+
+  function trace(event, cause, rejection, emitter, target, origin) {
+    if (!diagEnabled || (origin && origin.capture !== diagCaptureGeneration)) return;
+    // Settlements belong only to requests captured in this recording. A play
+    // begun while recording was off has no identity to attach to a later log.
+    if ((event === 'play-rejected' || event === 'unlock-settled') && !origin) return;
+    try {
+      const slots = diagSlots.map(el => {
+        const src = el.getAttribute('src') || '';
+        let ahead = 0;
+        for (let i = 0; i < Math.min(el.buffered.length, 16); i++) {
+          if (el.buffered.start(i) <= el.currentTime && el.currentTime < el.buffered.end(i)) {
+            ahead = el.buffered.end(i) - el.currentTime; break;
+          }
+        }
+        return { source: !src ? 'none' : src.indexOf('blob:') === 0 ? 'saved' :
+          src.indexOf(API + '/s/') === 0 ? 'flac' : src.indexOf(API + '/p/') === 0 ? 'mp3' : 'other',
+          paused: el.paused, muted: el.muted, volume: el.volume, ready: el.readyState,
+          network: el.networkState, time: el.currentTime, duration: el.duration,
+          ahead: ahead, error: el.error ? el.error.code : 0 };
+      });
+      const record = sanitizeDiag({ event: event, cause: cause, rejection: rejection, emitter: origin ? origin.slot : emitter, origin: origin,
+        target: target === '/s/' ? 'flac' : target === '/p/' ? 'mp3' : target === 'vault' ? 'saved' : 'none',
+        mediaSession: navigator.mediaSession && navigator.mediaSession.playbackState,
+        page: 1, ms: Date.now() - diagStarted, active: audio === diagSlots[1] ? 1 : 0,
+        track: slug ? index + 1 : 0, generation: handoffGen,
+        intent: playbackIntent === null ? 'default' : playbackIntent ? 'play' : 'pause',
+        quality: mode, visibility: document.visibilityState, online: navigator.onLine,
+        slots: slots });
+      if (!record) return;
+      diagHistory.push(record);
+      if (diagHistory.length > DIAG_LIMIT) { diagHistory.shift(); diagDropped++; }
+      queueDiagPaint();
+    } catch (e) { /* diagnostics cannot interrupt playback */ }
+  }
+
+  if (diagToggle) diagToggle.addEventListener('click', () => {
+    if (diagEnabled) { trace('disable'); diagEnabled = false; }
+    else { diagEnabled = true; trace('enable'); }
+    paintDiag();
+    announceDiag(diagEnabled ? 'Recording enabled in this tab. Reloading or closing it loses the log.' :
+      'Recording disabled. Trace retained in this tab.');
+  });
+  if (diagMark) diagMark.addEventListener('click', () => {
+    trace('silence-marker');
+    if (diagEnabled) announceDiag('Silence marked. Show the trace to copy when ready.');
+  });
+  const diagClear = document.getElementById('audio-diag-clear');
+  if (diagClear) diagClear.addEventListener('click', () => {
+    diagEnabled = false; diagCaptureGeneration++; cancelDiagPaint();
+    diagHistory = []; diagDropped = 0; diagLastSample = -5000;
+    if (diagOutput) { diagOutput.value = ''; diagOutput.hidden = true; }
+    paintDiag();
+    if (removeLegacyDiagnostics()) announceDiag('Trace cleared in this tab. Recording disabled.');
+  });
+  const diagExport = document.getElementById('audio-diag-export');
+  if (diagExport) diagExport.addEventListener('click', () => {
+    if (!diagOutput) return;
+    updateDiag();
+    diagOutput.value = JSON.stringify({ v: 1, dropped: diagDropped,
+      events: diagHistory.map(sanitizeDiag).filter(Boolean) }, null, 2);
+    diagOutput.hidden = false;
+    announceDiag('Trace ready. Select and copy it before reloading or closing this tab.');
+  });
+  diagSlots.forEach((el, slot) => {
+    ['loadstart', 'loadedmetadata', 'canplay', 'play', 'playing', 'pause', 'waiting',
+      'stalled', 'ended', 'error', 'emptied', 'abort', 'seeking', 'seeked', 'volumechange']
+      .forEach(type => el.addEventListener(type, () => trace(type, undefined, undefined, slot)));
+    el.addEventListener('timeupdate', () => {
+      if (!diagEnabled || el !== audio || Date.now() - diagLastSample < 5000) return;
+      diagLastSample = Date.now(); trace('sample');
+    });
+  });
+  document.addEventListener('visibilitychange', () => trace('visibilitychange'));
+  ['freeze', 'resume'].forEach(type => document.addEventListener(type, () => trace(type)));
+  ['pagehide', 'pageshow', 'offline', 'online'].forEach(type =>
+    window.addEventListener(type, () => trace(type)));
+  paintDiag();
+
+  function handoff(toPath, forcePlay, fromError, reason) {
     if (!slug) return;
     // the window can move between the decision and the call — a vault target
     // with no URL behind it is the 128k stream instead
     if (toPath === 'vault' && !urls.has(vaultKey(slug, trackNN))) toPath = '/p/';
     if (currentPath === toPath) return;
     const gen = ++handoffGen;
+    trace('handoff-request', reason || 'fallback', undefined, undefined, toPath);
     lastRunway = Infinity;   // the new source buffers on its own terms
 
     function done() {
@@ -1018,12 +1221,14 @@
       clearEl(audio);
       swapPointers();
       currentPath = toPath;
+      trace('handoff-complete', reason || 'fallback');
       stallReset();
       offlineStallClear();
       paintQuality();
       if (wasPlaying) {
+        const request = playRequest(audio, 'handoff');
         const p = audio.play();
-        if (p && p.catch) p.catch(() => syncToggle());
+        if (p && p.catch) p.catch(e => { trace('play-rejected', 'handoff', e && e.name, undefined, undefined, request); syncToggle(); });
       } else {
         syncToggle();
       }
@@ -1033,6 +1238,7 @@
       standby.removeEventListener('canplay', done);
       if (gen !== handoffGen) return;
       handoffGen++;   // nothing left to honour from this attempt
+      trace('handoff-failed', reason || 'fallback');
       clearEl(standby);
       // a demote can just give up and leave the current source playing, but an
       // error-path handoff has no live source behind it — the listener's
@@ -1117,6 +1323,7 @@
       healthySince = 0;
     }
     audio.src = srcFor(currentPath, slug, nn);
+    trace('load');
     // nothing to arm on a blob (there is no download to stall), and nothing to
     // arm offline either — the deadline's whole point is to reach a better
     // source, and offline there isn't one.
@@ -1124,7 +1331,7 @@
       startTimer = setTimeout(() => {
         startTimer = 0;
         recordDemote();
-        handoff(fallbackPath(), true);
+        handoff(fallbackPath(), true, false, 'startup');
       }, START_DEADLINE);
     }
     paintQuality();
@@ -1152,8 +1359,9 @@
     setMetadata();
 
     if (autoplay) {
+      const request = playRequest(audio, 'load');
       const p = audio.play();
-      if (p && p.catch) p.catch(() => syncToggle());
+      if (p && p.catch) p.catch(e => { trace('play-rejected', 'load', e && e.name, undefined, undefined, request); syncToggle(); });
     }
     syncToggle();
     // slide the prefetch window: this track, then the next two. Whatever the
@@ -1177,6 +1385,7 @@
   }
 
   function stop() {
+    trace('stop');
     stallReset();
     startClear();
     offlineStallClear();
@@ -1203,6 +1412,7 @@
 
   function pausePlayback() {
     playbackIntent = false;
+    trace('intent-pause');
     // Also clear timers when already paused (e.g. after a media load error),
     // where pause() emits no new event. The fallback can finish loading paused.
     stallEnd(); startClear(); offlineStallClear();
@@ -1212,8 +1422,10 @@
 
   function resumePlayback() {
     playbackIntent = true;
+    trace('intent-resume');
+    const request = playRequest(audio, 'resume');
     const p = audio.play();
-    if (p && p.catch) p.catch(() => syncToggle());
+    if (p && p.catch) p.catch(e => { trace('play-rejected', 'resume', e && e.name, undefined, undefined, request); syncToggle(); });
     syncToggle();
   }
 
@@ -1324,7 +1536,10 @@
     ];
     handlers.forEach(pair => {
       try {
-        navigator.mediaSession.setActionHandler(pair[0], pair[1]);
+        navigator.mediaSession.setActionHandler(pair[0], () => {
+          trace('media-action', pair[0]);
+          pair[1]();
+        });
       } catch (e) { /* an engine that doesn't know this action — skip it */ }
     });
   }
@@ -1334,6 +1549,7 @@
     // the playing track is left alone.
     qualityBtn.addEventListener('click', () => {
       mode = MODES[(MODES.indexOf(mode) + 1) % MODES.length];
+      trace('quality-change');
       try { localStorage.setItem(QUALITY_KEY, mode); } catch (e) { /* storage blocked */ }
       stallEnd();     // a pending demote belongs to the mode that armed it
       startClear();   // as does a startup deadline
@@ -1413,7 +1629,7 @@
     }
     if (runway < RUNWAY_MIN && runway < lastRunway) {
       recordDemote();
-      handoff(fallbackPath());
+      handoff(fallbackPath(), false, false, 'runway');
       // currentPath only flips when the handoff lands, so the monitor has to
       // disarm itself in the meantime — every tick until then would otherwise
       // cancel and restart the swap
@@ -1528,7 +1744,7 @@
     // failure reaches the listener
     if (currentPath === '/s/' && !retried) {
       retried = true;
-      handoff(fallbackPath(), true, true);
+      handoff(fallbackPath(), true, true, 'error');
       return;
     }
     // the link is down and this one was never saved. Say so plainly and stop:
