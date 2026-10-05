@@ -1123,6 +1123,9 @@
 
   function trace(event, cause, rejection, emitter, target, origin) {
     if (!diagEnabled || (origin && origin.capture !== diagCaptureGeneration)) return;
+    // Settlements belong only to requests captured in this recording. A play
+    // begun while recording was off has no identity to attach to a later log.
+    if ((event === 'play-rejected' || event === 'unlock-settled') && !origin) return;
     try {
       const slots = diagSlots.map(el => {
         const src = el.getAttribute('src') || '';

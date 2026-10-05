@@ -646,6 +646,67 @@ for (const cause of ['unlock', 'resume', 'handoff']) {
   });
 }
 
+for (const captured of [false, true]) {
+  for (const cause of ['load', 'unlock', 'resume', 'handoff']) {
+    test((captured ? 'captured' : 'uncaptured') + ' ' + cause + ' rejection cannot cross Clear into a new recording', async () => {
+      const w = boot({ onFetch: () => new Promise(() => {}) });
+      if (captured) diagClick(w, 'toggle');
+      let reject;
+      const pendingPlay = el => {
+        AudioEl.prototype.play.call(el);
+        return new Promise((resolve, fail) => { reject = fail; });
+      };
+      if (cause === 'load' || cause === 'unlock') {
+        const el = cause === 'load' ? w.audio : w.standby;
+        el.play = () => pendingPlay(el);
+        clickRelease(w, 'alb');
+        el.play = AudioEl.prototype.play.bind(el);
+      } else {
+        clickRelease(w, 'alb');
+        await flush();
+        if (cause === 'resume') {
+          w.els.get('store-toggle').dispatchEvent({ type: 'click' });
+          w.audio.play = () => pendingPlay(w.audio);
+          w.els.get('store-toggle').dispatchEvent({ type: 'click' });
+          w.audio.play = AudioEl.prototype.play.bind(w.audio);
+        } else {
+          await tick(w, 2500);
+          w.standby.play = () => pendingPlay(w.standby);
+          w.standby.dispatchEvent({ type: 'canplay' });
+          w.standby.play = AudioEl.prototype.play.bind(w.standby);
+        }
+      }
+      assert.equal(typeof reject, 'function');
+      w.els.get('store-next').dispatchEvent({ type: 'click' });
+      await flush();
+      diagClick(w, 'clear');
+      diagClick(w, 'toggle');
+      reject({ name: 'AbortError' });
+      await flush();
+      assert.equal(diagExport(w).events.some(e => e.event === 'play-rejected'), false);
+      if (cause === 'unlock') assert.equal(w.standby.muted, false, 'unlock cleanup still runs');
+      else assert.equal(w.els.get('store-toggle').getAttribute('aria-label'), 'pause playback', 'settlement still synchronizes controls');
+      diagClick(w, 'mark');
+      assert.ok(diagExport(w).events.some(e => e.event === 'silence-marker'));
+    });
+  }
+}
+
+test('uncaptured unlock success cannot cross Clear into a new recording but still unmutes', async () => {
+  const w = boot();
+  let resolve;
+  w.standby.play = () => new Promise(done => { resolve = done; });
+  clickRelease(w, 'alb');
+  await flush();
+  diagClick(w, 'clear');
+  diagClick(w, 'toggle');
+  resolve();
+  await flush();
+  assert.equal(w.standby.muted, false);
+  assert.equal(w.standby.paused, true);
+  assert.equal(diagExport(w).events.some(e => e.event === 'unlock-settled'), false);
+});
+
 test('queued session work cannot recreate cleared data or overwrite another tab session', async () => {
   const shared = new Map();
   const a = boot({ sharedStorage: shared });
