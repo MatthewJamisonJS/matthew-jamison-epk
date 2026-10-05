@@ -179,17 +179,27 @@
   function unlockStandby() {
     if (unlocked) return;
     unlocked = true;
+    // Keep the element identity: a quality handoff can swap standby before
+    // this src-less play promise settles.
+    const el = standby;
     try {
-      standby.muted = true;
+      el.muted = true;
       // load() inside the gesture is what actually lifts webkit's playback
       // restriction on a src-less element; the muted play is belt-and-braces
-      standby.load();
-      const up = standby.play();
+      el.load();
+      const up = el.play();
       if (up && up.then) {
-        up.then(() => { standby.pause(); standby.muted = false; })
-          .catch(() => { standby.muted = false; });
+        up.then(() => {
+          // A source assigned in the meantime belongs to real playback.
+          if (!el.hasAttribute('src')) el.pause();
+          el.muted = false;
+        }).catch(() => { el.muted = false; });
+      } else {
+        el.muted = false;
       }
-    } catch (e) { /* unlock is best-effort */ }
+    } catch (e) {
+      el.muted = false;  // unlock is best-effort; never retain its silent mute
+    }
   }
 
   let catalog;
@@ -953,6 +963,9 @@
   // flight. forcePlay covers the error path, where the active element is already
   // paused but the listener still expects playback to continue.
   let handoffGen = 0;
+  // null preserves the handoff's default behavior until an explicit request.
+  // Media paused state can reflect a failed source rather than user intent.
+  let playbackIntent = null;
 
   function handoff(toPath, forcePlay, fromError) {
     if (!slug) return;
@@ -967,9 +980,11 @@
       standby.removeEventListener('error', failed);
       if (gen !== handoffGen) return;
       const at = audio.currentTime;   // read before the active element is released
-      const wasPlaying = forcePlay || !audio.paused;
+      const wasPlaying = playbackIntent === null
+        ? forcePlay || !audio.paused : playbackIntent;
       // seek first: the active element is still playing until the line below
       try { standby.currentTime = at; } catch (e) { /* not seekable yet */ }
+      standby.muted = false;  // its silent unlock may still be pending
       clearEl(audio);
       swapPointers();
       currentPath = toPath;
@@ -1058,6 +1073,7 @@
     startClear();        // a rapid skip re-arms the deadline below
     lastRunway = Infinity;
     lastBufEnd = -1;     // buffer readings don't carry across tracks
+    playbackIntent = null;  // this load owns its autoplay choice
     handoffGen++;        // a handoff in flight is for the track being replaced
     clearEl(standby);    // and so is whatever it half-loaded
     // synchronous, all of it: on iOS this runs inside the `ended` handler and
@@ -1135,6 +1151,7 @@
     offlineStallClear();
     lastRunway = Infinity;
     handoffGen++;
+    playbackIntent = null;
     clearEl(audio);
     clearEl(standby);
     // the elements are released above, so every blob: URL is now unreferenced
@@ -1153,12 +1170,30 @@
     }
   }
 
+  function pausePlayback() {
+    playbackIntent = false;
+    // Also clear timers when already paused (e.g. after a media load error),
+    // where pause() emits no new event. The fallback can finish loading paused.
+    stallEnd(); startClear(); offlineStallClear();
+    audio.pause();
+    syncToggle();
+  }
+
+  function resumePlayback() {
+    playbackIntent = true;
+    const p = audio.play();
+    if (p && p.catch) p.catch(() => syncToggle());
+    syncToggle();
+  }
+
+  // Other site features request pause without bypassing the pending handoff.
+  document.addEventListener('mj-player-pause', pausePlayback);
+
   function playPause() {
     if (audio.paused) {
-      const p = audio.play();
-      if (p && p.catch) p.catch(() => syncToggle());
+      resumePlayback();
     } else {
-      audio.pause();
+      pausePlayback();
     }
     syncToggle();
   }
@@ -1167,8 +1202,7 @@
     if (!slug) return;
     if (audio.currentTime > RESTART_AFTER || index === 0) {
       try { audio.currentTime = 0; } catch (e) { /* not seekable yet */ }
-      const p = audio.play();
-      if (p && p.catch) p.catch(() => syncToggle());
+      resumePlayback();
       paintEnds();   // back at 0 on track one, ⏮ has nothing left to do
       syncToggle();
       return;
@@ -1252,8 +1286,8 @@
   // so an engine that doesn't know one action still gets the rest.
   if ('mediaSession' in navigator) {
     const handlers = [
-      ['play', () => { if (slug && audio.paused) playPause(); }],
-      ['pause', () => { if (slug && !audio.paused) playPause(); }],
+      ['play', () => { if (slug) resumePlayback(); }],
+      ['pause', () => { if (slug) pausePlayback(); }],
       ['previoustrack', prev],
       ['nexttrack', () => step(1)]
     ];

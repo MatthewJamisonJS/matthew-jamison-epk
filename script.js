@@ -303,7 +303,7 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
     if (pendingTile) { openGame(pendingTile, true); pendingTile = null; }
   });
   if (gameAudioBtn) gameAudioBtn.addEventListener('click', () => {
-    storeAudioEls().forEach(a => a.pause());
+    document.dispatchEvent(new Event('mj-player-pause'));
     musicDialog.close();
     if (pendingTile) { openGame(pendingTile, false); pendingTile = null; }
   });
