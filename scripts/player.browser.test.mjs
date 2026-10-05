@@ -57,6 +57,17 @@ try {
     await page.reload();
     await page.locator('.audio-diag summary').click();
     await page.locator('#audio-diag-toggle').click();
+    await page.evaluate(() => {
+      const slots = [...document.querySelectorAll('audio')];
+      window.outputViolations = [];
+      window.outputChecks = 0;
+      window.checkOutput = () => {
+        window.outputChecks++;
+        const sounding = slots.filter(el => !el.paused && !el.muted);
+        if (sounding.length > 1) window.outputViolations.push(sounding.length);
+      };
+      slots.forEach(el => ['play', 'playing', 'pause', 'emptied'].forEach(type => el.addEventListener(type, window.checkOutput)));
+    });
     const slug = await page.evaluate(() => sessionStorage.getItem('test-slug'));
     await page.locator('.store-play[data-slug="' + slug + '"]').first().click();
     if (scenario !== 'standby') {
@@ -88,11 +99,28 @@ try {
     const layout = await page.locator('.audio-diag').evaluate(el => ({ width: el.getBoundingClientRect().width, right: el.getBoundingClientRect().right, controls: [...el.querySelectorAll('button')].map(b => ({ height: b.getBoundingClientRect().height, right: b.getBoundingClientRect().right })), summary: el.querySelector('textarea').getBoundingClientRect().right }));
     assert.ok(layout.right <= width + 1 && layout.summary <= width + 1);
     assert.ok(layout.controls.every(b => b.height >= 44 && b.right <= width + 1));
+    if (scenario === 'active') {
+      // Consecutive skips before the destination has finished loading.
+      await page.evaluate(() => {
+        document.getElementById('store-prev').click();
+        document.getElementById('store-next').click();
+        document.getElementById('store-next').click();
+        window.checkOutput();
+      });
+      await page.waitForFunction(() => [...document.querySelectorAll('audio')].some(el => !el.paused && el.currentTime > .2));
+      await page.locator('#store-toggle').click();
+      assert.equal(await page.evaluate(() => [...document.querySelectorAll('audio')].filter(el => !el.paused && !el.muted).length), 0);
+      await page.locator('#store-toggle').click();
+      await page.waitForFunction(() => [...document.querySelectorAll('audio')].some(el => !el.paused && el.currentTime > .2));
+    }
+    assert.deepEqual(await page.evaluate(() => window.outputViolations), []);
+    const outputChecks = await page.evaluate(() => window.outputChecks);
     await page.locator('#store-stop').click();
+    assert.equal(await page.evaluate(() => [...document.querySelectorAll('audio')].filter(el => !el.paused && !el.muted).length), 0);
     await page.locator('#audio-diag-output').scrollIntoViewIfNeeded();
     await page.locator('.audio-diag').screenshot({ path: resolve(output, 'mobile-' + scenario + '-' + width + '.png') });
     assert.deepEqual(errors, []);
-    results.push({ width, scenario, realMediaChecked: true, sanitizedDownload: true, controlsFit: true, pageErrors: errors.length });
+    results.push({ width, scenario, realMediaChecked: true, sanitizedDownload: true, controlsFit: true, outputChecks, overlappingOutput: false, pageErrors: errors.length });
     await context.close();
   }
 } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }

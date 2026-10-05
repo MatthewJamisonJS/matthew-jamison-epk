@@ -134,6 +134,7 @@
   Array.prototype.forEach.call(audio.attributes, a => {
     if (a.name !== 'id') standby.setAttribute(a.name, a.value);
   });
+  standby.muted = true;
   audio.after(standby);
 
   function swapPointers() {
@@ -145,6 +146,7 @@
   // release an element's connection. Clearing a src-less element would fire a
   // spurious error event, so the attribute is checked first.
   function clearEl(el) {
+    el.muted = true;
     el.pause();
     if (el.hasAttribute('src')) {
       el.removeAttribute('src');
@@ -165,7 +167,7 @@
 
   // iOS/Safari only grants playback from a user gesture — the standby element
   // gets its own silent unlock the first time the user presses play.
-  let unlocked = false;
+  let unlocked = false, unlockPending = false;
 
   // a resumed track boots with preload='metadata' (see the resume block at the
   // foot of the file). The first time the listener asks for audio, both elements
@@ -179,6 +181,7 @@
   function unlockStandby() {
     if (unlocked) return;
     unlocked = true;
+    unlockPending = true;
     // Keep the element identity: a quality handoff can swap standby before
     // this src-less play promise settles.
     const el = standby;
@@ -192,16 +195,19 @@
       const up = el.play();
       if (up && up.then) {
         up.then(() => {
-          // A source assigned in the meantime belongs to real playback.
-          if (!el.hasAttribute('src')) el.pause();
-          el.muted = false;
+          unlockPending = false;
+          // Source presence is not playback ownership: this slot may be an
+          // idle fallback, or a retired element after several skips.
+          if (enforceOutput(el)) el.muted = false;
           trace('unlock-settled', 'unlock', undefined, undefined, undefined, request);
-        }).catch(e => { el.muted = false; trace('play-rejected', 'unlock', e && e.name, undefined, undefined, request); });
+        }).catch(e => { unlockPending = false; if (enforceOutput(el)) el.muted = false; trace('play-rejected', 'unlock', e && e.name, undefined, undefined, request); });
       } else {
-        el.muted = false;
+        unlockPending = false;
+        if (enforceOutput(el)) el.muted = false;
       }
     } catch (e) {
-      el.muted = false;  // unlock is best-effort; never retain its silent mute
+      unlockPending = false;
+      if (enforceOutput(el)) el.muted = false;
       trace('play-rejected', 'unlock', e && e.name, undefined, undefined, request);
     }
   }
@@ -881,7 +887,7 @@
     toggleBtn.classList.toggle('is-playing', sounding);
     toggleBtn.setAttribute('aria-label', sounding ? 'pause playback' : 'resume playback');
     if ('mediaSession' in navigator) {
-      navigator.mediaSession.playbackState = slug && sounding ? 'playing' : 'paused';
+      navigator.mediaSession.playbackState = slug ? (sounding ? 'playing' : 'paused') : 'none';
     }
     markCards();
   }
@@ -1016,6 +1022,20 @@
   // null preserves the handoff's default behavior until an explicit request.
   // Media paused state can reflect a failed source rather than user intent.
   let playbackIntent = null;
+
+  // Browser play/playing events and promise settlements may outlive a load or
+  // slot swap. Only the active slot with current play intent may produce sound.
+  function enforceOutput(el) {
+    if (el === audio && slug && playbackIntent !== false && !terminalFailure) return true;
+    el.muted = true;
+    // Preserve the initial, source-less silent unlock inside the gesture. It
+    // can never sound, and gains no permission to play a later assigned source.
+    if (!(unlockPending && el === standby && !el.hasAttribute('src') && playbackIntent !== false)) el.pause();
+    return false;
+  }
+  [audio, standby].forEach(el => {
+    ['play', 'playing'].forEach(type => el.addEventListener(type, () => enforceOutput(el)));
+  });
 
   // Opt-in, tab-local in-memory diagnostics. Fixed fields only: never titles, slugs,
   // URLs, error messages, user agent, wall-clock time or arbitrary event data.
@@ -1246,6 +1266,9 @@
   function requestPlayback(cause) {
     const el = audio, gen = handoffGen, src = el.getAttribute('src');
     const playGen = ++playbackRequestGen;
+    standby.muted = true;
+    standby.pause();
+    el.muted = false;
     const request = playRequest(el, cause);
     const rejected = e => {
       trace('play-rejected', cause, e && e.name, undefined, undefined, request);
@@ -1259,7 +1282,7 @@
     };
     try {
       const p = el.play();
-      if (p && p.catch) p.catch(rejected);
+      if (p && p.then) p.then(() => { enforceOutput(el); }).catch(rejected);
     } catch (e) { rejected(e); }
   }
 
@@ -1320,9 +1343,9 @@
       const wasPlaying = playbackIntent === null
         ? forcePlay || attempt.fromError || !audio.paused : playbackIntent;
       try { target.currentTime = at; } catch (e) { /* not seekable yet */ }
-      target.muted = false;
       clearEl(audio);
       swapPointers();
+      target.muted = false;
       currentPath = toPath;
       terminalFailure = false;
       setStatus('');
@@ -1415,6 +1438,7 @@
     playbackIntent = !!autoplay;  // a restored paused load must recover paused too
     invalidateHandoff(); // a handoff in flight is for the track being replaced
     clearEl(standby);    // and so is whatever it half-loaded
+    clearEl(audio);      // cancel the old decoder/play request before replacing its src
     // synchronous, all of it: on iOS this runs inside the `ended` handler and
     // the play() below only counts while that handler is still on the stack.
     // streamPath reads the in-memory url map, never IndexedDB.
@@ -1425,6 +1449,7 @@
       promotable = false;
       healthySince = 0;
     }
+    audio.muted = false;
     audio.src = srcFor(currentPath, slug, nn);
     trace('load');
     // nothing to arm on a blob (there is no download to stall), and nothing to
@@ -1521,6 +1546,8 @@
     // where pause() emits no new event. The fallback can finish loading paused.
     stallEnd(); startClear(); offlineStallClear();
     audio.pause();
+    standby.muted = true;
+    standby.pause();
     syncToggle();
   }
 
@@ -1667,6 +1694,9 @@
   // pausing during startup withdraws the deadline: a forced demote would resume
   // playback the listener just stopped
   bindBoth('pause', () => {
+    // A pause queued by retiring the previous source may arrive after the
+    // next play request. Read current media state before canceling its deadline.
+    if (!audio.paused) return;
     stallEnd(); startClear(); offlineStallClear();
     // stop() nulls slug synchronously and the pause event lands after it, so a
     // stopped player writes nothing here — saveState() reads the same flag.
@@ -1675,7 +1705,12 @@
   });
   bindBoth('waiting', () => { stallBegin(); offlineStallBegin(); });
   bindBoth('stalled', () => { stallBegin(); offlineStallBegin(); });
-  bindBoth('playing', () => { stallEnd(); startClear(); offlineStallClear(); });
+  bindBoth('playing', () => {
+    // A queued playing event from the previous resource is not evidence that
+    // the newly assigned source has enough data to play.
+    if (audio.paused || audio.readyState < 3) return;
+    stallEnd(); startClear(); offlineStallClear();
+  });
   bindBoth('ended', () => {
     if (!slug) return;
     if (index < catalog[slug].tr.length - 1) step(1);

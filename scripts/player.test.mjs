@@ -136,7 +136,8 @@ class AudioEl extends El {
   pause() {
     if (this.paused) return;
     this.paused = true;
-    this.dispatchEvent({ type: 'pause' });
+    if (this._w.asyncPause) this._w.clock.set(() => this.dispatchEvent({ type: 'pause' }), 0);
+    else this.dispatchEvent({ type: 'pause' });
   }
   load() { this.loads++; }
   canPlayType(t) { return this._w.canPlay(t); }
@@ -306,6 +307,7 @@ function makeWorld(opts = {}) {
   const w = {};
 
   w.clock = makeClock(w);
+  w.asyncPause = !!opts.asyncPause;
   w.audioEls = [];
   w.srcLog = [];
   w.playLog = [];
@@ -692,7 +694,7 @@ for (const captured of [false, true]) {
       reject({ name: 'AbortError' });
       await flush();
       assert.equal(diagExport(w).events.some(e => e.event === 'play-rejected'), false);
-      if (cause === 'unlock') assert.equal(w.standby.muted, false, 'unlock cleanup still runs');
+      if (cause === 'unlock') assert.equal(w.standby.muted, true, 'unlock cleanup keeps the idle slot silent');
       else assert.equal(w.els.get('store-toggle').getAttribute('aria-label'), 'pause playback', 'settlement still synchronizes controls');
       diagClick(w, 'mark');
       assert.ok(diagExport(w).events.some(e => e.event === 'silence-marker'));
@@ -700,7 +702,7 @@ for (const captured of [false, true]) {
   }
 }
 
-test('uncaptured unlock success cannot cross Clear into a new recording but still unmutes', async () => {
+test('uncaptured unlock success cannot cross Clear into a new recording and keeps idle muted', async () => {
   const w = boot();
   let resolve;
   w.standby.play = () => new Promise(done => { resolve = done; });
@@ -710,7 +712,7 @@ test('uncaptured unlock success cannot cross Clear into a new recording but stil
   diagClick(w, 'toggle');
   resolve();
   await flush();
-  assert.equal(w.standby.muted, false);
+  assert.equal(w.standby.muted, true);
   assert.equal(w.standby.paused, true);
   assert.equal(diagExport(w).events.some(e => e.event === 'unlock-settled'), false);
 });
@@ -1051,7 +1053,7 @@ test('a synchronous standby unlock exception does not leave its element muted', 
   const w = boot();
   w.standby.play = () => { throw new Error('unlock unavailable'); };
   clickRelease(w, 'alb');
-  assert.equal(w.standby.muted, false);
+  assert.equal(w.standby.muted, true);
 });
 
 for (const pauseVia of ['toggle', 'media-session', 'media-session-already-paused']) {
@@ -1637,4 +1639,170 @@ test('saved media error then late play rejection cannot restart its network retr
   assert.equal(w.srcLog.length, loads);
   assert.equal(retry.paused, false);
   assert.equal(w.status.textContent, '');
+});
+
+
+// Browser play events/promises can arrive after the element's ownership changed.
+// Count output state, not only play() calls: a delayed decoder start is the race.
+function audibleSlots(w) {
+  return [w.audio, w.standby].filter(el => !el.paused && !el.muted);
+}
+function delayedStart(el) {
+  let resolve;
+  const promise = new Promise(done => { resolve = done; });
+  return { promise, start() {
+    el.paused = false;
+    el.dispatchEvent({ type: 'play' });
+    el.dispatchEvent({ type: 'playing' });
+    resolve();
+  } };
+}
+test('delayed unlock cannot make a preparing standby audible after consecutive skips', async () => {
+  const w = boot({ onFetch: () => new Promise(() => {}) });
+  const delayed = delayedStart(w.standby);
+  w.standby.play = () => delayed.promise;
+  clickRelease(w, 'alb');
+  w.els.get('store-next').dispatchEvent({ type: 'click' });
+  w.els.get('store-next').dispatchEvent({ type: 'click' });
+  w.audio.dispatchEvent({ type: 'waiting' });
+  await tick(w, 2000);
+  assert.equal(w.standby.src, API + '/p/alb/03');
+  delayed.start();
+  await flush();
+  assert.equal(audibleSlots(w).length, 1, 'only the active source may sound before fallback readiness');
+  assert.equal(w.standby.paused, true, 'late unlock must stop an idle source');
+});
+test('late second-track start cannot revive retired slot while third track plays', async () => {
+  const w = boot({ onFetch: () => new Promise(() => {}) });
+  clickRelease(w, 'alb');
+  await flush();
+  w.els.get('store-next').dispatchEvent({ type: 'click' });
+  w.audio.dispatchEvent({ type: 'error' });
+  const second = w.standby;
+  const delayed = delayedStart(second);
+  second.play = () => delayed.promise;
+  second.dispatchEvent({ type: 'canplay' });
+  second.play = AudioEl.prototype.play.bind(second);
+  w.els.get('store-next').dispatchEvent({ type: 'click' });
+  second.dispatchEvent({ type: 'error' });
+  const third = w.audio;
+  third.dispatchEvent({ type: 'canplay' });
+  assert.equal(third.paused, false);
+  delayed.start();
+  await flush();
+  assert.equal(audibleSlots(w).length, 1, 'retired second-track play event/settlement must not overlap third');
+  assert.equal(second.paused, true);
+});
+test('explicit pause stops both slots and rejects delayed idle output', async () => {
+  const w = boot();
+  clickRelease(w, 'alb');
+  await flush();
+  w.standby.paused = false;
+  w.standby.muted = false;
+  w.mediaHandlers.get('pause')();
+  assert.equal(w.audio.paused, true);
+  assert.equal(w.standby.paused, true, 'pause must stop even unexpected idle output');
+  w.standby.paused = false;
+  w.standby.dispatchEvent({ type: 'playing' });
+  assert.equal(audibleSlots(w).length, 0, 'pause intent controls late events from either slot');
+});
+
+
+for (const action of ['pause', 'stop']) {
+  test('late active fulfillment after ' + action + ' produces no output', async () => {
+    const w = boot({ onFetch: () => new Promise(() => {}) });
+    clickRelease(w, 'alb');
+    await flush();
+    const delayed = delayedStart(w.audio);
+    w.audio.play = () => delayed.promise;
+    w.mediaHandlers.get('play')();
+    if (action === 'pause') w.mediaHandlers.get('pause')();
+    else w.els.get('store-stop').dispatchEvent({ type: 'click' });
+    delayed.start();
+    await flush();
+    assert.equal(audibleSlots(w).length, 0);
+    assert.equal(w.audio.paused, true);
+    assert.equal(w.navigator.mediaSession.playbackState, action === 'pause' ? 'paused' : 'none');
+  });
+}
+test('old fulfilled play on reused active slot preserves newer authorized resume', async () => {
+  const w = boot({ onFetch: () => new Promise(() => {}) });
+  clickRelease(w, 'alb');
+  await flush();
+  const delayed = delayedStart(w.audio);
+  w.audio.play = () => delayed.promise;
+  w.mediaHandlers.get('play')();
+  w.mediaHandlers.get('pause')();
+  w.audio.play = AudioEl.prototype.play.bind(w.audio);
+  w.mediaHandlers.get('play')();
+  delayed.start();
+  await flush();
+  assert.equal(audibleSlots(w).length, 1);
+  assert.equal(w.audio.paused, false);
+  assert.equal(w.audio.muted, false);
+  assert.equal(w.navigator.mediaSession.playbackState, 'playing');
+});
+test('every active play request retires unexpected idle output before resuming', async () => {
+  const w = boot();
+  clickRelease(w, 'alb');
+  await flush();
+  w.audio.pause();
+  w.standby.paused = false;
+  w.standby.muted = false;
+  w.mediaHandlers.get('play')();
+  assert.equal(w.standby.paused, true);
+  assert.equal(w.standby.muted, true);
+  assert.equal(audibleSlots(w).length, 1);
+});
+test('rapid consecutive skips, fallback swaps, pause and resume authorize at most one output', async () => {
+  const w = boot({ onFetch: () => new Promise(() => {}) });
+  const transitions = [];
+  const verify = () => {
+    const count = audibleSlots(w).length;
+    transitions.push(count);
+    assert.ok(count <= 1, 'two output slots after transition ' + transitions.length);
+  };
+  [w.audio, w.standby].forEach(el => ['play', 'playing', 'pause', 'emptied'].forEach(type => el.addEventListener(type, verify)));
+  clickRelease(w, 'alb');
+  await flush();
+  verify();
+  for (let track = 2; track <= 3; track++) {
+    w.els.get('store-next').dispatchEvent({ type: 'click' });
+    verify();
+    const active = track === 2 ? w.audio : w.standby;
+    active.dispatchEvent({ type: 'error' });
+    const target = track === 2 ? w.standby : w.audio;
+    target.dispatchEvent({ type: 'canplay' });
+    verify();
+  }
+  w.mediaHandlers.get('pause')();
+  assert.equal(audibleSlots(w).length, 0);
+  w.mediaHandlers.get('play')();
+  verify();
+  assert.equal(audibleSlots(w).length, 1);
+  w.els.get('store-stop').dispatchEvent({ type: 'click' });
+  assert.equal(audibleSlots(w).length, 0);
+  assert.ok(transitions.length > 10);
+});
+
+
+for (const staleEvent of ['pause', 'playing']) {
+  test('queued old ' + staleEvent + ' cannot cancel the next track startup deadline', async () => {
+    const w = boot({ asyncPause: true, onFetch: () => new Promise(() => {}) });
+    clickRelease(w, 'alb');
+    await flush();
+    w.els.get('store-next').dispatchEvent({ type: 'click' });
+    assert.equal(w.audio.paused, false, 'new play request owns the active element');
+    if (staleEvent === 'playing') w.audio.dispatchEvent({ type: 'playing' });
+    await tick(w, 2600);
+    assert.equal(w.standby.src, API + '/p/alb/02', 'new startup deadline must still recover');
+  });
+}
+test('current playing with enough media data withdraws its own startup deadline', async () => {
+  const w = boot({ asyncPause: true, onFetch: () => new Promise(() => {}) });
+  clickRelease(w, 'alb');
+  w.audio.readyState = 3;
+  w.audio.dispatchEvent({ type: 'playing' });
+  await tick(w, 2600);
+  assert.equal(w.standby.hasAttribute('src'), false, 'healthy current source keeps playing');
 });
