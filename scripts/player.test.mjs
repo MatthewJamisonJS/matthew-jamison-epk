@@ -297,7 +297,7 @@ const BAR_IDS = [
   'store-scrub', 'store-time', 'store-quality',
   'store-quality-mode', 'store-quality-now', 'store-size-toggle', 'store-player-meta', 'store-title-rail',
   'audio-diag-toggle', 'audio-diag-mark', 'audio-diag-export', 'audio-diag-clear',
-  'audio-diag-status', 'audio-diag-output'
+  'audio-diag-status', 'audio-diag-output', 'audio-diag-notice'
 ];
 
 function makeWorld(opts = {}) {
@@ -370,7 +370,7 @@ function makeWorld(opts = {}) {
   };
   w.window = win;
 
-  const store = new Map(Object.entries(opts.storage || {}));
+  const store = opts.sharedStorage || new Map(Object.entries(opts.storage || {}));
   w.storage = store;
   w.localStorage = {
     getItem: k => (store.has(k) ? store.get(k) : null),
@@ -407,6 +407,7 @@ function makeWorld(opts = {}) {
   w.requestAnimationFrame = fn => { w.rafs.push(fn); return w.rafs.length; };
   w.Date = { now: () => w.clock.now };
   w.console = console;
+  w.crypto = globalThis.crypto;
 
   w.fetch = (url, options) => {
     const rec = { url: String(url), opts: options, at: w.clock.now };
@@ -438,6 +439,7 @@ function makeWorld(opts = {}) {
 // Given the listener opts in, when silence is marked and the trace is shown,
 // then only bounded media state is available for their manual copy.
 const DIAG_KEY = 'mj-audio-diagnostics';
+const DIAG_CONSENT = 'mj-audio-diag-consent';
 const diagClick = (w, action) => w.els.get('audio-diag-' + action).dispatchEvent({ type: 'click' });
 const diagExport = w => { diagClick(w, 'export'); return JSON.parse(w.els.get('audio-diag-output').value); };
 
@@ -463,7 +465,7 @@ test('diagnostics require opt-in, expose a local trace and disable/clear on requ
 
 test('diagnostics bound history and sanitize restored records, errors and source URLs', async () => {
   const secret = 'https://example.test/private?token=do-not-export';
-  const w = boot({ storage: { [DIAG_KEY]: JSON.stringify({ v: 1, enabled: true, events: [{ event: secret, url: secret }] }) } });
+  const w = boot({ storage: { [DIAG_CONSENT]: JSON.stringify({v:1, epoch:'a'.repeat(32), enabled:true, action:'enable'}), [DIAG_KEY]: JSON.stringify({ v: 2, epoch:'a'.repeat(32), events: [{ event: secret, url: secret }] }) } });
   clickRelease(w, 'alb');
   await flush();
   w.audio.src = secret;
@@ -514,6 +516,7 @@ test('diagnostics never let denied storage break transport and report loss of pe
   clickRelease(w, 'alb');
   await flush();
   assert.equal(w.audio.paused, false);
+  await tick(w, 250);
   assert.match(w.els.get('audio-diag-status').textContent, /memory|tab/i);
   assert.ok(diagExport(w).events.length > 0);
   diagClick(w, 'clear');
@@ -541,16 +544,185 @@ test('recording survives reload locally, samples at most every five seconds, and
   await flush();
   for (let i = 0; i < 100; i++) w.audio.dispatchEvent({ type: 'timeupdate' });
   assert.equal(diagExport(w).events.filter(e => e.event === 'sample').length, 1);
-  const next = boot({ storage: { [DIAG_KEY]: w.storage.get(DIAG_KEY) } });
+  await tick(w, 250);
+  const next = boot({ storage: { [DIAG_KEY]: w.storage.get(DIAG_KEY), [DIAG_CONSENT]: w.storage.get(DIAG_CONSENT) } });
   assert.equal(next.els.get('audio-diag-toggle').getAttribute('aria-pressed'), 'true');
   next.document.dispatchEvent({ type: 'visibilitychange' });
   assert.equal(diagExport(next).events.at(-1).page, 2);
   diagClick(next, 'toggle');
-  const off = boot({ storage: { [DIAG_KEY]: next.storage.get(DIAG_KEY) } });
+  const off = boot({ storage: { [DIAG_KEY]: next.storage.get(DIAG_KEY), [DIAG_CONSENT]: next.storage.get(DIAG_CONSENT) } });
   const count = diagExport(off).events.length;
   off.audio.dispatchEvent({ type: 'playing' });
   assert.equal(diagExport(off).events.length, count);
   assert.equal(off.els.get('audio-diag-toggle').getAttribute('aria-pressed'), 'false');
+});
+
+// Given two tabs share recording consent, when one clears or disables it,
+// then the other cannot restore consent/history, even before storage delivery.
+test('a stale tab cannot restore recording or cleared history with queued writes', async () => {
+  const shared = new Map();
+  const a = boot({ sharedStorage: shared });
+  diagClick(a, 'toggle');
+  await tick(a, 250);
+  const b = boot({ sharedStorage: shared });
+  b.audio.dispatchEvent({ type: 'waiting' });
+  diagClick(a, 'clear');
+  await tick(b, 250); // deferred stale write without a storage event
+  assert.equal(JSON.parse(shared.get(DIAG_CONSENT)).enabled, false);
+  assert.deepEqual(diagExport(b).events, []);
+  assert.equal(shared.has(DIAG_KEY), false);
+  assert.equal(b.els.get('audio-diag-toggle').getAttribute('aria-pressed'), 'false');
+  diagClick(a, 'toggle');
+  await tick(a, 250);
+  const c = boot({ sharedStorage: shared });
+  diagClick(a, 'toggle'); // disable, keep history
+  c.window.dispatchEvent({ type: 'storage', key: DIAG_CONSENT });
+  assert.equal(c.els.get('audio-diag-toggle').getAttribute('aria-pressed'), 'false');
+  const retained = shared.get(DIAG_KEY);
+  c.document.dispatchEvent({ type: 'visibilitychange' });
+  await tick(c, 250);
+  assert.equal(shared.get(DIAG_KEY), retained);
+});
+
+test('late play failure identifies its originating request separately from the current track', async () => {
+  const w = boot();
+  diagClick(w, 'toggle');
+  let reject;
+  const originalPlay = w.audio.play.bind(w.audio);
+  w.audio.play = () => { originalPlay(); return new Promise((resolve, fail) => { reject = fail; }); };
+  clickRelease(w, 'alb');
+  const rejectFirst = reject;
+  w.audio.play = originalPlay;
+  w.els.get('store-next').dispatchEvent({ type: 'click' });
+  rejectFirst({ name: 'NotAllowedError' });
+  await flush();
+  const trace = diagExport(w);
+  const failure = trace.events.find(e => e.event === 'play-rejected' && e.cause === 'load');
+  assert.equal(failure.origin.track, 1);
+  assert.equal(failure.origin.generation, 1);
+  assert.equal(failure.origin.slot, 0);
+  assert.equal(failure.emitter, 0);
+  assert.equal(failure.track, 2);
+  assert.equal(failure.generation, 2);
+  const request = trace.events.find(e => e.event === 'play-request' && e.cause === 'load');
+  assert.equal(failure.origin.id, request.origin.id);
+});
+
+for (const cause of ['unlock', 'resume', 'handoff']) {
+  test('late ' + cause + ' rejection retains request slot and generation after Next', async () => {
+    const w = boot({ onFetch: () => new Promise(() => {}) });
+    diagClick(w, 'toggle');
+    let reject;
+    const pendingPlay = () => new Promise((resolve, fail) => { reject = fail; });
+    let originSlot = 0, originTrack = 1;
+    if (cause === 'unlock') {
+      originSlot = 1; originTrack = 0;
+      w.standby.play = pendingPlay;
+      clickRelease(w, 'alb');
+    } else {
+      clickRelease(w, 'alb');
+      await flush();
+      if (cause === 'resume') {
+        w.els.get('store-toggle').dispatchEvent({ type: 'click' });
+        w.audio.play = pendingPlay;
+        w.els.get('store-toggle').dispatchEvent({ type: 'click' });
+        w.audio.play = AudioEl.prototype.play.bind(w.audio);
+      } else {
+        await tick(w, 2500);
+        originSlot = 1;
+        w.standby.play = pendingPlay;
+        w.standby.dispatchEvent({ type: 'canplay' });
+        w.standby.play = AudioEl.prototype.play.bind(w.standby);
+      }
+    }
+    const failureCallback = reject;
+    const request = diagExport(w).events.find(e => e.event === 'play-request' && e.cause === cause);
+    w.els.get('store-next').dispatchEvent({ type: 'click' });
+    failureCallback({ name: 'AbortError' });
+    await flush();
+    const failure = diagExport(w).events.find(e => e.event === 'play-rejected' && e.cause === cause);
+    assert.equal(failure.origin.slot, originSlot);
+    assert.equal(failure.origin.track, originTrack);
+    assert.equal(failure.origin.id, request.origin.id);
+    assert.equal(failure.origin.generation, request.origin.generation);
+    assert.equal(failure.track, 2);
+    assert.equal(failure.emitter, originSlot);
+  });
+}
+
+test('a clear racing a deferred write invalidates and removes the obsolete envelope', async () => {
+  const shared = new Map();
+  const a = boot({ sharedStorage: shared });
+  diagClick(a, 'toggle');
+  await tick(a, 250);
+  const b = boot({ sharedStorage: shared });
+  b.audio.dispatchEvent({ type: 'waiting' });
+  const originalWrite = b.localStorage.setItem;
+  b.localStorage.setItem = (key, value) => {
+    if (key === DIAG_KEY) diagClick(a, 'clear');
+    originalWrite(key, value);
+  };
+  await tick(b, 250);
+  assert.equal(JSON.parse(shared.get(DIAG_CONSENT)).enabled, false);
+  assert.equal(shared.has(DIAG_KEY), false);
+  assert.deepEqual(diagExport(b).events, []);
+  assert.equal(b.els.get('audio-diag-output').hidden, false); // explicitly requested empty export
+  b.window.dispatchEvent({ type: 'storage', key: 'unrelated' });
+  assert.deepEqual(diagExport(b).events, []);
+});
+
+test('a revoked tab drops its displayed trace even when reading history fails', async () => {
+  const shared = new Map();
+  const a = boot({ sharedStorage: shared });
+  diagClick(a, 'toggle');
+  await tick(a, 250);
+  const b = boot({ sharedStorage: shared });
+  assert.ok(diagExport(b).events.length > 0);
+  diagClick(a, 'clear');
+  const read = b.localStorage.getItem;
+  b.localStorage.getItem = key => { if (key === DIAG_KEY) throw new Error('denied'); return read(key); };
+  b.window.dispatchEvent({ type: 'storage', key: DIAG_CONSENT });
+  assert.equal(b.els.get('audio-diag-output').hidden, true);
+  assert.equal(b.els.get('audio-diag-output').value, '');
+  assert.equal(b.els.get('audio-diag-toggle').getAttribute('aria-pressed'), 'false');
+  assert.deepEqual(diagExport(b).events, []);
+});
+
+test('diagnostic writes and paints are deferred beyond timing-sensitive playback and coalesced', async () => {
+  const w = boot({ onFetch: () => new Promise(() => {}) });
+  diagClick(w, 'toggle');
+  await tick(w, 250);
+  const before = w.clock.now;
+  const write = w.localStorage.setItem;
+  let writes = 0;
+  w.localStorage.setItem = (key, value) => {
+    if (key === DIAG_KEY || key === DIAG_CONSENT) { writes++; w.clock.now += 20; }
+    write(key, value);
+  };
+  const status = w.els.get('audio-diag-status').textContent;
+  clickRelease(w, 'alb');
+  assert.equal(writes, 0, 'no diagnostic storage writes before the gesture play completes');
+  assert.equal(w.audio.plays[0], before);
+  assert.equal(w.els.get('audio-diag-status').textContent, status);
+  await tick(w, 250);
+  assert.equal(writes, 1, 'one deferred write for the burst');
+});
+
+test('meaningful recording and failure notices are polite while event counts stay silent', async () => {
+  const w = boot();
+  diagClick(w, 'toggle');
+  const notice = w.els.get('audio-diag-notice');
+  assert.match(notice.textContent, /enabled|recording/i);
+  const announcement = notice.textContent;
+  w.audio.dispatchEvent({ type: 'volumechange' });
+  await tick(w, 250);
+  assert.equal(notice.textContent, announcement);
+  diagClick(w, 'clear');
+  assert.match(notice.textContent, /cleared/i);
+  w.localStorage.setItem = () => { throw new Error('denied'); };
+  diagClick(w, 'toggle');
+  await tick(w, 250);
+  assert.match(notice.textContent, /storage unavailable/i);
 });
 
 function boot(opts = {}) {

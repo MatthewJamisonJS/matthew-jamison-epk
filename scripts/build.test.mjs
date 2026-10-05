@@ -41,7 +41,7 @@ const PLAYER_IDS = [
   'store-stop',
   'store-audio',
   'audio-diag-toggle', 'audio-diag-mark', 'audio-diag-export', 'audio-diag-clear',
-  'audio-diag-status', 'audio-diag-output'
+  'audio-diag-status', 'audio-diag-output', 'audio-diag-notice'
 ];
 
 const out = mkdtempSync(join(tmpdir(), 'mj-build-'));
@@ -52,6 +52,13 @@ execFileSync(process.execPath, [join(root, 'scripts', 'build.mjs'), '--out', out
 });
 
 const read = (...p) => readFileSync(join(out, ...p), 'utf8');
+
+test('diagnostic notices are polite on home and generated releases, with counts outside the live region', () => {
+  for (const html of [readFileSync(join(root, 'index.html'), 'utf8'), ...releases.map(r => read('music', r.slug, 'index.html'))]) {
+    assert.match(html, /<p id="audio-diag-notice" role="status" aria-live="polite" aria-atomic="true"><\/p>/);
+    assert.match(html, /<p id="audio-diag-status">/);
+  }
+});
 const journey = releases.find(r => r.slug === 'the-journey');
 
 // the generator's escaper, mirrored so an expected attribute value can be built

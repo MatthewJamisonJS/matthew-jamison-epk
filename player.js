@@ -182,25 +182,27 @@
     // Keep the element identity: a quality handoff can swap standby before
     // this src-less play promise settles.
     const el = standby;
+    let request = null;
     try {
       el.muted = true;
       // load() inside the gesture is what actually lifts webkit's playback
       // restriction on a src-less element; the muted play is belt-and-braces
       el.load();
-      trace('play-request', 'unlock');
+      request = playRequest(el, 'unlock');
       const up = el.play();
       if (up && up.then) {
         up.then(() => {
           // A source assigned in the meantime belongs to real playback.
           if (!el.hasAttribute('src')) el.pause();
           el.muted = false;
-          trace('unlock-settled', 'unlock');
-        }).catch(e => { el.muted = false; trace('play-rejected', 'unlock', e && e.name); });
+          trace('unlock-settled', 'unlock', undefined, undefined, undefined, request);
+        }).catch(e => { el.muted = false; trace('play-rejected', 'unlock', e && e.name, undefined, undefined, request); });
       } else {
         el.muted = false;
       }
     } catch (e) {
       el.muted = false;  // unlock is best-effort; never retain its silent mute
+      trace('play-rejected', 'unlock', e && e.name, undefined, undefined, request);
     }
   }
 
@@ -1003,7 +1005,9 @@
   // URLs, error messages, user agent, wall-clock time or arbitrary event data.
   // Diagnostic failures must never escape into the transport.
   const DIAG_KEY = 'mj-audio-diagnostics';
+  const DIAG_CONSENT = 'mj-audio-diag-consent';
   const DIAG_LIMIT = 128;
+  const DIAG_FLUSH_DELAY = 250; // coalesce media-event bursts outside transport
   const diagSlots = [audio, standby];
   const diagStarted = Date.now();
   const diagEvents = ['enable', 'disable', 'silence-marker', 'load', 'stop',
@@ -1018,11 +1022,13 @@
   const diagErrors = ['none', 'NotAllowedError', 'AbortError', 'NotSupportedError',
     'NetworkError', 'SecurityError', 'unknown'];
   let diagEnabled = false, diagMemoryOnly = false, diagPage = 1, diagDropped = 0;
-  let diagHistory = [], diagLastSample = -5000;
+  let diagHistory = [], diagLastSample = -5000, diagRequestId = 0;
+  let diagEpoch = null, diagTimer = null, diagDirty = false, diagLocalOnly = false;
   const diagToggle = document.getElementById('audio-diag-toggle');
   const diagMark = document.getElementById('audio-diag-mark');
   const diagStatus = document.getElementById('audio-diag-status');
   const diagOutput = document.getElementById('audio-diag-output');
+  const diagNotice = document.getElementById('audio-diag-notice');
   const bounded = (value, max) => typeof value === 'number' && isFinite(value)
     ? Math.round(Math.max(0, Math.min(max, value)) * 10) / 10 : 0;
   const choice = (value, values, fallback) => values.indexOf(value) !== -1 ? value : fallback;
@@ -1044,6 +1050,11 @@
       quality: choice(record.quality, MODES, 'auto'),
       visibility: choice(record.visibility, ['visible', 'hidden'], 'hidden'),
       online: record.online === true,
+      origin: record.origin ? {
+        id: bounded(record.origin.id, 1000000), page: bounded(record.origin.page, 1000000),
+        slot: record.origin.slot === 1 ? 1 : 0,
+        track: bounded(record.origin.track, 10000), generation: bounded(record.origin.generation, 1000000)
+      } : null,
       slots: []
     };
     for (let i = 0; i < 2; i++) {
@@ -1060,16 +1071,30 @@
     return clean;
   }
 
-  try {
+  // Only explicit controls write consent. Trace writers never write enabled.
+  // The bounded random epoch is local coordination data and is not exported.
+  function readDiagConsent() {
+    const raw = localStorage.getItem(DIAG_CONSENT);
+    const value = raw && raw.length <= 256 ? JSON.parse(raw) : null;
+    if (!value || value.v !== 1 || typeof value.epoch !== 'string' ||
+        !/^[a-f0-9]{32}$/.test(value.epoch)) return { epoch: null, enabled: false, action: 'clear' };
+    return { epoch: value.epoch, enabled: value.enabled === true,
+      action: choice(value.action, ['enable', 'disable', 'clear'], 'clear') };
+  }
+
+  function readDiagHistory() {
+    diagHistory = []; diagDropped = 0;
     const raw = localStorage.getItem(DIAG_KEY);
     const saved = raw && raw.length <= 65536 ? JSON.parse(raw) : null;
-    if (saved && saved.v === 1 && Array.isArray(saved.events)) {
-      diagEnabled = saved.enabled === true;
+    if (saved && saved.v === 2 && saved.epoch === diagEpoch && Array.isArray(saved.events)) {
       diagHistory = saved.events.slice(-DIAG_LIMIT).map(sanitizeDiag).filter(Boolean);
       diagDropped = bounded(saved.dropped, 1000000);
-      diagPage = Math.min(1000000, 1 + diagHistory.reduce((n, e) => Math.max(n, e.page), 0));
     }
-  } catch (e) { diagMemoryOnly = true; }
+  }
+
+  function announceDiag(message) {
+    if (diagNotice && diagNotice.textContent !== message) diagNotice.textContent = message;
+  }
 
   function paintDiag() {
     if (diagToggle) {
@@ -1082,21 +1107,111 @@
       (diagMemoryOnly ? 'this tab only; storage unavailable, older saved data may remain' : 'saved only on this device');
   }
 
-  function persistDiag() {
+  function diagStorageFailure() {
+    diagMemoryOnly = true;
+    announceDiag('Storage unavailable. Recording is in this tab only; older saved data may remain.');
+  }
+
+  function cancelDiagFlush() {
+    if (diagTimer !== null) clearTimeout(diagTimer);
+    diagTimer = null;
+  }
+
+  // Called only from deferred work, lifecycle or explicit controls, never play.
+  function syncDiagConsent(force) {
+    if (diagLocalOnly && !force) return false;
     try {
-      localStorage.setItem(DIAG_KEY, JSON.stringify({ v: 1, enabled: diagEnabled,
-        dropped: diagDropped, events: diagHistory }));
-    } catch (e) { diagMemoryOnly = true; }
+      const consent = readDiagConsent();
+      if (consent.epoch === diagEpoch && consent.enabled === diagEnabled && !diagLocalOnly) return false;
+      cancelDiagFlush(); diagDirty = false; diagLocalOnly = false;
+      diagEpoch = consent.epoch; diagEnabled = consent.enabled;
+      if (diagOutput) { diagOutput.value = ''; diagOutput.hidden = true; }
+      readDiagHistory();
+      paintDiag();
+      announceDiag(consent.action === 'clear' ? 'Trace cleared in another tab. Recording disabled.' :
+        diagEnabled ? 'Recording enabled in another tab.' : 'Recording disabled in another tab.');
+      return true;
+    } catch (e) { diagStorageFailure(); paintDiag(); return false; }
+  }
+
+  function trimDiag() {
+    while (diagHistory.length > DIAG_LIMIT || JSON.stringify(diagHistory).length > 60000) {
+      diagHistory.shift(); diagDropped++;
+    }
+  }
+
+  function persistDiag() {
+    cancelDiagFlush();
+    if (syncDiagConsent()) return;
+    try {
+      trimDiag();
+      if (diagDirty && !diagLocalOnly) {
+        // Check the independent authority before and after the write. A clear
+        // racing this flush invalidates the old epoch, even if storage delivery
+        // is delayed. Remove only our obsolete envelope, never a newer writer's.
+        const epoch = diagEpoch;
+        localStorage.setItem(DIAG_KEY, JSON.stringify({ v: 2, epoch: epoch,
+          dropped: diagDropped, events: diagHistory }));
+        const consent = readDiagConsent();
+        if (consent.epoch !== epoch || consent.enabled !== diagEnabled) {
+          const saved = localStorage.getItem(DIAG_KEY);
+          if (saved && saved.length <= 65536 && JSON.parse(saved).epoch === epoch) localStorage.removeItem(DIAG_KEY);
+          syncDiagConsent(); return;
+        }
+      }
+      diagDirty = false;
+    } catch (e) { diagStorageFailure(); }
     paintDiag();
   }
 
-  function trace(event, cause, rejection, emitter, target) {
+  function queueDiagFlush() {
+    if (diagTimer === null) diagTimer = setTimeout(persistDiag, DIAG_FLUSH_DELAY);
+  }
+
+  function changeDiagConsent(enabled, clear) {
+    syncDiagConsent(); cancelDiagFlush();
+    try {
+      const words = crypto.getRandomValues(new Uint32Array(4));
+      diagEpoch = Array.from(words, n => n.toString(16).padStart(8, '0')).join('');
+      localStorage.setItem(DIAG_CONSENT, JSON.stringify({ v: 1, epoch: diagEpoch,
+        enabled: enabled, action: clear ? 'clear' : enabled ? 'enable' : 'disable' }));
+      diagLocalOnly = false; diagMemoryOnly = false;
+    } catch (e) { diagLocalOnly = true; diagStorageFailure(); }
+    diagEnabled = enabled;
+    if (clear) {
+      diagHistory = []; diagDropped = 0; diagDirty = false;
+      if (diagOutput) { diagOutput.value = ''; diagOutput.hidden = true; }
+      try { localStorage.removeItem(DIAG_KEY); } catch (e) { diagStorageFailure(); }
+    } else {
+      diagDirty = true;
+    }
+    paintDiag();
+    if (!diagMemoryOnly) announceDiag(clear ? 'Trace cleared. Recording disabled.' :
+      enabled ? 'Recording enabled on this device.' : 'Recording disabled. Trace retained.');
+  }
+
+  try {
+    const consent = readDiagConsent();
+    diagEpoch = consent.epoch; diagEnabled = consent.enabled;
+    readDiagHistory();
+    diagPage = Math.min(1000000, 1 + diagHistory.reduce((n, e) => Math.max(n, e.page), 0));
+  } catch (e) { diagStorageFailure(); }
+
+  function playRequest(el, cause) {
+    if (!diagEnabled) return null;
+    const origin = { id: diagRequestId = (diagRequestId % 1000000) + 1, page: diagPage,
+      slot: el === diagSlots[1] ? 1 : 0, track: slug ? index + 1 : 0, generation: handoffGen };
+    trace('play-request', cause, undefined, origin.slot, undefined, origin);
+    return origin;
+  }
+
+  function trace(event, cause, rejection, emitter, target, origin) {
     if (!diagEnabled) return;
     try {
       const slots = diagSlots.map(el => {
         const src = el.getAttribute('src') || '';
         let ahead = 0;
-        for (let i = 0; i < el.buffered.length; i++) {
+        for (let i = 0; i < Math.min(el.buffered.length, 16); i++) {
           if (el.buffered.start(i) <= el.currentTime && el.currentTime < el.buffered.end(i)) {
             ahead = el.buffered.end(i) - el.currentTime; break;
           }
@@ -1107,7 +1222,7 @@
           network: el.networkState, time: el.currentTime, duration: el.duration,
           ahead: ahead, error: el.error ? el.error.code : 0 };
       });
-      const record = sanitizeDiag({ event: event, cause: cause, rejection: rejection, emitter: emitter,
+      const record = sanitizeDiag({ event: event, cause: cause, rejection: rejection, emitter: origin ? origin.slot : emitter, origin: origin,
         target: target === '/s/' ? 'flac' : target === '/p/' ? 'mp3' : target === 'vault' ? 'saved' : 'none',
         mediaSession: navigator.mediaSession && navigator.mediaSession.playbackState,
         page: diagPage, ms: Date.now() - diagStarted, active: audio === diagSlots[1] ? 1 : 0,
@@ -1117,31 +1232,36 @@
         slots: slots });
       if (!record) return;
       diagHistory.push(record);
-      while (diagHistory.length > DIAG_LIMIT || JSON.stringify(diagHistory).length > 60000) {
-        diagHistory.shift(); diagDropped++;
-      }
-      persistDiag();
+      if (diagHistory.length > DIAG_LIMIT) { diagHistory.shift(); diagDropped++; }
+      diagDirty = true;
+      queueDiagFlush();
     } catch (e) { /* diagnostics cannot interrupt playback */ }
   }
 
   if (diagToggle) diagToggle.addEventListener('click', () => {
-    if (diagEnabled) { trace('disable'); diagEnabled = false; persistDiag(); }
-    else { diagEnabled = true; trace('enable'); }
+    const enabled = !diagEnabled;
+    if (!enabled) trace('disable');
+    changeDiagConsent(enabled, false);
+    if (enabled) trace('enable');
+    else persistDiag(); // explicit disable retains the captured history
   });
-  if (diagMark) diagMark.addEventListener('click', () => trace('silence-marker'));
+  if (diagMark) diagMark.addEventListener('click', () => {
+    syncDiagConsent(); trace('silence-marker');
+    if (diagEnabled) announceDiag('Silence marked. Show the trace to copy when ready.');
+  });
   const diagClear = document.getElementById('audio-diag-clear');
-  if (diagClear) diagClear.addEventListener('click', () => {
-    diagEnabled = false; diagHistory = []; diagDropped = 0;
-    if (diagOutput) { diagOutput.value = ''; diagOutput.hidden = true; }
-    try { localStorage.removeItem(DIAG_KEY); diagMemoryOnly = false; } catch (e) { diagMemoryOnly = true; }
-    paintDiag();
-  });
+  if (diagClear) diagClear.addEventListener('click', () => changeDiagConsent(false, true));
   const diagExport = document.getElementById('audio-diag-export');
   if (diagExport) diagExport.addEventListener('click', () => {
     if (!diagOutput) return;
+    persistDiag();
     diagOutput.value = JSON.stringify({ v: 1, dropped: diagDropped,
       events: diagHistory.map(sanitizeDiag).filter(Boolean) }, null, 2);
     diagOutput.hidden = false;
+    announceDiag('Trace ready. Select and copy it to share.');
+  });
+  window.addEventListener('storage', e => {
+    if (e.key === DIAG_CONSENT || e.key === DIAG_KEY || e.key === null) syncDiagConsent(true);
   });
   diagSlots.forEach((el, slot) => {
     ['loadstart', 'loadedmetadata', 'canplay', 'play', 'playing', 'pause', 'waiting',
@@ -1152,10 +1272,16 @@
       diagLastSample = Date.now(); trace('sample');
     });
   });
-  document.addEventListener('visibilitychange', () => trace('visibilitychange'));
+  document.addEventListener('visibilitychange', () => {
+    trace('visibilitychange');
+    if (document.visibilityState === 'hidden') persistDiag();
+  });
   ['freeze', 'resume'].forEach(type => document.addEventListener(type, () => trace(type)));
   ['pagehide', 'pageshow', 'offline', 'online'].forEach(type =>
-    window.addEventListener(type, () => trace(type)));
+    window.addEventListener(type, () => {
+      trace(type);
+      if (type === 'pagehide') persistDiag();
+    }));
   paintDiag();
 
   function handoff(toPath, forcePlay, fromError, reason) {
@@ -1185,9 +1311,9 @@
       offlineStallClear();
       paintQuality();
       if (wasPlaying) {
-        trace('play-request', 'handoff');
+        const request = playRequest(audio, 'handoff');
         const p = audio.play();
-        if (p && p.catch) p.catch(e => { trace('play-rejected', 'handoff', e && e.name); syncToggle(); });
+        if (p && p.catch) p.catch(e => { trace('play-rejected', 'handoff', e && e.name, undefined, undefined, request); syncToggle(); });
       } else {
         syncToggle();
       }
@@ -1318,9 +1444,9 @@
     setMetadata();
 
     if (autoplay) {
-      trace('play-request', 'load');
+      const request = playRequest(audio, 'load');
       const p = audio.play();
-      if (p && p.catch) p.catch(e => { trace('play-rejected', 'load', e && e.name); syncToggle(); });
+      if (p && p.catch) p.catch(e => { trace('play-rejected', 'load', e && e.name, undefined, undefined, request); syncToggle(); });
     }
     syncToggle();
     // slide the prefetch window: this track, then the next two. Whatever the
@@ -1382,9 +1508,9 @@
   function resumePlayback() {
     playbackIntent = true;
     trace('intent-resume');
-    trace('play-request', 'resume');
+    const request = playRequest(audio, 'resume');
     const p = audio.play();
-    if (p && p.catch) p.catch(e => { trace('play-rejected', 'resume', e && e.name); syncToggle(); });
+    if (p && p.catch) p.catch(e => { trace('play-rejected', 'resume', e && e.name, undefined, undefined, request); syncToggle(); });
     syncToggle();
   }
 
