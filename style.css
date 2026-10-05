@@ -2701,6 +2701,16 @@ body.game-locked star-field { display: none; }
   0%, 18% { transform: translateX(0); }
   82%, 100% { transform: translateX(var(--title-travel, 0)); }
 }
+
+/* Local diagnostic controls remain reachable with the dock hidden/minimized. */
+.audio-diag { position: relative; z-index: 1; margin: 24px auto; padding: 12px; max-width: 680px; color: #eeeaf2; background: #17171c; border: 1px solid #777; border-radius: 12px; }
+.audio-diag summary { cursor: pointer; min-height: 44px; display: list-item; padding: 10px 0; }
+.audio-diag p, .audio-diag label { font-size: 14px; line-height: 1.5; }
+.audio-diag-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.audio-diag button { min-height: 44px; padding: 8px 12px; font: inherit; color: #eeeaf2; background: #282830; border: 1px solid #888; border-radius: 8px; cursor: pointer; }
+.audio-diag button:disabled { opacity: .65; cursor: default; }
+.audio-diag textarea { width: 100%; margin-top: 8px; padding: 8px; font: 13px monospace; color: #eeeaf2; background: #17171c; border: 1px solid #888; }
+.audio-diag :focus-visible { outline: 2px solid #a9dfb4; outline-offset: 3px; }
 /* Focus/hover lets readers inspect the entire title at their own pace. */
 .store-player.is-minimized .store-player-meta:hover,
 .store-player.is-minimized .store-player-meta:focus { overflow-x: auto; }

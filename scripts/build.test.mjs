@@ -39,7 +39,9 @@ const PLAYER_IDS = [
   'store-quality-mode',
   'store-quality-now',
   'store-stop',
-  'store-audio'
+  'store-audio',
+  'audio-diag-toggle', 'audio-diag-mark', 'audio-diag-export', 'audio-diag-clear',
+  'audio-diag-status', 'audio-diag-output'
 ];
 
 const out = mkdtempSync(join(tmpdir(), 'mj-build-'));

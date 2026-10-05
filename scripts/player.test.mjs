@@ -295,7 +295,9 @@ const BAR_IDS = [
   'store-player-art', 'store-player-release', 'store-player-track',
   'store-prev', 'store-toggle', 'store-next', 'store-stop',
   'store-scrub', 'store-time', 'store-quality',
-  'store-quality-mode', 'store-quality-now', 'store-size-toggle', 'store-player-meta', 'store-title-rail'
+  'store-quality-mode', 'store-quality-now', 'store-size-toggle', 'store-player-meta', 'store-title-rail',
+  'audio-diag-toggle', 'audio-diag-mark', 'audio-diag-export', 'audio-diag-clear',
+  'audio-diag-status', 'audio-diag-output'
 ];
 
 function makeWorld(opts = {}) {
@@ -358,6 +360,7 @@ function makeWorld(opts = {}) {
   document.querySelector = sel => (w.onQuery ? w.onQuery(sel) : null);
   document.querySelectorAll = () => [];
   w.document = document;
+  document.visibilityState = 'visible';
   w.body = body;
 
   const win = new El('window', w);
@@ -430,6 +433,125 @@ function makeWorld(opts = {}) {
 
   return w;
 }
+
+// Given recording is off, when playback starts, then no diagnostic data is saved.
+// Given the listener opts in, when silence is marked and the trace is shown,
+// then only bounded media state is available for their manual copy.
+const DIAG_KEY = 'mj-audio-diagnostics';
+const diagClick = (w, action) => w.els.get('audio-diag-' + action).dispatchEvent({ type: 'click' });
+const diagExport = w => { diagClick(w, 'export'); return JSON.parse(w.els.get('audio-diag-output').value); };
+
+test('diagnostics require opt-in, expose a local trace and disable/clear on request', async () => {
+  const w = boot();
+  clickRelease(w, 'alb');
+  await flush();
+  assert.equal(w.storage.has(DIAG_KEY), false);
+  diagClick(w, 'toggle');
+  diagClick(w, 'mark');
+  const trace = diagExport(w);
+  assert.equal(trace.v, 1);
+  assert.ok(trace.events.some(e => e.event === 'silence-marker'));
+  assert.equal(w.els.get('audio-diag-toggle').getAttribute('aria-pressed'), 'true');
+  diagClick(w, 'toggle');
+  const count = diagExport(w).events.length;
+  w.audio.dispatchEvent({ type: 'waiting' });
+  assert.equal(diagExport(w).events.length, count);
+  diagClick(w, 'clear');
+  assert.equal(w.storage.has(DIAG_KEY), false);
+  assert.deepEqual(diagExport(w).events, []);
+});
+
+test('diagnostics bound history and sanitize restored records, errors and source URLs', async () => {
+  const secret = 'https://example.test/private?token=do-not-export';
+  const w = boot({ storage: { [DIAG_KEY]: JSON.stringify({ v: 1, enabled: true, events: [{ event: secret, url: secret }] }) } });
+  clickRelease(w, 'alb');
+  await flush();
+  w.audio.src = secret;
+  w.audio.error = { code: 4, message: secret };
+  w.audio.volume = 0;
+  for (let i = 0; i < 250; i++) w.audio.dispatchEvent({ type: 'volumechange' });
+  const trace = diagExport(w);
+  assert.ok(trace.events.length <= 128);
+  assert.ok(trace.dropped > 0);
+  assert.ok(JSON.stringify(trace).length <= 65536);
+  assert.equal(JSON.stringify(trace).includes(secret), false);
+  const last = trace.events.at(-1);
+  assert.equal(last.slots[0].source, 'other');
+  assert.equal(last.slots[0].error, 4);
+  assert.equal(last.slots[0].volume, 0);
+});
+
+test('recording preserves playback calls while showing fallback, intent and lifecycle', async () => {
+  const worlds = [boot({ onFetch: () => new Promise(() => {}) }), boot({ onFetch: () => new Promise(() => {}) })];
+  diagClick(worlds[1], 'toggle');
+  for (const w of worlds) {
+    clickRelease(w, 'alb');
+    await flush();
+    await tick(w, 2500);
+    w.els.get('store-toggle').dispatchEvent({ type: 'click' });
+    w.standby.dispatchEvent({ type: 'canplay' });
+    w.document.visibilityState = 'hidden';
+    w.document.dispatchEvent({ type: 'visibilitychange' });
+    w.window.dispatchEvent({ type: 'pagehide' });
+  }
+  assert.deepEqual(worlds[1].playLog, worlds[0].playLog);
+  assert.deepEqual(worlds[1].srcLog, worlds[0].srcLog);
+  assert.deepEqual(worlds[1].fetches.map(f => f.url), worlds[0].fetches.map(f => f.url));
+  const trace = diagExport(worlds[1]);
+  for (const name of ['handoff-request', 'handoff-complete', 'intent-pause', 'visibilitychange', 'pagehide']) {
+    assert.ok(trace.events.some(e => e.event === name), name);
+  }
+  const swap = trace.events.find(e => e.event === 'handoff-complete');
+  assert.equal(swap.active, 1);
+  assert.equal(swap.intent, 'pause');
+});
+
+test('diagnostics never let denied storage break transport and report loss of persistence', async () => {
+  const w = boot();
+  w.localStorage.setItem = () => { throw new Error('denied'); };
+  w.localStorage.removeItem = () => { throw new Error('denied'); };
+  diagClick(w, 'toggle');
+  clickRelease(w, 'alb');
+  await flush();
+  assert.equal(w.audio.paused, false);
+  assert.match(w.els.get('audio-diag-status').textContent, /memory|tab/i);
+  assert.ok(diagExport(w).events.length > 0);
+  diagClick(w, 'clear');
+  assert.deepEqual(diagExport(w).events, []);
+});
+
+test('a rejected play records its safe name and idle-element events identify their emitter', async () => {
+  const w = boot();
+  diagClick(w, 'toggle');
+  w.standby.play = () => Promise.reject({ name: 'NotAllowedError', message: 'private token' });
+  clickRelease(w, 'alb');
+  await flush();
+  w.standby.dispatchEvent({ type: 'error' });
+  const trace = diagExport(w);
+  assert.ok(trace.events.some(e => e.event === 'play-rejected' && e.rejection === 'NotAllowedError' && e.cause === 'unlock'));
+  assert.equal(trace.events.at(-1).emitter, 1);
+  assert.equal(trace.events.at(-1).active, 0);
+  assert.equal(JSON.stringify(trace).includes('private token'), false);
+});
+
+test('recording survives reload locally, samples at most every five seconds, and stays disabled after reload', async () => {
+  const w = boot();
+  diagClick(w, 'toggle');
+  clickRelease(w, 'alb');
+  await flush();
+  for (let i = 0; i < 100; i++) w.audio.dispatchEvent({ type: 'timeupdate' });
+  assert.equal(diagExport(w).events.filter(e => e.event === 'sample').length, 1);
+  const next = boot({ storage: { [DIAG_KEY]: w.storage.get(DIAG_KEY) } });
+  assert.equal(next.els.get('audio-diag-toggle').getAttribute('aria-pressed'), 'true');
+  next.document.dispatchEvent({ type: 'visibilitychange' });
+  assert.equal(diagExport(next).events.at(-1).page, 2);
+  diagClick(next, 'toggle');
+  const off = boot({ storage: { [DIAG_KEY]: next.storage.get(DIAG_KEY) } });
+  const count = diagExport(off).events.length;
+  off.audio.dispatchEvent({ type: 'playing' });
+  assert.equal(diagExport(off).events.length, count);
+  assert.equal(off.els.get('audio-diag-toggle').getAttribute('aria-pressed'), 'false');
+});
 
 function boot(opts = {}) {
   const w = makeWorld(opts);

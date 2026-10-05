@@ -1308,6 +1308,20 @@ still healing</p>
     </div>
     <audio id="store-audio" preload="none"></audio>
   </div>
+  <details class="audio-diag">
+    <summary>audio diagnostics</summary>
+    <p>Off by default. Records the last 128 player events on this device only. Nothing is uploaded. Recording stays on across page visits until you disable it.</p>
+    <p>While parked: enable recording, play and skip songs. If progress moves but sound stops, press “mark silence,” then show the trace. Select and copy it only when you want to share it. Progress alone does not prove sound.</p>
+    <div class="audio-diag-actions">
+      <button type="button" id="audio-diag-toggle" aria-pressed="false">enable recording</button>
+      <button type="button" id="audio-diag-mark" disabled>mark silence</button>
+      <button type="button" id="audio-diag-export" aria-controls="audio-diag-output">show trace to copy</button>
+      <button type="button" id="audio-diag-clear">clear and disable</button>
+    </div>
+    <p id="audio-diag-status">off · saved only on this device</p>
+    <label for="audio-diag-output">local trace — select and copy to share</label>
+    <textarea id="audio-diag-output" rows="8" readonly hidden spellcheck="false" autocomplete="off"></textarea>
+  </details>
   <!-- player:end -->
 
   <!-- footer -->
