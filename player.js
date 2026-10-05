@@ -651,6 +651,36 @@
   const qModeEl = document.getElementById('store-quality-mode');
   const qNowEl = document.getElementById('store-quality-now');
 
+  // Presentation only: retain the existing elements, transport listeners and
+  // both quality-handoff audio slots while changing the dock's layout.
+  const sizeBtn = document.getElementById('store-size-toggle');
+  const titleMeta = document.getElementById('store-player-meta');
+  const titleRail = document.getElementById('store-title-rail');
+  function measureTitle() {
+    if (!titleMeta || !titleRail) return;
+    const distance = Math.max(0, titleRail.scrollWidth - titleMeta.clientWidth);
+    const overflow = bar.classList.contains('is-minimized') && distance > 1;
+    titleMeta.classList.toggle('is-overflowing', overflow);
+    titleMeta.style.setProperty('--title-travel', '-' + distance + 'px');
+    titleMeta.style.setProperty('--title-duration', Math.max(10, distance / 22 + 6) + 's');
+    titleMeta.setAttribute('aria-label', releaseEl.textContent + ' — ' + trackEl.textContent);
+    titleMeta.setAttribute('title', releaseEl.textContent + ' — ' + trackEl.textContent);
+  }
+  if (sizeBtn) sizeBtn.addEventListener('click', () => {
+    const minimized = bar.classList.toggle('is-minimized');
+    sizeBtn.setAttribute('aria-expanded', String(!minimized));
+    sizeBtn.setAttribute('aria-label', minimized ? 'restore player' : 'minimize player');
+    sizeBtn.setAttribute('title', minimized ? 'restore player' : 'minimize player');
+    sizeDock();
+    measureTitle();
+  });
+  window.addEventListener('resize', measureTitle);
+  if (titleMeta && typeof ResizeObserver !== 'undefined') {
+    const titleObserver = new ResizeObserver(measureTitle);
+    titleObserver.observe(titleMeta);
+    titleObserver.observe(titleRail);
+  }
+
   let slug = null;   // release currently loaded in the bar
   let index = 0;     // 0-based position in that release's track list
   let scrubbing = false;
@@ -1110,6 +1140,7 @@
     trackEl.textContent = total > 1
       ? nn + ' / ' + total + ' · ' + track[1]
       : track[1];
+    measureTitle();
 
     const dur = track[2] || 0;
     scrub.max = String(Math.max(1, Math.round(dur)));

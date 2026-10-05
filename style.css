@@ -2643,3 +2643,73 @@ body.game-locked star-field { display: none; }
   .sample-card-bundle .sample-body { flex: 0 0 auto; }
   .sample-card-bundle .sample-foot { flex: 0 0 auto; }
 }
+
+/* Compact dock: opaque backing keeps text legible over every section.
+   The shared transport stays mounted; only secondary controls are concealed. */
+.store-player { display: flex; flex-direction: column; }
+.store-player-heading { order: -1; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.store-player-heading .store-player-label { margin-bottom: 0; }
+.store-size-toggle { min-width: 44px; height: 44px; font-size: 22px; flex-shrink: 0; }
+.store-title-rail { min-width: 0; }
+.store-player-meta:focus-visible { outline: 2px solid var(--mj-comment-green); outline-offset: 3px; }
+.store-player.is-minimized {
+  display: grid;
+  grid-template-columns: repeat(4, 44px);
+  justify-content: space-between;
+  row-gap: 8px;
+  left: auto;
+  right: calc(12px + env(safe-area-inset-right));
+  margin-inline: 0;
+  width: clamp(280px, calc(25vw - 24px), 360px);
+  max-width: calc(100% - 24px - env(safe-area-inset-left) - env(safe-area-inset-right));
+  padding: 10px 12px;
+  border-radius: 22px;
+  background: linear-gradient(145deg, rgba(255,255,255,.09), transparent 52%), #17171c;
+  border-color: rgba(214,194,232,.32);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 8px 30px rgba(0,0,0,.55);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+}
+/* One shared grid owns both rows. The fourth control uses the same row,
+   columns and gap distribution as transport, rather than an absolute offset. */
+.store-player.is-minimized[hidden] { display: none; }
+.store-player.is-minimized .store-player-heading { position: static; grid-column: 4; grid-row: 2; margin: 0; }
+.store-player.is-minimized .store-player-label { display: none; }
+.store-player.is-minimized .store-player-row { display: contents; }
+.store-player.is-minimized .store-player-art,
+.store-player.is-minimized .store-scrub,
+.store-player.is-minimized .store-time,
+.store-player.is-minimized .store-quality,
+.store-player.is-minimized .store-ctl-stop { display: none; }
+.store-player.is-minimized .store-player-meta { grid-column: 1 / -1; grid-row: 1; overflow: hidden; color: #eeeaf2; }
+.store-player.is-minimized .store-title-rail { display: flex; gap: 1.25em; width: max-content; }
+.store-player.is-minimized .store-player-release,
+.store-player.is-minimized .store-player-track { display: block; white-space: nowrap; overflow: visible; overflow-wrap: normal; font-size: 13px; color: #eeeaf2; line-height: 24px; }
+.store-player.is-minimized .store-player-release { font-weight: 600; }
+.store-player.is-minimized .store-player-track::before { content: "· "; }
+.store-player.is-minimized .store-transport { display: grid; grid-column: 1 / 4; grid-row: 2; grid-template-columns: repeat(3, 44px); justify-content: space-between; padding: 0; gap: 0; }
+.store-player.is-minimized .store-ctl { width: 44px; min-width: 44px; height: 44px; padding: 0; border-radius: 14px; }
+.store-size-toggle .icon { width: 16px; height: 16px; }
+.store-size-toggle .icon-size-restore { display: none; }
+.is-minimized .store-size-toggle .icon-size-minimize { display: none; }
+.is-minimized .store-size-toggle .icon-size-restore { display: block; }
+/* A triangle's visual weight sits left of its box centre; pause/skip stay exact. */
+.store-player.is-minimized .icon-play { transform: translateX(1px); }
+.store-player.is-minimized .store-ctl:focus-visible { outline: 2px solid #a9dfb4; outline-offset: 2px; }
+.store-player.is-minimized .is-overflowing .store-title-rail { animation: store-title-pan var(--title-duration, 12s) linear infinite alternate; }
+@keyframes store-title-pan {
+  0%, 18% { transform: translateX(0); }
+  82%, 100% { transform: translateX(var(--title-travel, 0)); }
+}
+/* Focus/hover lets readers inspect the entire title at their own pace. */
+.store-player.is-minimized .store-player-meta:hover,
+.store-player.is-minimized .store-player-meta:focus { overflow-x: auto; }
+.store-player.is-minimized .store-player-meta:hover .store-title-rail,
+.store-player.is-minimized .store-player-meta:focus .store-title-rail { animation: none; transform: none; }
+@media (max-width: 768px) {
+  .store-player.is-minimized { width: 300px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .store-player.is-minimized .store-player-meta { overflow-x: auto; }
+  .store-player.is-minimized .is-overflowing .store-title-rail { animation: none; }
+}

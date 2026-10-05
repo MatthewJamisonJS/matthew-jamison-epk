@@ -295,7 +295,7 @@ const BAR_IDS = [
   'store-player-art', 'store-player-release', 'store-player-track',
   'store-prev', 'store-toggle', 'store-next', 'store-stop',
   'store-scrub', 'store-time', 'store-quality',
-  'store-quality-mode', 'store-quality-now'
+  'store-quality-mode', 'store-quality-now', 'store-size-toggle', 'store-player-meta', 'store-title-rail'
 ];
 
 function makeWorld(opts = {}) {
@@ -339,6 +339,9 @@ function makeWorld(opts = {}) {
   toggle.classList.add('is-playing');
   toggle.setAttribute('aria-label', 'pause playback');
 
+  els.get('store-size-toggle').firstElementChild = { textContent: '↘' };
+  els.get('store-player-meta').clientWidth = 180;
+  els.get('store-title-rail').scrollWidth = 300;
   w.els = els;
   w.audio = audio;
   w.bar = bar;
@@ -969,4 +972,75 @@ test('the IIFE adds no globals', () => {
   const before = Object.keys(w).sort();
   vm.runInContext(SRC, ctx, { filename: 'player.js' });
   assert.deepEqual(Object.keys(w).sort(), before);
+});
+
+
+test('repeated minimize and restore preserve source, position and playback intent', async () => {
+  const w = boot();
+  clickRelease(w, 'alb');
+  await flush();
+  w.audio.currentTime = 23;
+  const source = w.audio.src;
+  const sources = w.srcLog.length;
+  const plays = w.playLog.length;
+  const size = w.els.get('store-size-toggle');
+  for (let i = 0; i < 12; i++) size.dispatchEvent({ type: 'click' });
+  assert.equal(w.audio.src, source);
+  assert.equal(w.audio.currentTime, 23);
+  assert.equal(w.srcLog.length, sources);
+  assert.equal(w.playLog.length, plays);
+  assert.equal(w.audio.paused, false);
+  assert.equal(size.getAttribute('aria-expanded'), 'true');
+  size.dispatchEvent({ type: 'click' });
+  assert.equal(size.getAttribute('aria-label'), 'restore player');
+  assert.equal(w.els.get('store-player-meta').classList.contains('is-overflowing'), true);
+  w.els.get('store-toggle').dispatchEvent({ type: 'click' });
+  size.dispatchEvent({ type: 'click' });
+  assert.equal(w.audio.paused, true);
+  assert.equal(w.audio.currentTime, 23);
+  size.dispatchEvent({ type: 'click' });
+  w.els.get('store-toggle').dispatchEvent({ type: 'click' });
+  w.els.get('store-next').dispatchEvent({ type: 'click' });
+  assert.equal(w.els.get('store-player-track').textContent.includes('two'), true);
+  assert.equal(w.bar.classList.contains('is-minimized'), true);
+});
+
+test('compact controls preserve pause/resume through pending fallback and automatic next', async () => {
+  const w = boot({ onFetch: () => new Promise(() => {}) });
+  clickRelease(w, 'alb');
+  await flush();
+  await tick(w, 2500);
+  const fallback = w.standby;
+  const size = w.els.get('store-size-toggle');
+  size.dispatchEvent({ type: 'click' });
+  w.els.get('store-toggle').dispatchEvent({ type: 'click' });
+  const plays = fallback.plays.length;
+  size.dispatchEvent({ type: 'click' });
+  size.dispatchEvent({ type: 'click' });
+  fallback.dispatchEvent({ type: 'canplay' });
+  assert.equal(fallback.plays.length, plays);
+  assert.equal(fallback.paused, true);
+  w.els.get('store-toggle').dispatchEvent({ type: 'click' });
+  assert.equal(fallback.paused, false);
+  assert.equal(fallback.muted, false);
+  fallback.dispatchEvent({ type: 'ended' });
+  assert.equal(fallback.src, API + '/p/alb/02');
+  assert.equal(fallback.paused, false);
+  assert.equal(fallback.muted, false);
+  assert.equal(w.bar.classList.contains('is-minimized'), true);
+});
+
+test('compact title pans only when overflowing and updates after track changes', async () => {
+  const w = boot();
+  clickRelease(w, 'alb');
+  await flush();
+  const meta = w.els.get('store-player-meta');
+  const rail = w.els.get('store-title-rail');
+  w.els.get('store-size-toggle').dispatchEvent({ type: 'click' });
+  assert.equal(meta.classList.contains('is-overflowing'), true);
+  rail.scrollWidth = 120;
+  w.window.dispatchEvent({ type: 'resize' });
+  assert.equal(meta.classList.contains('is-overflowing'), false);
+  w.els.get('store-next').dispatchEvent({ type: 'click' });
+  assert.match(meta.getAttribute('aria-label'), /alb.*two/);
 });
