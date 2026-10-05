@@ -98,6 +98,8 @@ class El {
   querySelectorAll() { return []; }
   after(el) { this._w.afterCalls.push([this.name, el.name]); }
   remove() { this._w.removed.push(this.name); }
+  appendChild(el) { this._w.appended = el; }
+  click() { this._w.download = this; }
 }
 
 class AudioEl extends El {
@@ -297,7 +299,7 @@ const BAR_IDS = [
   'store-scrub', 'store-time', 'store-quality',
   'store-quality-mode', 'store-quality-now', 'store-size-toggle', 'store-player-meta', 'store-title-rail',
   'audio-diag-toggle', 'audio-diag-mark', 'audio-diag-export', 'audio-diag-clear',
-  'audio-diag-status', 'audio-diag-output', 'audio-diag-notice'
+  'audio-diag-download', 'audio-diag-status', 'audio-diag-output', 'audio-diag-notice'
 ];
 
 function makeWorld(opts = {}) {
@@ -391,6 +393,7 @@ function makeWorld(opts = {}) {
   };
 
   let urlSeq = 0;
+  w.Blob = class Blob { constructor(parts, options) { this.parts = parts; this.type = options.type; } };
   w.URL = {
     createObjectURL: blob => {
       const u = 'blob:test/' + (urlSeq++);
@@ -440,7 +443,12 @@ function makeWorld(opts = {}) {
 const DIAG_KEY = 'mj-audio-diagnostics';
 const DIAG_CONSENT = 'mj-audio-diag-consent';
 const diagClick = (w, action) => w.els.get('audio-diag-' + action).dispatchEvent({ type: 'click' });
-const diagExport = w => { diagClick(w, 'export'); return JSON.parse(w.els.get('audio-diag-output').value); };
+const diagExport = w => {
+  diagClick(w, 'export');
+  diagClick(w, 'download');
+  assert.equal(w.download.download, 'audio-trace.json');
+  return JSON.parse(w.objectUrls.at(-1).blob.parts.join(''));
+};
 
 test('diagnostics require opt-in, expose a local trace and disable/clear on request', async () => {
   const w = boot();
@@ -1404,4 +1412,229 @@ test('compact title pans only when overflowing and updates after track changes',
   assert.equal(meta.classList.contains('is-overflowing'), false);
   w.els.get('store-next').dispatchEvent({ type: 'click' });
   assert.match(meta.getAttribute('aria-label'), /alb.*two/);
+});
+
+
+// Saved-source failures must recover within the same track and remain quarantined.
+async function savedWorld() {
+  const w = boot({ storage: { 'mj-stream-quality': 'saver' } });
+  seed(w, 'alb/02');
+  clickRelease(w, 'alb');
+  await flush();
+  w.els.get('store-next').dispatchEvent({ type: 'click' });
+  assert.match(w.audio.src, /^blob:/);
+  return w;
+}
+for (const trigger of ['error', 'rejection', 'throw']) {
+  test('active saved ' + trigger + ' retries same track once and quarantines without deleting', async () => {
+    const w = await savedWorld();
+    const old = w.audio;
+    old.error = { code: 4 };
+    old.paused = false;
+    if (trigger === 'error') old.dispatchEvent({ type: 'error' });
+    else {
+      old.play = () => {
+        const e = Object.assign(new Error('private URL'), { name: 'NotSupportedError' });
+        old.paused = false;
+        if (trigger === 'throw') throw e;
+        return Promise.reject(e);
+      };
+      w.mediaHandlers.get('play')();
+      await flush();
+    }
+    const retry = w.standby;
+    assert.equal(retry.src, API + '/p/alb/02');
+    assert.equal(w.navigator.mediaSession.playbackState, 'paused');
+    const loads = retry.srcHistory.length;
+    old.dispatchEvent({ type: 'error' });
+    assert.equal(retry.srcHistory.length, loads, 'error/rejection dedupe');
+    retry.dispatchEvent({ type: 'canplay' });
+    assert.equal(retry.paused, false);
+    assert.equal(w.navigator.mediaSession.playbackState, 'playing');
+    assert.equal(w.status.textContent, '');
+    w.els.get('store-prev').dispatchEvent({ type: 'click' });
+    w.els.get('store-next').dispatchEvent({ type: 'click' });
+    assert.equal(retry.src, API + '/p/alb/02', 'saved source cannot be re-adopted this tab');
+    assert.ok(w.idb.tracks.has('alb/02'), 'saved music retained');
+  });
+}
+for (const action of ['pause', 'stop', 'next']) {
+  test(action + ' outranks saved recovery and late rejected plays', async () => {
+    const w = await savedWorld();
+    let reject;
+    w.audio.play = () => new Promise((resolve, fail) => { reject = fail; });
+    w.mediaHandlers.get('play')();
+    w.audio.dispatchEvent({ type: 'error' });
+    const oldReject = reject;
+    const retry = w.standby, plays = retry.plays.length;
+    if (action === 'pause') w.mediaHandlers.get('pause')();
+    else w.els.get('store-' + action).dispatchEvent({ type: 'click' });
+    oldReject(Object.assign(new Error('old source'), { name: 'NotSupportedError' }));
+    await flush();
+    retry.dispatchEvent({ type: 'canplay' });
+    assert.equal(retry.plays.length, plays);
+    if (action === 'pause') {
+      assert.equal(retry.paused, true);
+      assert.equal(w.navigator.mediaSession.playbackState, 'paused');
+      w.mediaHandlers.get('play')();
+      assert.equal(retry.paused, false);
+    }
+    if (action === 'stop') assert.equal(w.navigator.mediaSession.playbackState, 'none');
+    if (action === 'next') {
+      assert.match(w.audio.src, /^blob:/, 'next track retains its healthy saved source');
+      assert.equal(w.status.textContent, '');
+    }
+  });
+}
+for (const failure of ['error', 'timeout', 'rejection']) {
+  test('failed saved network retry ' + failure + ' ends truthfully paused', async () => {
+    const w = await savedWorld();
+    w.audio.dispatchEvent({ type: 'error' });
+    const retry = w.standby;
+    if (failure === 'timeout') await tick(w, 15000);
+    else if (failure === 'error') retry.dispatchEvent({ type: 'error' });
+    else {
+      retry.play = () => { retry.paused = false; return Promise.reject(Object.assign(new Error('bad MP3'), { name: 'NotSupportedError' })); };
+      retry.dispatchEvent({ type: 'canplay' });
+      await flush();
+    }
+    assert.equal(w.navigator.mediaSession.playbackState, 'paused');
+    assert.equal(w.els.get('store-toggle').classList.contains('is-playing'), false);
+    assert.match(w.status.textContent, /didn’t load/);
+    const loads = w.srcLog.length;
+    retry.dispatchEvent({ type: 'error' });
+    w.audio.dispatchEvent({ type: 'error' });
+    assert.equal(w.srcLog.length, loads, 'exhausted recovery cannot loop');
+  });
+}
+test('failed standby saved fallback retries network and preserves latest pause intent', async () => {
+  const w = boot();
+  seed(w, 'alb/01');
+  clickRelease(w, 'alb');
+  await flush();
+  w.audio.dispatchEvent({ type: 'error' });
+  const retry = w.standby;
+  assert.match(retry.src, /^blob:/);
+  retry.dispatchEvent({ type: 'error' });
+  assert.equal(retry.src, API + '/p/alb/01');
+  w.mediaHandlers.get('pause')();
+  const plays = retry.plays.length;
+  retry.dispatchEvent({ type: 'canplay' });
+  assert.equal(retry.plays.length, plays);
+  assert.equal(w.navigator.mediaSession.playbackState, 'paused');
+  assert.equal(w.status.textContent, '');
+  w.mediaHandlers.get('play')();
+  assert.equal(retry.paused, false);
+});
+test('diagnostic summary stays short and detailed sanitized trace downloads only on request', async () => {
+  const w = boot();
+  diagClick(w, 'toggle');
+  clickRelease(w, 'alb');
+  await flush();
+  w.audio.error = { code: 4, message: 'credentials https://private.test/' };
+  for (let i = 0; i < 250; i++) w.audio.dispatchEvent({ type: 'waiting' });
+  diagClick(w, 'export');
+  assert.ok(w.els.get('audio-diag-output').value.length < 600);
+  assert.equal(w.download, undefined);
+  diagClick(w, 'download');
+  const file = w.objectUrls.at(-1);
+  assert.equal(file.blob.type, 'application/json');
+  assert.equal(file.blob.parts.join('').includes('private.test'), false);
+  assert.equal(w.fetches.some(f => f.url.includes('trace')), false);
+  await tick(w, 60000);
+  assert.ok(w.revoked.includes(file.url));
+});
+
+
+for (const rejection of ['AbortError', 'NotSupportedError']) {
+  test('old ' + rejection + ' cannot override a newer resume on the same source', async () => {
+    const w = await savedWorld();
+    let reject;
+    const originalPlay = w.audio.play.bind(w.audio);
+    w.audio.play = () => { originalPlay(); return new Promise((resolve, fail) => { reject = fail; }); };
+    w.mediaHandlers.get('play')();
+    w.mediaHandlers.get('pause')();
+    w.audio.play = originalPlay;
+    w.mediaHandlers.get('play')();
+    reject(Object.assign(new Error('older attempt'), { name: rejection }));
+    await flush();
+    assert.equal(w.audio.paused, false);
+    assert.equal(w.navigator.mediaSession.playbackState, 'playing');
+    assert.equal(w.standby.hasAttribute('src'), false);
+    assert.equal(w.status.textContent, '');
+  });
+}
+test('active failure during pending startup network handoff has a terminal deadline', async () => {
+  const w = boot({ onFetch: () => new Promise(() => {}) });
+  clickRelease(w, 'alb');
+  await tick(w, 2500);
+  assert.equal(w.standby.src, API + '/p/alb/01');
+  w.audio.dispatchEvent({ type: 'error' });
+  await tick(w, 15000);
+  assert.equal(w.navigator.mediaSession.playbackState, 'paused');
+  assert.match(w.status.textContent, /didn’t load/);
+});
+
+
+test('restored paused track keeps recovery paused through saved and network fallback', async () => {
+  const w = boot({ storage: { 'mj-player-state': '{"v":1,"slug":"alb","index":1,"t":42.3}' } });
+  seed(w, 'alb/02');
+  await flush();
+  w.audio.dispatchEvent({ type: 'error' });
+  const retry = w.standby;
+  assert.match(retry.src, /^blob:/);
+  retry.dispatchEvent({ type: 'error' });
+  assert.equal(retry.src, API + '/p/alb/02');
+  const plays = retry.plays.length;
+  retry.dispatchEvent({ type: 'canplay' });
+  assert.equal(retry.plays.length, plays);
+  assert.equal(retry.paused, true);
+  assert.equal(w.navigator.mediaSession.playbackState, 'paused');
+});
+
+
+test('cancelled quality handoff cannot mask a later play rejection', async () => {
+  const w = boot({ onFetch: () => new Promise(() => {}) });
+  clickRelease(w, 'alb');
+  await tick(w, 2500);
+  w.els.get('store-quality').dispatchEvent({ type: 'click' });
+  w.audio.play = () => { w.audio.paused = false; return Promise.reject(Object.assign(new Error('blocked'), { name: 'NotAllowedError' })); };
+  w.mediaHandlers.get('play')();
+  await flush();
+  assert.equal(w.navigator.mediaSession.playbackState, 'paused');
+  assert.equal(w.audio.paused, true);
+  assert.match(w.status.textContent, /press play/);
+});
+for (const action of ['stop', 'next']) {
+  test(action + ' cancels network recovery after standby saved failure', async () => {
+    const w = boot();
+    seed(w, 'alb/01');
+    clickRelease(w, 'alb');
+    await flush();
+    w.audio.dispatchEvent({ type: 'error' });
+    const retry = w.standby;
+    retry.dispatchEvent({ type: 'error' });
+    const plays = retry.plays.length;
+    w.els.get('store-' + action).dispatchEvent({ type: 'click' });
+    retry.dispatchEvent({ type: 'error' });
+    retry.dispatchEvent({ type: 'canplay' });
+    assert.equal(retry.plays.length, plays);
+    if (action === 'stop') assert.equal(w.navigator.mediaSession.playbackState, 'none');
+    else assert.equal(w.status.textContent, '');
+  });
+}
+test('saved media error then late play rejection cannot restart its network retry', async () => {
+  const w = await savedWorld();
+  let reject;
+  w.audio.play = () => new Promise((resolve, fail) => { reject = fail; });
+  w.mediaHandlers.get('play')();
+  w.audio.dispatchEvent({ type: 'error' });
+  const retry = w.standby;
+  retry.dispatchEvent({ type: 'canplay' });
+  const loads = w.srcLog.length;
+  reject(Object.assign(new Error('old blob'), { name: 'NotSupportedError' }));
+  await flush();
+  assert.equal(w.srcLog.length, loads);
+  assert.equal(retry.paused, false);
+  assert.equal(w.status.textContent, '');
 });

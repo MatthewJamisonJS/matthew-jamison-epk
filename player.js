@@ -112,7 +112,7 @@
   // sends the current track: the saved copy when there is one, the 128k stream
   // otherwise.
   function fallbackPath() {
-    return slug && urls.has(vaultKey(slug, trackNN)) ? 'vault' : '/p/';
+    return vaulted(slug, trackNN) ? 'vault' : '/p/';
   }
 
   const dataEl = document.getElementById('store-data');
@@ -287,8 +287,11 @@
     return s + '/' + nn;
   }
 
+  // A failed saved source stays on disk, but is ineligible for this tab.
+  const quarantined = new Set();
+
   function vaulted(s, nn) {
-    return !!s && urls.has(vaultKey(s, nn));
+    return !!s && !quarantined.has(vaultKey(s, nn)) && urls.has(vaultKey(s, nn));
   }
 
   // a read that also touches `at` — the LRU clock is "last played or prefetched"
@@ -844,7 +847,7 @@
   // rows on /music/<slug>/. Nothing else writes their state, so the two can
   // never disagree with the bar.
   function markCards() {
-    const sounding = !!slug && !audio.paused;
+    const sounding = !!slug && !terminalFailure && !audio.paused;
 
     document.querySelectorAll('.store-card').forEach(c => {
       const active = c.dataset.slug === slug;
@@ -874,7 +877,7 @@
   }
 
   function syncToggle() {
-    const sounding = !audio.paused;
+    const sounding = !terminalFailure && !audio.paused;
     toggleBtn.classList.toggle('is-playing', sounding);
     toggleBtn.setAttribute('aria-label', sounding ? 'pause playback' : 'resume playback');
     if ('mediaSession' in navigator) {
@@ -984,8 +987,12 @@
   // the end of the line for a source: nothing is playing and nothing is left
   // to try
   function reportLoadFailure(msg) {
+    terminalFailure = true;
+    invalidateHandoff();
+    startClear();
     stallReset();
     offlineStallClear();
+    audio.pause();
     setStatus(msg || 'that preview didn’t load. try again in a moment.');
     syncToggle();
   }
@@ -997,6 +1004,15 @@
   // flight. forcePlay covers the error path, where the active element is already
   // paused but the listener still expects playback to continue.
   let handoffGen = 0;
+  let terminalFailure = false, savedRetried = false;
+  let pendingHandoff = null;
+  let playbackRequestGen = 0;
+
+  function invalidateHandoff() {
+    handoffGen++;
+    if (pendingHandoff && pendingHandoff.cancel) pendingHandoff.cancel();
+    pendingHandoff = null;
+  }
   // null preserves the handoff's default behavior until an explicit request.
   // Media paused state can reflect a failed source rather than user intent.
   let playbackIntent = null;
@@ -1165,7 +1181,7 @@
   });
   if (diagMark) diagMark.addEventListener('click', () => {
     trace('silence-marker');
-    if (diagEnabled) announceDiag('Silence marked. Show the trace to copy when ready.');
+    if (diagEnabled) announceDiag('Silence marked. Show the summary or download the trace when ready.');
   });
   const diagClear = document.getElementById('audio-diag-clear');
   if (diagClear) diagClear.addEventListener('click', () => {
@@ -1179,10 +1195,36 @@
   if (diagExport) diagExport.addEventListener('click', () => {
     if (!diagOutput) return;
     updateDiag();
-    diagOutput.value = JSON.stringify({ v: 1, dropped: diagDropped,
-      events: diagHistory.map(sanitizeDiag).filter(Boolean) }, null, 2);
+    const last = diagHistory[diagHistory.length - 1];
+    const slot = last && last.slots[last.active];
+    const failure = diagHistory.slice().reverse().find(e => e.event === 'play-rejected' || e.event === 'error');
+    diagOutput.value = 'Audio summary: ' + diagHistory.length + ' events; ' + diagDropped + ' dropped.' +
+      (last ? '\nTrack ' + last.track + '; intent ' + last.intent + '; media session ' + last.mediaSession +
+        '.\nSource ' + slot.source + '; paused ' + slot.paused + '; ready ' + slot.ready +
+        '; media error ' + slot.error + '; position ' + slot.time + 's.' : '\nNo events recorded.') +
+      (failure ? '\nLast failure: ' + failure.event + '; ' + failure.rejection + '.' : '') +
+      '\nDownload the sanitized trace file for detailed review.';
     diagOutput.hidden = false;
-    announceDiag('Trace ready. Select and copy it before reloading or closing this tab.');
+    announceDiag('Short summary ready. Download the trace to share detailed events.');
+  });
+  const diagDownload = document.getElementById('audio-diag-download');
+  if (diagDownload) diagDownload.addEventListener('click', () => {
+    let url;
+    try {
+      updateDiag();
+      const file = new Blob([JSON.stringify({ v: 1, dropped: diagDropped,
+        events: diagHistory.map(sanitizeDiag).filter(Boolean) })], { type: 'application/json' });
+      url = URL.createObjectURL(file);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'audio-trace.json';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      announceDiag('Trace download requested. Nothing was uploaded.');
+    } catch (e) { announceDiag('Download unavailable. You can copy the short summary.'); }
+    // Give mobile browsers time to consume the local download URL.
+    if (url) setTimeout(() => URL.revokeObjectURL(url), 60000);
   });
   diagSlots.forEach((el, slot) => {
     ['loadstart', 'loadedmetadata', 'canplay', 'play', 'playing', 'pause', 'waiting',
@@ -1199,59 +1241,118 @@
     window.addEventListener(type, () => trace(type)));
   paintDiag();
 
+  // Every play settlement carries transport identity even when recording is off.
+  // An old rejection must never recover or pause a newer track/source.
+  function requestPlayback(cause) {
+    const el = audio, gen = handoffGen, src = el.getAttribute('src');
+    const playGen = ++playbackRequestGen;
+    const request = playRequest(el, cause);
+    const rejected = e => {
+      trace('play-rejected', cause, e && e.name, undefined, undefined, request);
+      if (playGen !== playbackRequestGen || el !== audio || gen !== handoffGen || src !== el.getAttribute('src') || !slug) return;
+      if (e && (e.name === 'NotSupportedError' || e.name === 'NetworkError') || el.error) {
+        sourceFailed();
+      } else if (playbackIntent !== false && !pendingHandoff) {
+        // A rejected request is not playback, even if WebKit leaves paused=false.
+        reportLoadFailure(e && e.name === 'NotAllowedError' ? 'press play to resume playback.' : '');
+      }
+    };
+    try {
+      const p = el.play();
+      if (p && p.catch) p.catch(rejected);
+    } catch (e) { rejected(e); }
+  }
+
+  function recoverSaved(forcePlay, fromError) {
+    quarantined.add(vaultKey(slug, trackNN));
+    if (savedRetried) return false;
+    savedRetried = true;
+    handoff('/p/', forcePlay, fromError, 'error');
+    return true;
+  }
+
+  function sourceFailed() {
+    if (!slug) return;
+    if (pendingHandoff && pendingHandoff.gen === handoffGen) {
+      pendingHandoff.fromError = true;
+      terminalFailure = true;
+      audio.pause();
+      syncToggle();
+      return;
+    }
+    if (terminalFailure) return;
+    terminalFailure = true;
+    audio.pause();
+    syncToggle();
+    if (currentPath === 'vault' && recoverSaved(true, true)) return;
+    if (currentPath === '/s/' && !retried) {
+      retried = true;
+      handoff(fallbackPath(), true, true, 'error');
+      return;
+    }
+    reportLoadFailure(isOffline() && currentPath !== 'vault' ? NO_SIGNAL : '');
+  }
+
   function handoff(toPath, forcePlay, fromError, reason) {
     if (!slug) return;
-    // the window can move between the decision and the call — a vault target
-    // with no URL behind it is the 128k stream instead
-    if (toPath === 'vault' && !urls.has(vaultKey(slug, trackNN))) toPath = '/p/';
+    if (toPath === 'vault' && !vaulted(slug, trackNN)) toPath = '/p/';
     if (currentPath === toPath) return;
-    const gen = ++handoffGen;
+    invalidateHandoff();
+    const gen = handoffGen;
+    const target = standby;
+    const key = vaultKey(slug, trackNN);
+    const attempt = { gen: gen, fromError: !!fromError };
+    pendingHandoff = attempt;
     trace('handoff-request', reason || 'fallback', undefined, undefined, toPath);
-    lastRunway = Infinity;   // the new source buffers on its own terms
-
+    lastRunway = Infinity;
+    let timer = 0;
+    function cleanup() {
+      target.removeEventListener('canplay', done);
+      target.removeEventListener('error', failed);
+      if (timer) clearTimeout(timer);
+    }
+    attempt.cancel = cleanup;
     function done() {
-      standby.removeEventListener('error', failed);
+      cleanup();
       if (gen !== handoffGen) return;
-      const at = audio.currentTime;   // read before the active element is released
+      pendingHandoff = null;
+      const at = audio.currentTime;
       const wasPlaying = playbackIntent === null
-        ? forcePlay || !audio.paused : playbackIntent;
-      // seek first: the active element is still playing until the line below
-      try { standby.currentTime = at; } catch (e) { /* not seekable yet */ }
-      standby.muted = false;  // its silent unlock may still be pending
+        ? forcePlay || attempt.fromError || !audio.paused : playbackIntent;
+      try { target.currentTime = at; } catch (e) { /* not seekable yet */ }
+      target.muted = false;
       clearEl(audio);
       swapPointers();
       currentPath = toPath;
+      terminalFailure = false;
+      setStatus('');
       trace('handoff-complete', reason || 'fallback');
-      stallReset();
-      offlineStallClear();
+      stallReset(); startClear(); offlineStallClear();
       paintQuality();
-      if (wasPlaying) {
-        const request = playRequest(audio, 'handoff');
-        const p = audio.play();
-        if (p && p.catch) p.catch(e => { trace('play-rejected', 'handoff', e && e.name, undefined, undefined, request); syncToggle(); });
-      } else {
-        syncToggle();
-      }
+      if (wasPlaying) requestPlayback('handoff');
+      syncToggle();
     }
-
     function failed() {
-      standby.removeEventListener('canplay', done);
+      cleanup();
       if (gen !== handoffGen) return;
-      handoffGen++;   // nothing left to honour from this attempt
+      pendingHandoff = null;
+      handoffGen++;
       trace('handoff-failed', reason || 'fallback');
-      clearEl(standby);
-      // a demote can just give up and leave the current source playing, but an
-      // error-path handoff has no live source behind it — the listener's
-      // message is all that is left
-      if (fromError) reportLoadFailure(isOffline() && toPath !== 'vault' ? NO_SIGNAL : '');
+      clearEl(target);
+      if (toPath === 'vault') {
+        quarantined.add(key);
+        if (recoverSaved(forcePlay || attempt.fromError, attempt.fromError)) return;
+      }
+      // A quality demotion may retain healthy buffered audio; an error recovery
+      // has no usable source behind it and must finish visibly paused.
+      if (attempt.fromError || currentPath === 'vault') reportLoadFailure(isOffline() ? NO_SIGNAL : '');
     }
-
-    standby.addEventListener('canplay', done, { once: true });
-    standby.addEventListener('error', failed, { once: true });
-    // the element was cloned from a preload="none" tag, so a bare src assignment
-    // would download nothing
-    standby.preload = 'auto';
-    standby.src = srcFor(toPath, slug, trackNN);
+    target.addEventListener('canplay', done, { once: true });
+    target.addEventListener('error', failed, { once: true });
+    // Bound recovery even when an engine emits neither error nor canplay.
+    timer = setTimeout(failed, 15000);
+    target.preload = 'auto';
+    target.src = srcFor(toPath, slug, trackNN);
   }
 
   // ⏮ is a restart before it is a skip — the same convention every transport
@@ -1303,14 +1404,16 @@
 
     trackNN = nn;
     retried = false;
+    savedRetried = false;
+    terminalFailure = false;
     finished = false;
     stallReset();
     offlineStallClear();
     startClear();        // a rapid skip re-arms the deadline below
     lastRunway = Infinity;
     lastBufEnd = -1;     // buffer readings don't carry across tracks
-    playbackIntent = null;  // this load owns its autoplay choice
-    handoffGen++;        // a handoff in flight is for the track being replaced
+    playbackIntent = !!autoplay;  // a restored paused load must recover paused too
+    invalidateHandoff(); // a handoff in flight is for the track being replaced
     clearEl(standby);    // and so is whatever it half-loaded
     // synchronous, all of it: on iOS this runs inside the `ended` handler and
     // the play() below only counts while that handler is still on the stack.
@@ -1359,9 +1462,7 @@
     setMetadata();
 
     if (autoplay) {
-      const request = playRequest(audio, 'load');
-      const p = audio.play();
-      if (p && p.catch) p.catch(e => { trace('play-rejected', 'load', e && e.name, undefined, undefined, request); syncToggle(); });
+      requestPlayback('load');
     }
     syncToggle();
     // slide the prefetch window: this track, then the next two. Whatever the
@@ -1390,8 +1491,10 @@
     startClear();
     offlineStallClear();
     lastRunway = Infinity;
-    handoffGen++;
+    invalidateHandoff();
     playbackIntent = null;
+    terminalFailure = false;
+    pendingHandoff = null;
     clearEl(audio);
     clearEl(standby);
     // the elements are released above, so every blob: URL is now unreferenced
@@ -1412,6 +1515,7 @@
 
   function pausePlayback() {
     playbackIntent = false;
+    playbackRequestGen++;
     trace('intent-pause');
     // Also clear timers when already paused (e.g. after a media load error),
     // where pause() emits no new event. The fallback can finish loading paused.
@@ -1422,10 +1526,10 @@
 
   function resumePlayback() {
     playbackIntent = true;
+    terminalFailure = false;
+    setStatus('');
     trace('intent-resume');
-    const request = playRequest(audio, 'resume');
-    const p = audio.play();
-    if (p && p.catch) p.catch(e => { trace('play-rejected', 'resume', e && e.name, undefined, undefined, request); syncToggle(); });
+    requestPlayback('resume');
     syncToggle();
   }
 
@@ -1553,7 +1657,7 @@
       try { localStorage.setItem(QUALITY_KEY, mode); } catch (e) { /* storage blocked */ }
       stallEnd();     // a pending demote belongs to the mode that armed it
       startClear();   // as does a startup deadline
-      handoffGen++;   // and so does a handoff it already started
+      invalidateHandoff(); // and so does a handoff it already started
       paintQuality();
     });
     paintQuality();
@@ -1737,24 +1841,7 @@
     }
   });
 
-  bindBoth('error', () => {
-    // stop() clears the src, which fires error too — only report a real failure
-    if (!slug) return;
-    // a lossless source that fails outright gets one mp3 attempt before the
-    // failure reaches the listener
-    if (currentPath === '/s/' && !retried) {
-      retried = true;
-      handoff(fallbackPath(), true, true, 'error');
-      return;
-    }
-    // the link is down and this one was never saved. Say so plainly and stop:
-    // there is nothing left to try, and auto-advancing would only fail again.
-    if (isOffline() && currentPath !== 'vault') {
-      reportLoadFailure(NO_SIGNAL);
-      return;
-    }
-    reportLoadFailure();
-  });
+  bindBoth('error', sourceFailed);
 
   scrub.addEventListener('pointerdown', () => { scrubbing = true; });
   scrub.addEventListener('pointerup', () => { scrubbing = false; });

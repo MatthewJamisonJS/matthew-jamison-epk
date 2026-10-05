@@ -310,17 +310,18 @@ function playerBar({ art = '', release = '', extraClass = '' } = {}) {
   <details class="audio-diag">
     <summary>audio diagnostics</summary>
     <p>Off by default. Records up to 128 player events in this tab only. Each tab records independently. Reloading or closing this tab loses the log. Nothing is uploaded.</p>
-    <p>While parked: enable recording, play and skip songs. If progress moves but sound stops, press “mark silence,” then show the trace. Select and copy it only when you want to share it. Progress alone does not prove sound.</p>
+    <p>While parked: enable recording, play and skip songs. If progress moves but sound stops, press “mark silence,” then show the short summary or download the sanitized trace file to share. Progress alone does not prove sound.</p>
     <div class="audio-diag-actions">
       <button type="button" id="audio-diag-toggle" aria-pressed="false">enable recording</button>
       <button type="button" id="audio-diag-mark" disabled>mark silence</button>
-      <button type="button" id="audio-diag-export" aria-controls="audio-diag-output">show trace to copy</button>
+      <button type="button" id="audio-diag-export" aria-controls="audio-diag-output">show summary</button>
+      <button type="button" id="audio-diag-download">download trace file</button>
       <button type="button" id="audio-diag-clear">clear and disable</button>
     </div>
     <p id="audio-diag-status">off · 0 events · this tab only</p>
     <p id="audio-diag-notice" role="status" aria-live="polite" aria-atomic="true"></p>
-    <label for="audio-diag-output">local trace — select and copy to share</label>
-    <textarea id="audio-diag-output" rows="8" readonly hidden spellcheck="false" autocomplete="off"></textarea>
+    <label for="audio-diag-output">short audio summary — select and copy to share</label>
+    <textarea id="audio-diag-output" rows="5" readonly hidden spellcheck="false" autocomplete="off"></textarea>
   </details>
 `;
 }
