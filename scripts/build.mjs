@@ -309,7 +309,7 @@ function playerBar({ art = '', release = '', extraClass = '' } = {}) {
   </div>
   <details class="audio-diag">
     <summary>audio diagnostics</summary>
-    <p>Off by default. Records the last 128 player events on this device only. Nothing is uploaded. Recording stays on across page visits until you disable it.</p>
+    <p>Off by default. Records up to 128 player events in this tab only. Each tab records independently. Reloading or closing this tab loses the log. Nothing is uploaded.</p>
     <p>While parked: enable recording, play and skip songs. If progress moves but sound stops, press “mark silence,” then show the trace. Select and copy it only when you want to share it. Progress alone does not prove sound.</p>
     <div class="audio-diag-actions">
       <button type="button" id="audio-diag-toggle" aria-pressed="false">enable recording</button>
@@ -317,7 +317,7 @@ function playerBar({ art = '', release = '', extraClass = '' } = {}) {
       <button type="button" id="audio-diag-export" aria-controls="audio-diag-output">show trace to copy</button>
       <button type="button" id="audio-diag-clear">clear and disable</button>
     </div>
-    <p id="audio-diag-status">off · saved only on this device</p>
+    <p id="audio-diag-status">off · 0 events · this tab only</p>
     <p id="audio-diag-notice" role="status" aria-live="polite" aria-atomic="true"></p>
     <label for="audio-diag-output">local trace — select and copy to share</label>
     <textarea id="audio-diag-output" rows="8" readonly hidden spellcheck="false" autocomplete="off"></textarea>

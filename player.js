@@ -1001,13 +1001,12 @@
   // Media paused state can reflect a failed source rather than user intent.
   let playbackIntent = null;
 
-  // Opt-in, device-local diagnostics. Fixed fields only: never titles, slugs,
+  // Opt-in, tab-local in-memory diagnostics. Fixed fields only: never titles, slugs,
   // URLs, error messages, user agent, wall-clock time or arbitrary event data.
   // Diagnostic failures must never escape into the transport.
-  const DIAG_KEY = 'mj-audio-diagnostics';
-  const DIAG_CONSENT = 'mj-audio-diag-consent';
+  const LEGACY_DIAG_KEYS = ['mj-audio-diagnostics', 'mj-audio-diag-consent'];
   const DIAG_LIMIT = 128;
-  const DIAG_FLUSH_DELAY = 250; // coalesce media-event bursts outside transport
+  const DIAG_PAINT_DELAY = 250; // coalesce UI updates outside transport
   const diagSlots = [audio, standby];
   const diagStarted = Date.now();
   const diagEvents = ['enable', 'disable', 'silence-marker', 'load', 'stop',
@@ -1021,9 +1020,9 @@
     'runway', 'error', 'fallback', 'play', 'pause', 'nexttrack', 'previoustrack'];
   const diagErrors = ['none', 'NotAllowedError', 'AbortError', 'NotSupportedError',
     'NetworkError', 'SecurityError', 'unknown'];
-  let diagEnabled = false, diagMemoryOnly = false, diagPage = 1, diagDropped = 0;
+  let diagEnabled = false, diagDropped = 0, diagCaptureGeneration = 0;
   let diagHistory = [], diagLastSample = -5000, diagRequestId = 0;
-  let diagEpoch = null, diagTimer = null, diagDirty = false, diagLocalOnly = false;
+  let diagTimer = null;
   const diagToggle = document.getElementById('audio-diag-toggle');
   const diagMark = document.getElementById('audio-diag-mark');
   const diagStatus = document.getElementById('audio-diag-status');
@@ -1033,8 +1032,7 @@
     ? Math.round(Math.max(0, Math.min(max, value)) * 10) / 10 : 0;
   const choice = (value, values, fallback) => values.indexOf(value) !== -1 ? value : fallback;
 
-  // Reconstruct persisted records from an allowlist before displaying them.
-  // localStorage can be changed by other same-origin code; never export it raw.
+  // Fixed allowlist for snapshots and explicit export; no arbitrary strings.
   function sanitizeDiag(record) {
     if (!record || diagEvents.indexOf(record.event) === -1) return null;
     const clean = {
@@ -1071,27 +1069,6 @@
     return clean;
   }
 
-  // Only explicit controls write consent. Trace writers never write enabled.
-  // The bounded random epoch is local coordination data and is not exported.
-  function readDiagConsent() {
-    const raw = localStorage.getItem(DIAG_CONSENT);
-    const value = raw && raw.length <= 256 ? JSON.parse(raw) : null;
-    if (!value || value.v !== 1 || typeof value.epoch !== 'string' ||
-        !/^[a-f0-9]{32}$/.test(value.epoch)) return { epoch: null, enabled: false, action: 'clear' };
-    return { epoch: value.epoch, enabled: value.enabled === true,
-      action: choice(value.action, ['enable', 'disable', 'clear'], 'clear') };
-  }
-
-  function readDiagHistory() {
-    diagHistory = []; diagDropped = 0;
-    const raw = localStorage.getItem(DIAG_KEY);
-    const saved = raw && raw.length <= 65536 ? JSON.parse(raw) : null;
-    if (saved && saved.v === 2 && saved.epoch === diagEpoch && Array.isArray(saved.events)) {
-      diagHistory = saved.events.slice(-DIAG_LIMIT).map(sanitizeDiag).filter(Boolean);
-      diagDropped = bounded(saved.dropped, 1000000);
-    }
-  }
-
   function announceDiag(message) {
     if (diagNotice && diagNotice.textContent !== message) diagNotice.textContent = message;
   }
@@ -1103,110 +1080,49 @@
     }
     if (diagMark) diagMark.disabled = !diagEnabled;
     if (diagStatus) diagStatus.textContent =
-      (diagEnabled ? 'recording' : 'off') + ' · ' + diagHistory.length + ' events · ' +
-      (diagMemoryOnly ? 'this tab only; storage unavailable, older saved data may remain' : 'saved only on this device');
+      (diagEnabled ? 'recording' : 'off') + ' · ' + diagHistory.length + ' events · this tab only';
   }
 
-  function diagStorageFailure() {
-    diagMemoryOnly = true;
-    announceDiag('Storage unavailable. Recording is in this tab only; older saved data may remain.');
+  // Remove only earlier prototype keys. Never read consent/history or write
+  // new diagnostic storage. Denied cleanup cannot affect the in-memory log.
+  function removeLegacyDiagnostics() {
+    let removed = true;
+    LEGACY_DIAG_KEYS.forEach(key => {
+      try { localStorage.removeItem(key); } catch (e) { removed = false; }
+    });
+    if (!removed) announceDiag('Older saved diagnostic data could not be removed. This log stays in this tab only.');
+    return removed;
   }
 
-  function cancelDiagFlush() {
+  function cancelDiagPaint() {
     if (diagTimer !== null) clearTimeout(diagTimer);
     diagTimer = null;
   }
 
-  // Called only from deferred work, lifecycle or explicit controls, never play.
-  function syncDiagConsent(force) {
-    if (diagLocalOnly && !force) return false;
-    try {
-      const consent = readDiagConsent();
-      if (consent.epoch === diagEpoch && consent.enabled === diagEnabled && !diagLocalOnly) return false;
-      cancelDiagFlush(); diagDirty = false; diagLocalOnly = false;
-      diagEpoch = consent.epoch; diagEnabled = consent.enabled;
-      if (diagOutput) { diagOutput.value = ''; diagOutput.hidden = true; }
-      readDiagHistory();
-      paintDiag();
-      announceDiag(consent.action === 'clear' ? 'Trace cleared in another tab. Recording disabled.' :
-        diagEnabled ? 'Recording enabled in another tab.' : 'Recording disabled in another tab.');
-      return true;
-    } catch (e) { diagStorageFailure(); paintDiag(); return false; }
-  }
-
-  function trimDiag() {
+  function updateDiag() {
+    cancelDiagPaint();
     while (diagHistory.length > DIAG_LIMIT || JSON.stringify(diagHistory).length > 60000) {
       diagHistory.shift(); diagDropped++;
     }
-  }
-
-  function persistDiag() {
-    cancelDiagFlush();
-    if (syncDiagConsent()) return;
-    try {
-      trimDiag();
-      if (diagDirty && !diagLocalOnly) {
-        // Check the independent authority before and after the write. A clear
-        // racing this flush invalidates the old epoch, even if storage delivery
-        // is delayed. Remove only our obsolete envelope, never a newer writer's.
-        const epoch = diagEpoch;
-        localStorage.setItem(DIAG_KEY, JSON.stringify({ v: 2, epoch: epoch,
-          dropped: diagDropped, events: diagHistory }));
-        const consent = readDiagConsent();
-        if (consent.epoch !== epoch || consent.enabled !== diagEnabled) {
-          const saved = localStorage.getItem(DIAG_KEY);
-          if (saved && saved.length <= 65536 && JSON.parse(saved).epoch === epoch) localStorage.removeItem(DIAG_KEY);
-          syncDiagConsent(); return;
-        }
-      }
-      diagDirty = false;
-    } catch (e) { diagStorageFailure(); }
     paintDiag();
   }
 
-  function queueDiagFlush() {
-    if (diagTimer === null) diagTimer = setTimeout(persistDiag, DIAG_FLUSH_DELAY);
+  function queueDiagPaint() {
+    if (diagTimer === null) diagTimer = setTimeout(updateDiag, DIAG_PAINT_DELAY);
   }
 
-  function changeDiagConsent(enabled, clear) {
-    syncDiagConsent(); cancelDiagFlush();
-    try {
-      const words = crypto.getRandomValues(new Uint32Array(4));
-      diagEpoch = Array.from(words, n => n.toString(16).padStart(8, '0')).join('');
-      localStorage.setItem(DIAG_CONSENT, JSON.stringify({ v: 1, epoch: diagEpoch,
-        enabled: enabled, action: clear ? 'clear' : enabled ? 'enable' : 'disable' }));
-      diagLocalOnly = false; diagMemoryOnly = false;
-    } catch (e) { diagLocalOnly = true; diagStorageFailure(); }
-    diagEnabled = enabled;
-    if (clear) {
-      diagHistory = []; diagDropped = 0; diagDirty = false;
-      if (diagOutput) { diagOutput.value = ''; diagOutput.hidden = true; }
-      try { localStorage.removeItem(DIAG_KEY); } catch (e) { diagStorageFailure(); }
-    } else {
-      diagDirty = true;
-    }
-    paintDiag();
-    if (!diagMemoryOnly) announceDiag(clear ? 'Trace cleared. Recording disabled.' :
-      enabled ? 'Recording enabled on this device.' : 'Recording disabled. Trace retained.');
-  }
-
-  try {
-    const consent = readDiagConsent();
-    diagEpoch = consent.epoch; diagEnabled = consent.enabled;
-    readDiagHistory();
-    diagPage = Math.min(1000000, 1 + diagHistory.reduce((n, e) => Math.max(n, e.page), 0));
-  } catch (e) { diagStorageFailure(); }
+  removeLegacyDiagnostics();
 
   function playRequest(el, cause) {
     if (!diagEnabled) return null;
-    const origin = { id: diagRequestId = (diagRequestId % 1000000) + 1, page: diagPage,
+    const origin = { id: diagRequestId = (diagRequestId % 1000000) + 1, page: 1, capture: diagCaptureGeneration,
       slot: el === diagSlots[1] ? 1 : 0, track: slug ? index + 1 : 0, generation: handoffGen };
     trace('play-request', cause, undefined, origin.slot, undefined, origin);
     return origin;
   }
 
   function trace(event, cause, rejection, emitter, target, origin) {
-    if (!diagEnabled) return;
+    if (!diagEnabled || (origin && origin.capture !== diagCaptureGeneration)) return;
     try {
       const slots = diagSlots.map(el => {
         const src = el.getAttribute('src') || '';
@@ -1225,7 +1141,7 @@
       const record = sanitizeDiag({ event: event, cause: cause, rejection: rejection, emitter: origin ? origin.slot : emitter, origin: origin,
         target: target === '/s/' ? 'flac' : target === '/p/' ? 'mp3' : target === 'vault' ? 'saved' : 'none',
         mediaSession: navigator.mediaSession && navigator.mediaSession.playbackState,
-        page: diagPage, ms: Date.now() - diagStarted, active: audio === diagSlots[1] ? 1 : 0,
+        page: 1, ms: Date.now() - diagStarted, active: audio === diagSlots[1] ? 1 : 0,
         track: slug ? index + 1 : 0, generation: handoffGen,
         intent: playbackIntent === null ? 'default' : playbackIntent ? 'play' : 'pause',
         quality: mode, visibility: document.visibilityState, online: navigator.onLine,
@@ -1233,35 +1149,37 @@
       if (!record) return;
       diagHistory.push(record);
       if (diagHistory.length > DIAG_LIMIT) { diagHistory.shift(); diagDropped++; }
-      diagDirty = true;
-      queueDiagFlush();
+      queueDiagPaint();
     } catch (e) { /* diagnostics cannot interrupt playback */ }
   }
 
   if (diagToggle) diagToggle.addEventListener('click', () => {
-    const enabled = !diagEnabled;
-    if (!enabled) trace('disable');
-    changeDiagConsent(enabled, false);
-    if (enabled) trace('enable');
-    else persistDiag(); // explicit disable retains the captured history
+    if (diagEnabled) { trace('disable'); diagEnabled = false; }
+    else { diagEnabled = true; trace('enable'); }
+    paintDiag();
+    announceDiag(diagEnabled ? 'Recording enabled in this tab. Reloading or closing it loses the log.' :
+      'Recording disabled. Trace retained in this tab.');
   });
   if (diagMark) diagMark.addEventListener('click', () => {
-    syncDiagConsent(); trace('silence-marker');
+    trace('silence-marker');
     if (diagEnabled) announceDiag('Silence marked. Show the trace to copy when ready.');
   });
   const diagClear = document.getElementById('audio-diag-clear');
-  if (diagClear) diagClear.addEventListener('click', () => changeDiagConsent(false, true));
+  if (diagClear) diagClear.addEventListener('click', () => {
+    diagEnabled = false; diagCaptureGeneration++; cancelDiagPaint();
+    diagHistory = []; diagDropped = 0; diagLastSample = -5000;
+    if (diagOutput) { diagOutput.value = ''; diagOutput.hidden = true; }
+    paintDiag();
+    if (removeLegacyDiagnostics()) announceDiag('Trace cleared in this tab. Recording disabled.');
+  });
   const diagExport = document.getElementById('audio-diag-export');
   if (diagExport) diagExport.addEventListener('click', () => {
     if (!diagOutput) return;
-    persistDiag();
+    updateDiag();
     diagOutput.value = JSON.stringify({ v: 1, dropped: diagDropped,
       events: diagHistory.map(sanitizeDiag).filter(Boolean) }, null, 2);
     diagOutput.hidden = false;
-    announceDiag('Trace ready. Select and copy it to share.');
-  });
-  window.addEventListener('storage', e => {
-    if (e.key === DIAG_CONSENT || e.key === DIAG_KEY || e.key === null) syncDiagConsent(true);
+    announceDiag('Trace ready. Select and copy it before reloading or closing this tab.');
   });
   diagSlots.forEach((el, slot) => {
     ['loadstart', 'loadedmetadata', 'canplay', 'play', 'playing', 'pause', 'waiting',
@@ -1272,16 +1190,10 @@
       diagLastSample = Date.now(); trace('sample');
     });
   });
-  document.addEventListener('visibilitychange', () => {
-    trace('visibilitychange');
-    if (document.visibilityState === 'hidden') persistDiag();
-  });
+  document.addEventListener('visibilitychange', () => trace('visibilitychange'));
   ['freeze', 'resume'].forEach(type => document.addEventListener(type, () => trace(type)));
   ['pagehide', 'pageshow', 'offline', 'online'].forEach(type =>
-    window.addEventListener(type, () => {
-      trace(type);
-      if (type === 'pagehide') persistDiag();
-    }));
+    window.addEventListener(type, () => trace(type)));
   paintDiag();
 
   function handoff(toPath, forcePlay, fromError, reason) {

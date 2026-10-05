@@ -57,6 +57,7 @@ test('diagnostic notices are polite on home and generated releases, with counts 
   for (const html of [readFileSync(join(root, 'index.html'), 'utf8'), ...releases.map(r => read('music', r.slug, 'index.html'))]) {
     assert.match(html, /<p id="audio-diag-notice" role="status" aria-live="polite" aria-atomic="true"><\/p>/);
     assert.match(html, /<p id="audio-diag-status">/);
+    assert.match(html, /Each tab records independently\. Reloading or closing this tab loses the log\. Nothing is uploaded\./);
   }
 });
 const journey = releases.find(r => r.slug === 'the-journey');
