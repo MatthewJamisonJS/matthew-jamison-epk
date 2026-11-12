@@ -23,6 +23,31 @@ function meetsFloor(version, minimum) {
   }
   return true;
 }
+// Security fixes are release-line specific, not monotonic across major/minor
+// upgrades. Unknown release lines fail closed until their advisories are reviewed.
+export function isReviewedVersion(name, version) {
+  if (typeof version !== 'string' || !stable.test(version)) return false;
+  const [major, minor] = version.split('.');
+  if (name === 'vite') {
+    if (major !== '8') return false;
+    return minor === '2' ? meetsFloor(version, '8.2.4')
+      : minor === '3' && meetsFloor(version, '8.3.3');
+  }
+  if (name === '@vitest/mocker') {
+    return major === '4' ? meetsFloor(version, '4.1.12')
+      : major === '5' && meetsFloor(version, '5.0.3');
+  }
+  if (name === 'undici') {
+    return major === '7' ? meetsFloor(version, '7.30.1')
+      : major === '8' && meetsFloor(version, '8.12.2');
+  }
+  const minimum = name.startsWith('@cloudflare/workerd-') ? floors.workerd
+    : Object.hasOwn(floors, name) ? floors[name] : undefined;
+  if (!minimum) return false;
+  const [requiredMajor, requiredMinor] = minimum.split('.');
+  return major === requiredMajor &&
+    (major !== '0' || minor === requiredMinor) && meetsFloor(version, minimum);
+}
 export function scanLockfile(lock) {
   const errors = [];
   let checked = 0;
@@ -39,8 +64,8 @@ export function scanLockfile(lock) {
     const minimum = name.startsWith('@cloudflare/workerd-') ? floors.workerd : Object.hasOwn(floors, name) ? floors[name] : undefined;
     if (!minimum) continue;
     checked++;
-    if (!meetsFloor(entry.version, minimum)) {
-      errors.push(`${path}: ${String(entry.version)} must be a stable version >= ${minimum}`);
+    if (!isReviewedVersion(name, entry.version)) {
+      errors.push(`${path}: ${String(entry.version)} is outside the reviewed secure release lines (baseline ${minimum})`);
     }
   }
   return { checked, errors };
