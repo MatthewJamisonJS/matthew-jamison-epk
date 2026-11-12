@@ -6,7 +6,7 @@ Repository: `MatthewJamisonJS/matthew-jamison-epk`, website `matthewjamison.dev`
 
 **84 distinct finding IDs** were retained: 41 high, 33 medium, 10 low. Their original states were 31 Open, 28 Fixing, and 25 Provisionally_Ignored_App. The two inputs contain 31 and 53 rows respectively. Repeated CVEs across versions/platforms remain separate rows; no finding was dropped merely because it was marked unreachable.
 
-**Locally remediated and verified; Semgrep rescan and deployment remain pending.** The reported vulnerable versions have been removed from the edited lockfile and replaced with versions outside the baseline npm advisory ranges. Native Brotli coverage was checked separately against the exact workerd release source. This is not a claim that Semgrep has closed its alerts, that production has received these changes, or that the application has no other vulnerabilities.
+**Remediated, reviewed, merged, and deployed.** PR #11 merged as `8280d0a88603a17a33af5b50d13e6c73d1472af2` after final-head CI, independent Astra re-review and Semgrep passed. Pages and the separate production Worker deployment succeeded. The later follow-through section records adjacent safeguards. The reported vulnerable versions have been removed from the edited lockfile and replaced with versions outside the baseline npm advisory ranges. Native Brotli coverage was checked separately against the exact workerd release source. The aggregate Semgrep check passed; individual hosted alert closure was not separately queried. This is not a claim that the application has no other vulnerabilities.
 
 The companion [`2026-11-12-findings.csv`](2026-11-12-findings.csv) is the complete per-finding ledger: source file, original ID/state/severity/reachability, package, advisory, reported version, every replacement path/version, scope, evidence, and remaining verification.
 
@@ -82,23 +82,23 @@ The ledger includes the baseline npm advisory URLs for each affected package. Fo
 | Player tests | `node scripts/player.test.mjs`: 102 passed |
 | Whitespace/diff validation | `git diff --check` passed |
 | Installed Sharp native libraries | sharp 0.35.5; vips 8.18.7; heif 1.23.5; rsvg 2.63.2 |
-| Live smoke script | Not run: requires services/credentials |
+| Legacy transactional smoke script | Deliberately not run in production: creates checkout sessions and can send email |
 | Browser QA | Not run: dependency-only changes, with no UI implementation changes |
-| GitHub security workflow | Initial push and PR runs passed at `0b2053f`; review-fix head must pass again before merge (see PR #11) |
+| GitHub security workflow | Final-head push and PR runs passed at `6cd9c6e`; merged-main verification passed at `8280d0a8` |
 | All supplied IDs retained | 84 unique IDs in companion ledger |
 | All reported vulnerable versions removed | Verified across all current matching lock paths |
-| Hosted Semgrep rescan | Automatically queued on PR #11; completion is a separate pre-merge gate |
-| Production deployment / live smoke | Not performed |
+| Hosted Semgrep rescan | Final-head check passed at `6cd9c6e`, completed 2026-11-12 18:05:22 UTC; individual alert closure not queried |
+| Production deployment / live smoke | Pages and Worker deployed; health, 404, CORS, Access protection and public audio range passed |
 
 ## Completion boundary and follow-through
 
-The initial remediation was repository-local. The owner subsequently requested a full check, separate commits per fix, and a push. The complete local checks were rerun successfully and the seven initial commits were pushed on `fix/security-supply-chain-20261112`. The owner then authorized PR #11, independent review, correction, re-review, and merge only after all checks pass. This snapshot is recorded before the review-fix push and conditional merge. Merging to main triggers the existing Pages deployment; the Worker deploys separately. No live database mutation, security-setting change, manual Worker deployment, or Semgrep status mutation is included. Final local checks passed as recorded above; skipped/unrun stages are not represented as passed. Rerun Semgrep against the resulting commit and reconcile every finding ID before marking the external findings fixed. Review any remaining custom-rule matches against the exact workerd build evidence rather than suppressing them on reachability alone.
+The owner authorized commits, push, PR #11, independent review, review fixes and conditional merge after checks. Final head `6cd9c6e` passed both GitHub verification runs and Semgrep, and Astra re-review approved it. PR #11 merged at 18:13:29 UTC on 2026-11-12, preserving individual commits. The existing main workflow deployed Pages successfully. The owner then separately authorized the production Worker deployment at 19:09:59 UTC. No live database mutation, security-setting change, secret change, or Semgrep alert-status mutation was performed. Individual external alert closure is not inferred from an aggregate successful check.
 
 Keep local development servers private and avoid untrusted test/build inputs until the updated dependencies are installed. Use the committed lockfile with a clean `npm ci` so another machine or CI does not retain the obsolete nested tree.
 
 ## Regression prevention
 
-`.github/workflows/worker-security.yml` runs a clean install, `npm run verify`, and a live npm audit on pull requests and pushes. It requests read-only repository contents permission and contains no deployment step. Initial push and PR runs both passed on GitHub. The workflow pins checkout and setup-node to verified immutable commits. Final-head checks remain a merge gate after review fixes. The lockfile guard rejects the original vulnerable tree and checks current resolved package copies; the native Brotli mapping remains backed by release-source evidence rather than an npm-only result. npm advisory coverage and Semgrep rules differ, so a zero npm audit is not a substitute for the pending Semgrep rescan.
+`.github/workflows/worker-security.yml` runs a clean install, `npm run verify`, and a live npm audit on pull requests and pushes. It requests read-only repository contents permission and contains no deployment step. Initial push and PR runs both passed on GitHub. The workflow pins checkout and setup-node to verified immutable commits. Final-head checks passed after review fixes before merge. The lockfile guard rejects the original vulnerable tree and checks current resolved package copies; the native Brotli mapping remains backed by release-source evidence rather than an npm-only result. npm advisory coverage and Semgrep rules differ, so a zero npm audit is not a substitute for Semgrep coverage; the final-head Semgrep check also passed.
 
 ## Publication review
 
@@ -108,8 +108,27 @@ Independent fixes are separated into commits for qs/Stripe serialization, source
 
 ## Independent PR review correction
 
-A fresh Astra review of `0b2053f` found one P2: comparing every version to a single numeric floor incorrectly accepted vulnerable later release lines (Vite 8.3.2, Vitest mocker 5.0.2, Undici 8.12.1). Installed versions were already patched; the defect was in the new regression gate. The guard now uses explicit reviewed release-line ranges, rejects unknown major lines (and unknown Vite/zero-major minor lines), and has 57 passing tests including exact negative/positive boundaries. Local aggregate verification and both npm audits passed again after this correction. Final independent re-review and checks on the resulting SHA are required before merge.
+A fresh Astra review of `0b2053f` found one P2: comparing every version to a single numeric floor incorrectly accepted vulnerable later release lines (Vite 8.3.2, Vitest mocker 5.0.2, Undici 8.12.1). Installed versions were already patched; the defect was in the new regression gate. The guard now uses explicit reviewed release-line ranges, rejects unknown major lines (and unknown Vite/zero-major minor lines), and has 57 passing tests including exact negative/positive boundaries. Local aggregate verification and both npm audits passed again after this correction. Final independent Astra re-review approved `6cd9c6e`, and its checks passed before merge.
 
 Review evidence and live status: [PR #11](https://github.com/MatthewJamisonJS/matthew-jamison-epk/pull/11), [initial push verification](https://github.com/MatthewJamisonJS/matthew-jamison-epk/actions/runs/43269756085), [initial PR verification](https://github.com/MatthewJamisonJS/matthew-jamison-epk/actions/runs/43274824547). These linked runs apply to their stated commit, not automatically to later changes.
 
-Future coverage assessment: Dependabot currently updates only GitHub Actions. The existing Dependabot workflow can fall back to a direct squash merge. Adding npm updates without changing that policy could therefore merge dependencies without the intended review gate. This PR does not broaden Dependabot or enable automatic dependency merges. A separately approved report-only scheduled audit or reviewed npm-update process would address newly published advisories between code changes.
+## Production deployment evidence
+
+- [PR #11](https://github.com/MatthewJamisonJS/matthew-jamison-epk/pull/11), final reviewed head `6cd9c6e8336778b9e5a47100763525a66249333c`.
+- [Final push verification](https://github.com/MatthewJamisonJS/matthew-jamison-epk/actions/runs/43275516081), [final PR verification](https://github.com/MatthewJamisonJS/matthew-jamison-epk/actions/runs/43275530796), [Semgrep scan](https://semgrep.dev/orgs/concordia_publishing_house_test/projects/7024470/scans/267494631).
+- Merge `8280d0a88603a17a33af5b50d13e6c73d1472af2`: [Pages deployment](https://github.com/MatthewJamisonJS/matthew-jamison-epk/actions/runs/43277592240), [main verification](https://github.com/MatthewJamisonJS/matthew-jamison-epk/actions/runs/43277592085). Public HTML returned HTTP 200 and asset stamp `8280d0a8`.
+- Production Worker `mj-music`, `api.matthewjamison.dev`, version `fff337e3-491c-4e53-a728-a8f46c5a6ccd`, deployment `e7f6d869-285e-47ee-accf-1ac4ec43bbe7`, 100% traffic, 19:09:59 UTC.
+- Uploaded and downloaded production JavaScript both SHA-256 `c9f2efa93ceebff6aaea1242d73dd11c91bf95d16be7993abf079fd680b18e41` (360759 bytes), identical to the tested merged build. All 19 bindings, compatibility date/flags, observability, routes and two cron schedules remained unchanged. Secrets were inherited without reading or rotating their values.
+- Rollback target retained: `f9ce395b-26d8-428d-9efd-752357e84f8e`. A rollback would restore the older vulnerable bundle; use only after weighing an actual production regression. No database migration was needed.
+
+## Adjacent follow-through
+
+A second independent Astra review found no new defect in the patched Worker dependencies. Fresh full npm audit remained zero. It identified pre-existing adjacent publication gaps addressed separately:
+
+1. Pages no longer downloads unpinned esbuild or action-bootstrapped Wrangler. Both come from the audited committed Worker lockfile; checkout/setup-node are immutable SHA pins. Only the final publishing step receives Cloudflare credentials.
+2. Frontend build/player tests, dependency checks/audit and a full isolated build now run before publication, and on pull requests. Public output uses an explicit allowlist rather than uploading the checkout; Worker source, configuration and tooling are excluded.
+3. The unconditional Dependabot merging workflow is removed. Dependency/action PRs require deliberate review and merge; no account or branch protection setting was changed.
+4. `npm run smoke:readonly` repeats eight safe production checks: health, 404, three CORS preflights, foreign-origin rejection, exact Cloudflare Access redirect and a 32-byte public FLAC range. It never follows redirects, sends credentials, creates checkout sessions, consumes purchased tokens, invokes cron or sends email. Five mocked safety tests are part of `npm run verify`. The production run passed all eight checks.
+5. Worker security CI has manual dispatch for a fresh audit without a code change. No recurring schedule or automated dependency merging was added. New advisories can still appear between explicit checks.
+
+Follow-through verification is recorded in its pull request and CI at the exact final SHA. Frontend tests include eight existing fixture-dependent skips; the browser/transactional purchase-email suites remain outside this verification. These safeguards require no Worker runtime source change or unnecessary Worker redeployment.
