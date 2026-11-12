@@ -536,6 +536,16 @@ test('release player: the track control has sizing and state rules to hang on', 
   assert.match(css, /\.release-player \.store-ctl \{[^}]*min-width: 44px/, 'the transport is under the 44px target');
 });
 
+test('all publication and verification actions use immutable revisions', () => {
+  for (const name of ['deploy.yml', 'frontend.yml', 'worker-security.yml', 'publish-scheduled.yml']) {
+    const workflow = readFileSync(join(root, '.github', 'workflows', name), 'utf8');
+    const actions = [...workflow.matchAll(/\buses:\s*([^\s#]+)/g)].map(match => match[1]);
+    assert.ok(actions.length > 0, `${name}: expected action references`);
+    for (const action of actions) assert.match(action, /^[\w-]+\/[\w-]+@[0-9a-f]{40}$/, `${name}: mutable action ${action}`);
+  }
+  assert.ok(!existsSync(join(root, '.github', 'workflows', 'dependabot-auto-merge.yml')), 'unconditional dependency merging must not be restored');
+});
+
 // Shell invariants — the CSP has no 'unsafe-inline' and requires Trusted Types.
 test('generated pages carry no inline style or executable inline script', () => {
   const pages = [join('music', 'index.html'), ...releases.map(r => join('music', r.slug, 'index.html'))];
