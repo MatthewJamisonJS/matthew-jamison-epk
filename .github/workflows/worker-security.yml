@@ -1,0 +1,39 @@
+name: worker security and regression checks
+
+on:
+  pull_request:
+    paths:
+      - 'worker/**'
+      - '.github/workflows/worker-security.yml'
+  push:
+    paths:
+      - 'worker/**'
+      - '.github/workflows/worker-security.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: worker
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+      # Platform binaries are supplied as optional npm packages; avoid running
+      # dependency lifecycle scripts. No credentials or remote services needed.
+      - run: npm ci --ignore-scripts
+      - run: npm run verify
+      # Regression floors cover the supplied findings, including native Brotli.
+      # The live audit additionally detects newly published npm advisories.
+      - run: npm audit --audit-level=low

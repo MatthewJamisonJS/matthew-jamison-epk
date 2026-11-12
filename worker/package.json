@@ -13,7 +13,10 @@
     "smoke": "./test/smoke.sh",
     "db:local": "wrangler d1 migrations apply mj-music --local",
     "db:remote": "wrangler d1 migrations apply mj-music --remote",
-    "seed:local": "wrangler d1 execute mj-music --local --file=./seed-albums.sql"
+    "seed:local": "wrangler d1 execute mj-music --local --file=./seed-albums.sql",
+    "check:dependencies": "node scripts/check-dependencies.mjs",
+    "test:dependencies": "node --test scripts/check-dependencies.test.mjs",
+    "verify": "npm run check:dependencies && npm run test:dependencies && npm run typecheck && npm test && npm run dry-run"
   },
   "dependencies": {
     "stripe": "^18.5.0"
