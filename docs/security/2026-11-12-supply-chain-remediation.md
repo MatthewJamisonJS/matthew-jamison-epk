@@ -70,7 +70,7 @@ The ledger includes the baseline npm advisory URLs for each affected package. Fo
 | Baseline full npm audit | 13 vulnerable package groups |
 | Clean dependency installation | `npm ci --ignore-scripts` passed |
 | Aggregate Worker verification | `npm run verify` passed |
-| Dependency guard | Passed for all 16 current package copies; 21 guard tests passed |
+| Dependency guard | Passed for all 16 current package copies; 57 guard tests passed |
 | Guard negative control | Original lock rejected with exit 1 and 23 vulnerable package copies |
 | Final TypeScript typecheck | Passed |
 | Final Worker functional suite | 170 tests passed across 14 files, including actual Stripe SDK serialization regression |
@@ -84,24 +84,32 @@ The ledger includes the baseline npm advisory URLs for each affected package. Fo
 | Installed Sharp native libraries | sharp 0.35.5; vips 8.18.7; heif 1.23.5; rsvg 2.63.2 |
 | Live smoke script | Not run: requires services/credentials |
 | Browser QA | Not run: dependency-only changes, with no UI implementation changes |
-| GitHub security workflow | Added locally; not executed on GitHub because changes were not published |
+| GitHub security workflow | Initial push and PR runs passed at `0b2053f`; review-fix head must pass again before merge (see PR #11) |
 | All supplied IDs retained | 84 unique IDs in companion ledger |
 | All reported vulnerable versions removed | Verified across all current matching lock paths |
-| Hosted Semgrep rescan | Not performed |
+| Hosted Semgrep rescan | Automatically queued on PR #11; completion is a separate pre-merge gate |
 | Production deployment / live smoke | Not performed |
 
 ## Completion boundary and follow-through
 
-The initial remediation was repository-local. The owner subsequently requested a full check, separate commits per fix, and a push. The complete local checks were rerun successfully, and publication is being prepared on `fix/security-supply-chain-20261112`, not `main`, to avoid the existing automatic Pages deployment. No merge, deployment, live database mutation, security-setting change, or Semgrep status mutation is part of this publication. Final local checks passed as recorded above; skipped/unrun stages are not represented as passed. Rerun Semgrep against the resulting commit and reconcile every finding ID before marking the external findings fixed. Review any remaining custom-rule matches against the exact workerd build evidence rather than suppressing them on reachability alone.
+The initial remediation was repository-local. The owner subsequently requested a full check, separate commits per fix, and a push. The complete local checks were rerun successfully and the seven initial commits were pushed on `fix/security-supply-chain-20261112`. The owner then authorized PR #11, independent review, correction, re-review, and merge only after all checks pass. This snapshot is recorded before the review-fix push and conditional merge. Merging to main triggers the existing Pages deployment; the Worker deploys separately. No live database mutation, security-setting change, manual Worker deployment, or Semgrep status mutation is included. Final local checks passed as recorded above; skipped/unrun stages are not represented as passed. Rerun Semgrep against the resulting commit and reconcile every finding ID before marking the external findings fixed. Review any remaining custom-rule matches against the exact workerd build evidence rather than suppressing them on reachability alone.
 
 Keep local development servers private and avoid untrusted test/build inputs until the updated dependencies are installed. Use the committed lockfile with a clean `npm ci` so another machine or CI does not retain the obsolete nested tree.
 
 ## Regression prevention
 
-`.github/workflows/worker-security.yml` runs a clean install, `npm run verify`, and a live npm audit on pull requests and pushes. It requests read-only repository contents permission and contains no deployment step. This workflow was added locally and has not run on GitHub. The lockfile guard rejects the original vulnerable tree and checks current resolved package copies; the native Brotli mapping remains backed by release-source evidence rather than an npm-only result. npm advisory coverage and Semgrep rules differ, so a zero npm audit is not a substitute for the pending Semgrep rescan.
+`.github/workflows/worker-security.yml` runs a clean install, `npm run verify`, and a live npm audit on pull requests and pushes. It requests read-only repository contents permission and contains no deployment step. Initial push and PR runs both passed on GitHub. The workflow pins checkout and setup-node to verified immutable commits. Final-head checks remain a merge gate after review fixes. The lockfile guard rejects the original vulnerable tree and checks current resolved package copies; the native Brotli mapping remains backed by release-source evidence rather than an npm-only result. npm advisory coverage and Semgrep rules differ, so a zero npm audit is not a substitute for the pending Semgrep rescan.
 
 ## Publication review
 
 A fresh independent review confirmed all 84 IDs and replacement path/version mappings. Full clean-install checks, both audits, all runnable automated test suites and diff validation were repeated before committing. The optional browser suite could not run because its required full FFmpeg binary is unavailable; an installed Playwright package alone is insufficient. The live smoke script was deliberately not run: it can create Stripe sessions, trigger/resend events, and execute email/outbox processing even with localhost as its base URL. These are not claimed as passed.
 
 Independent fixes are separated into commits for qs/Stripe serialization, source-map-js, Vite, Vitest mocker, and the coordinated Cloudflare toolchain. Cloudflare dependency fixes must stay together because maintained Wrangler/Miniflare/test-plugin versions pin mutually compatible dependencies and runtime APIs. Regression automation and the 84-finding evidence ledger receive separate commits. The new verification workflow also runs on feature-branch pushes; the existing main-only deployment workflow is unchanged.
+
+## Independent PR review correction
+
+A fresh Astra review of `0b2053f` found one P2: comparing every version to a single numeric floor incorrectly accepted vulnerable later release lines (Vite 8.3.2, Vitest mocker 5.0.2, Undici 8.12.1). Installed versions were already patched; the defect was in the new regression gate. The guard now uses explicit reviewed release-line ranges, rejects unknown major lines (and unknown Vite/zero-major minor lines), and has 57 passing tests including exact negative/positive boundaries. Local aggregate verification and both npm audits passed again after this correction. Final independent re-review and checks on the resulting SHA are required before merge.
+
+Review evidence and live status: [PR #11](https://github.com/MatthewJamisonJS/matthew-jamison-epk/pull/11), [initial push verification](https://github.com/MatthewJamisonJS/matthew-jamison-epk/actions/runs/43269756085), [initial PR verification](https://github.com/MatthewJamisonJS/matthew-jamison-epk/actions/runs/43274824547). These linked runs apply to their stated commit, not automatically to later changes.
+
+Future coverage assessment: Dependabot currently updates only GitHub Actions. The existing Dependabot workflow can fall back to a direct squash merge. Adding npm updates without changing that policy could therefore merge dependencies without the intended review gate. This PR does not broaden Dependabot or enable automatic dependency merges. A separately approved report-only scheduled audit or reviewed npm-update process would address newly published advisories between code changes.
