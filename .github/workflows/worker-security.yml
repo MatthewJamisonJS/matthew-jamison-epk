@@ -1,6 +1,7 @@
 name: worker security and regression checks
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - 'worker/**'
