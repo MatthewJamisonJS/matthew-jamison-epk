@@ -13,16 +13,19 @@
     "smoke": "./test/smoke.sh",
     "db:local": "wrangler d1 migrations apply mj-music --local",
     "db:remote": "wrangler d1 migrations apply mj-music --remote",
-    "seed:local": "wrangler d1 execute mj-music --local --file=./seed-albums.sql"
+    "seed:local": "wrangler d1 execute mj-music --local --file=./seed-albums.sql",
+    "check:dependencies": "node scripts/check-dependencies.mjs",
+    "test:dependencies": "node --test scripts/check-dependencies.test.mjs",
+    "verify": "npm run check:dependencies && npm run test:dependencies && npm run typecheck && npm test && npm run dry-run"
   },
   "dependencies": {
     "stripe": "^18.5.0"
   },
   "devDependencies": {
-    "@cloudflare/vitest-pool-workers": "^0.22.0",
-    "@cloudflare/workers-types": "^4.20250801.0",
+    "@cloudflare/vitest-plugin": "^1.8.1",
+    "@cloudflare/workers-types": "^5.20261110.1",
     "typescript": "^5.7.3",
-    "vitest": "^4.1.0",
-    "wrangler": "^4.86.0"
+    "vitest": "^4.1.12",
+    "wrangler": "^4.161.0"
   }
 }
