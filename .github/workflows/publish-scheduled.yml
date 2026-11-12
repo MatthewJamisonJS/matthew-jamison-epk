@@ -11,24 +11,26 @@ on:
   # slot drifts an hour in local terms between CDT and CST.
   workflow_dispatch: {}
 
-# There is deliberately no deploy job here. deploy.yml already fires on every
-# push to main and is the single place the build/sed/minify/prune/pages-deploy
-# sequence is written down; the push below triggers it. Duplicating those steps
-# would give this repo two deploy paths to keep in step, and the one that runs
-# twice a day is the one nobody would notice drifting.
+# GITHUB_TOKEN pushes do not trigger another push workflow. Call the shared
+# deployment explicitly after a successful release push, using its exact SHA.
 jobs:
   release:
+    if: github.ref == 'refs/heads/main'
+    outputs:
+      released: ${{ steps.commit.outputs.released }}
+      commit: ${{ steps.commit.outputs.commit }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
+          ref: main
 
       - name: Setup Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: "3.12"
 
@@ -36,14 +38,29 @@ jobs:
         id: release
         run: python scripts/release_scheduled.py
 
-      # Pushing to main is what publishes: deploy.yml picks it up from here.
+      # Publish only after the push succeeds; failed/no-op releases do not deploy.
       - name: Commit and push releases
+        id: commit
         if: steps.release.outputs.released == 'true'
         env:
           SLUGS: ${{ steps.release.outputs.slugs }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
+          git add -- content/blog
           git commit -m "release: publish ${SLUGS}"
-          git push
+          git push origin HEAD:main
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "released=true" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: release
+    if: needs.release.outputs.released == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/deploy.yml
+    with:
+      commit: ${{ needs.release.outputs.commit }}
+    secrets:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

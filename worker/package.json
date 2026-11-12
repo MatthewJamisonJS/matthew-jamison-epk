@@ -11,12 +11,14 @@
     "test:watch": "vitest",
     "dry-run": "wrangler deploy --dry-run",
     "smoke": "./test/smoke.sh",
+    "smoke:readonly": "node scripts/smoke-readonly.mjs",
+    "test:smoke": "node --test scripts/smoke-readonly.test.mjs",
     "db:local": "wrangler d1 migrations apply mj-music --local",
     "db:remote": "wrangler d1 migrations apply mj-music --remote",
     "seed:local": "wrangler d1 execute mj-music --local --file=./seed-albums.sql",
     "check:dependencies": "node scripts/check-dependencies.mjs",
     "test:dependencies": "node --test scripts/check-dependencies.test.mjs",
-    "verify": "npm run check:dependencies && npm run test:dependencies && npm run typecheck && npm test && npm run dry-run"
+    "verify": "npm run check:dependencies && npm run test:dependencies && npm run test:smoke && npm run typecheck && npm test && npm run dry-run"
   },
   "dependencies": {
     "stripe": "^18.5.0"
