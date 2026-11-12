@@ -541,7 +541,11 @@ test('all publication and verification actions use immutable revisions', () => {
     const workflow = readFileSync(join(root, '.github', 'workflows', name), 'utf8');
     const actions = [...workflow.matchAll(/\buses:\s*([^\s#]+)/g)].map(match => match[1]);
     assert.ok(actions.length > 0, `${name}: expected action references`);
-    for (const action of actions) assert.match(action, /^[\w-]+\/[\w-]+@[0-9a-f]{40}$/, `${name}: mutable action ${action}`);
+    for (const action of actions) {
+      // A local reusable workflow is resolved from the caller's exact commit.
+      if (name === 'publish-scheduled.yml' && action === './.github/workflows/deploy.yml') continue;
+      assert.match(action, /^[\w-]+\/[\w-]+@[0-9a-f]{40}$/, `${name}: mutable action ${action}`);
+    }
   }
   assert.ok(!existsSync(join(root, '.github', 'workflows', 'dependabot-auto-merge.yml')), 'unconditional dependency merging must not be restored');
 });
@@ -1296,7 +1300,30 @@ test('Pages workflows use locked tooling, isolated output, and pre-publication t
     else {
       assert.ok(workflow.indexOf('frontend regression tests') < workflow.indexOf('publish Pages'));
       assert.match(workflow, /pages deploy "\$RUNNER_TEMP\/pages-output"/);
-      assert.ok(workflow.indexOf('CLOUDFLARE_API_TOKEN:') > workflow.indexOf('publish Pages'));
+      assert.ok(workflow.indexOf('CLOUDFLARE_API_TOKEN:', workflow.indexOf('jobs:')) > workflow.indexOf('publish Pages'));
     }
   }
+});
+
+
+test('scheduled releases explicitly deploy the successfully pushed revision', () => {
+  const scheduled = readFileSync(join(root, '.github/workflows/publish-scheduled.yml'), 'utf8');
+  const deploy = readFileSync(join(root, '.github/workflows/deploy.yml'), 'utf8');
+  assert.match(scheduled, /if: github.ref == 'refs\/heads\/main'/);
+  assert.match(scheduled, /released: \$\{\{ steps.commit.outputs.released \}\}/);
+  assert.match(scheduled, /commit: \$\{\{ steps.commit.outputs.commit \}\}/);
+  assert.match(scheduled, /git push origin HEAD:main/);
+  assert.ok(scheduled.indexOf('echo "released=true"') > scheduled.indexOf('git push origin HEAD:main'));
+  assert.match(scheduled, /needs: release/);
+  assert.match(scheduled, /if: needs.release.outputs.released == 'true'/);
+  assert.match(scheduled, /uses: \.\/\.github\/workflows\/deploy.yml/);
+  assert.match(scheduled, /commit: \$\{\{ needs.release.outputs.commit \}\}/);
+  assert.ok(!scheduled.includes('secrets: inherit'));
+  assert.match(deploy, /workflow_call:/);
+  assert.match(deploy, /ref: \$\{\{ inputs.commit \|\| github.sha \}\}/);
+  assert.match(deploy, /test "\$\(git rev-parse HEAD\)" = "\$REQUESTED_COMMIT"/);
+  assert.match(deploy, /build_sha="\$\(git rev-parse HEAD\)"/);
+  assert.ok(!deploy.includes('GITHUB_SHA::8'));
+  assert.match(deploy, /--branch=main --commit-hash="\$\(git rev-parse HEAD\)"/);
+  assert.match(deploy, /push:\n    branches: \[main\]/);
 });
