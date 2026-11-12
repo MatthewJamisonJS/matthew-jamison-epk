@@ -514,7 +514,8 @@ test('the one player is wired into the home page, _headers and the deploy', () =
   assert.match(csp, /media-src [^;]*\bblob:/, "media-src does not allow blob:");
 
   const deploy = readFileSync(join(root, '.github', 'workflows', 'deploy.yml'), 'utf8');
-  assert.match(deploy, /esbuild player\.js --minify/, 'the deploy does not minify player.js');
+  assert.match(deploy, /for file in style\.css script\.js player\.js blog\.js subscribe\.js;/, 'the minification list excludes player.js');
+  assert.match(deploy, /esbuild\/bin\/esbuild \"\$output\/\$file\" --minify/, 'the deploy does not use installed esbuild');
   assert.ok(!deploy.includes('release.js'), 'the deploy still minifies release.js');
 });
 
@@ -1265,4 +1266,27 @@ test('corpus: no raw HTML, no inline style, no smart-quote transform', { skip: !
 test('blog.js and subscribe.js exist', () => {
   assert.ok(existsSync(join(root, 'blog.js')), 'blog.js missing');
   assert.ok(existsSync(join(root, 'subscribe.js')), 'subscribe.js missing');
+});
+
+
+test('Pages workflows use locked tooling, isolated output, and pre-publication tests', () => {
+  for (const name of ['deploy.yml', 'frontend.yml']) {
+    const workflow = readFileSync(join(root, '.github/workflows', name), 'utf8');
+    assert.match(workflow, /npm ci --prefix worker --ignore-scripts/);
+    assert.match(workflow, /node scripts\/build.test.mjs/);
+    assert.match(workflow, /node scripts\/player.test.mjs/);
+    assert.match(workflow, /node scripts\/build.mjs --out "\$output"/);
+    assert.match(workflow, /cp index.html 404.html _headers/);
+    assert.match(workflow, /test ! -e "\$output\/\$private"/);
+    assert.ok(!/npx|wrangler-action/.test(workflow.replace(/#.*$/gm, '')));
+    for (const match of workflow.matchAll(/uses: ([^\s]+)/g)) {
+      assert.match(match[1], /@[a-f0-9]{40}$/);
+    }
+    if (name === 'frontend.yml') assert.ok(!workflow.includes('secrets.') && !workflow.includes('pages deploy'));
+    else {
+      assert.ok(workflow.indexOf('frontend regression tests') < workflow.indexOf('publish Pages'));
+      assert.match(workflow, /pages deploy "\$RUNNER_TEMP\/pages-output"/);
+      assert.ok(workflow.indexOf('CLOUDFLARE_API_TOKEN:') > workflow.indexOf('publish Pages'));
+    }
+  }
 });

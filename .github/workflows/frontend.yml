@@ -1,0 +1,57 @@
+name: frontend regression and build checks
+
+on:
+  pull_request:
+  push:
+    branches-ignore: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+      - name: install audited build tooling
+        run: npm ci --prefix worker --ignore-scripts
+      - name: frontend regression tests
+        run: |
+          node scripts/build.test.mjs
+          node scripts/player.test.mjs
+      - name: verify toolchain
+        run: |
+          npm run check:dependencies --prefix worker
+          npm audit --prefix worker --audit-level=low
+          node -e "if (require('./worker/node_modules/wrangler/package.json').version !== '4.161.0') throw Error('Review Pages Wrangler version before upgrading')"
+      # Publish an explicit public-file allowlist, never the checkout itself.
+      # Tooling stays outside the output, available for both minify and deploy.
+      - name: build isolated public output
+        shell: bash
+        run: |
+          set -euo pipefail
+          output="$RUNNER_TEMP/pages-output"
+          mkdir -p "$output"
+          cp index.html 404.html _headers robots.txt sitemap.xml llms.txt google84b19217eb072b7b.html style.css script.js player.js blog.js subscribe.js "$output/"
+          cp -R assets games privacy terms thanks "$output/"
+          rm -rf "$output/games/_test"
+          node scripts/build.mjs --out "$output"
+          sed -i "s/?v=dev/?v=${GITHUB_SHA::8}/g" "$output/index.html" "$output/404.html"
+          find "$output/music" "$output/blog" -name index.html -print0 | xargs -0 sed -i "s/?v=dev/?v=${GITHUB_SHA::8}/g"
+          for file in style.css script.js player.js blog.js subscribe.js; do
+            node worker/node_modules/wrangler/node_modules/esbuild/bin/esbuild "$output/$file" --minify --allow-overwrite --outfile="$output/$file"
+          done
+          for private in worker docs scripts data content .git .github .env .dev.vars wrangler.jsonc; do
+            test ! -e "$output/$private"
+          done
+          test ! -e "$output/games/_test"
+          test -s "$output/music/index.html"
+          test -s "$output/blog/index.html"
+          test -s "$output/feed.xml"
